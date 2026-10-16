@@ -145,3 +145,27 @@ Desktop's behaviour for non-operators needs a test pass (item A9).
 4. Decide whether `/api/pty` and `/api/console` stay at all for non-admins; they run an agent as the
    server OS user, so they are the sandbox decision (A6) in route form.
 5. Verify the three "unverified" WebSocket rows before phase 3.
+
+## 9. Phase 1 status (policy, config, groups, subject key): done
+
+Added `gateway/access_policy.py` (`parse_access_policy`, `AccessPolicy.grant_for`, `Grant.allows`),
+`GatewayConfig.access`, the `access` bridge and root key, `Session.groups`, `groups_from_claims`, and
+`session_identity.dashboard_subject` (the one subject string both session ownership and the policy use).
+Tests: `tests/gateway/test_access_policy.py` (25), `tests/plugins/dashboard_auth/test_session_groups.py` (9).
+
+Deviations from section 3, with reasons:
+- **`users`/`admins` are lists of `{provider, issuer, sub}` rows**, not `host|sub` keys. The key is the
+  full `(provider, issuer, sub)` triple (finding A7). `Session.user_id` is the `sub` claim, confirmed.
+- **New `group_providers` (default `self_hosted`).** Group grants count only for these providers, so
+  another provider (e.g. `nous`) cannot mint a grant by emitting a matching group name.
+- **`org_id` folding of groups is kept** (existing test asserts it). Authorization reads
+  `Session.groups` only. Only the `groups` claim is read; `roles` is not (different namespace).
+- **`access` is not in `DEFAULT_CONFIG`** (it is in `_EXTRA_KNOWN_ROOT_KEYS`, like `profile_routes`);
+  adding it grew `config_defaults.py` past its ratchet. **Not added to `GatewayConfig.to_dict`**: nothing
+  needs to persist it, and the loader re-reads YAML.
+- Empty `profile_group_prefix` turns group-to-profile grants off rather than mapping every group.
+
+Verification: new tests green; related suites green (503 passed); `scripts/check --only health` ok. Two
+`TestEnvWriteDenylist` near-miss cases fail identically on base (Windows case-insensitive env names).
+`scripts/check` blob-size flags the untracked `architecture/*.html`, which is not part of this commit.
+"red on base" here means import failure (the modules did not exist), not a behavioural red.

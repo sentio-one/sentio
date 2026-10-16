@@ -10,6 +10,8 @@ import re
 from pathlib import Path
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from typing import Dict, List, Optional, Any, Callable
+
+from gateway.access_policy import AccessPolicy, parse_access_policy
 from enum import Enum
 
 from hermes_cli.config import get_hermes_home
@@ -641,6 +643,7 @@ class GatewayConfig:
     # Prune SessionEntry records older than this (a resumed chat gets a fresh session). 0 = off.
     session_store_max_age_days: int = 90
     profile_routes: list = field(default_factory=list)  # gateway/profile_routing.py
+    access: AccessPolicy = field(default_factory=AccessPolicy)  # per-user profile grants; unconfigured = off
 
     # Scalar fields serialized verbatim by ``to_dict`` (in output order).
     _SCALAR_DICT_FIELDS = (
@@ -813,6 +816,7 @@ class GatewayConfig:
             streaming=StreamingConfig.from_dict(data.get("streaming", {})),
             session_store_max_age_days=session_store_max_age_days,
             profile_routes=parse_profile_routes(data.get("profile_routes") or []),
+            access=parse_access_policy(data.get("access") or nested_gateway.get("access")),
         )
 
     def _extra_choice(self, platform: Optional[Platform], key: str, choices: set, default: str) -> Optional[str]:

@@ -195,6 +195,24 @@ def refresh_token_from(payload: dict[str, Any], fallback: str = "") -> str:
     return rt if isinstance(rt, str) and rt else fallback
 
 
+_MAX_GROUPS = 512
+
+
+def groups_from_claims(claims: dict[str, Any]) -> tuple[str, ...]:
+    """The verified ``groups`` claim as ordered, de-duplicated, non-empty strings. Anything but a
+    list (a comma string, a mapping) yields no groups: authorization input is never guessed at."""
+    raw = claims.get("groups")
+    if not isinstance(raw, list):
+        return ()
+    seen: dict[str, None] = {}
+    for item in raw:
+        if isinstance(item, str) and (name := item.strip()):
+            seen.setdefault(name)
+        if len(seen) >= _MAX_GROUPS:
+            break
+    return tuple(seen)
+
+
 def session_from_claims(
     provider: str, claims: dict[str, Any], *, access_token: str, refresh_token: str,
     label: str = "token", email: str = "", display_name: str = "", org_id: str = "") -> Session:
@@ -205,7 +223,7 @@ def session_from_claims(
     return Session(
         user_id=user_id, email=email, display_name=display_name, org_id=org_id, provider=provider,
         expires_at=int(claims["exp"]), access_token=access_token, refresh_token=refresh_token,
-        issuer=str(claims.get("iss") or ""))
+        issuer=str(claims.get("iss") or ""), groups=groups_from_claims(claims))
 
 
 # ---- JWT verification ----

@@ -285,6 +285,11 @@ def authenticated_subject(identity):
     if (identity.get('provider') == 'local' and identity.get('profile_id')
             and identity.get('instance_id') and 'capabilities' in identity):
         return subject
-    return 'auth:v1:' + json.dumps(
-        [identity.get('provider') or '', identity.get('issuer') or '', subject],
-        separators=(',', ':'), ensure_ascii=True)
+    return dashboard_subject(identity.get('provider'), identity.get('issuer'), subject)
+
+
+def dashboard_subject(provider, issuer, subject) -> str:
+    """The namespaced subject of a dashboard identity: ``(provider, issuer, sub)``, never a bare
+    ``sub``. The access policy keys its grants on this same string."""
+    return 'auth:v1:' + json.dumps([provider or '', issuer or '', subject],
+                                   separators=(',', ':'), ensure_ascii=True)

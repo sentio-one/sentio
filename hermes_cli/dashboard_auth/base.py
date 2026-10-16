@@ -19,6 +19,7 @@ class Session:
     access_token: str
     refresh_token: str
     issuer: str = ""  # Verified issuer; empty for non-federated providers.
+    groups: tuple[str, ...] = ()  # Verified IdP group claim; the input to per-profile access.
 
 
 @dataclass(frozen=True)
