@@ -227,3 +227,46 @@ fail identically on the base commit (Windows: no `fcntl`, path separators, slow 
 Residual, not fixed: `/api/pub` and `/api/events` are keyed by a client-chosen channel id (a random UUID
 in the shipped clients), so they are a capability secret, not an authorization check. A granted user's PTY
 still runs as the server OS user (decision A6). REST routes and the roster are phase 4.
+
+## 12. Phase 4 status (REST role gate, roster, describe): done, regression run noted below
+
+- `hermes_cli/dashboard_auth/access_http.py`: `classify(method, path)` returns `open | profile | admin`,
+  default-deny. `enforce()` runs from the gate (`middleware._authorized_call`) on all three session paths
+  (cookie, bearer, refreshed) once the session is verified, only when an access policy is configured.
+  - `admin`: `/api/fs, files, media, git, gateway, hermes, ops, local-models, logs, actions, host, system,
+    ssh`, agent-plugin install/enable/update/delete, provider `validate` (SSRF), bot onboarding, profile
+    create/delete/rename/import/export/open-terminal/active-switch, and any route nobody classified.
+  - `profile`: config, env, sessions, skills, tools, mcp, model, memory, cron, analytics, credentials,
+    providers, chat, status, webhooks, messaging platforms, dashboard settings, audio, pairing, and
+    `/api/profiles/<name>/{soul,description,model,desktop-overlay,setup-command,describe-auto}`.
+    Every selector the request carries (`?profile=` repeated, `?recents_profile=`, JSON body `profile`,
+    the `/api/profiles/<name>` segment) must be granted. An absent selector means the launch profile and
+    needs it granted. `all` is never accepted. `/api/sessions`, `/api/cron/jobs` and `/api/profiles/*`
+    treat an absent or `current` selector as "everything", so a grant-scoped caller must name a profile
+    (mirrors `native_http._check_profile_scope`); the cross-profile aggregates need every selector explicit.
+  - `open`: `/api/auth/*`, `GET /api/health`, `GET /api/config/defaults`, `GET /api/profiles`.
+- `GET /api/profiles` and the RPC rosters (`profiles.list` canonical + legacy) return only granted profiles.
+  `profiles.list` and `runtime.describe` no longer need the launch profile to be granted (finding from
+  phase 2). `runtime.describe` carries `allowed_profiles` for a grant-scoped caller (absent otherwise;
+  declared in `tui_gateway/contracts`, TypeScript regenerated).
+- A contract test walks the REAL app routes: every profile-class handler reads its profile only where the
+  gate looks, so a new upstream route that reads it elsewhere fails the test instead of slipping past.
+
+Known limits (not fixed):
+- A grant is access to the whole profile on REST: the REST session routes are not filtered per owner, so two
+  users sharing one profile see each other's sessions there (the gateway WebSocket plane does isolate by
+  subject). One profile per person avoids it.
+- `multipart` / `urlencoded` bodies are not inspected for a `profile` field; only the query and JSON are.
+- Service tokens and native tickets are trusted callers and are not subject to this gate.
+- `runtime.describe` still returns the launch authority's `profile_id` (a home path) to a caller who is not
+  granted it.
+- Non-admin desktops lose the host file browser, git and update panels (admin-only by design).
+- Upstream merges: a new `/api/*` route is admin-only until classified. Keep the contract test green.
+
+Also in this change: the Light desktop artifact no longer carries a company gateway (one installer serves
+every customer); the first-run choice card moved to its own component and the local-install guard moved
+into the first-run gate, to stay within the repo's size ratchets.
+
+Verification (phase 4): new tests green (55 across six files); health ratchet clean. Broader run over 38 existing
+files: 620 passed, 11 failed in `test_profiles.py` and `test_web_server.py`; the same 11 fail identically on the
+base commit (Windows host), so none is attributable to this change.

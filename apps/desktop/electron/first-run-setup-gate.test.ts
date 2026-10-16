@@ -132,3 +132,29 @@ test('remote apply without a waiter has no first-run side effects', async () => 
   assert.equal(hidden, 0)
   assert.equal(gate.isLocalBootstrapConfirmed(), true)
 })
+
+test('first-run setup gate ignores a local-install request when the artifact forbids it', async () => {
+  const logs: string[] = []
+  const gate = createFirstRunSetupGate({ canContinueLocal: () => false, log: line => logs.push(line), stuckAfterMs: 0 })
+  const pending = gate.wait(bootstrapBackend)
+
+  gate.continueLocal()
+
+  assert.equal(await settledState(pending), 'pending')
+  assert.equal(gate.isLocalBootstrapConfirmed(), false)
+  assert.equal(gate.hasWaiter(), true)
+  assert.ok(logs.some(line => /remote-only/.test(line)))
+
+  gate.abandonForRemoteApply()
+  assert.equal(await pending, 'remote-applied')
+})
+
+test('first-run setup gate lets local install continue when nothing forbids it', async () => {
+  const gate = createFirstRunSetupGate({ canContinueLocal: () => true, stuckAfterMs: 0 })
+  const pending = gate.wait(bootstrapBackend)
+
+  gate.continueLocal()
+
+  assert.equal(await pending, 'continue-local')
+  assert.equal(gate.isLocalBootstrapConfirmed(), true)
+})

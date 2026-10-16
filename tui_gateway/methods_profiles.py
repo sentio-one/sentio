@@ -287,7 +287,11 @@ def _(rid, params: dict) -> dict:
     include_sessions = is_truthy_value(params.get("include_sessions", True))
     out = []
     # Roster polls this every 5s: ``skill_count`` is the last known value, refreshed off-request.
-    for p in list_profiles(lazy_skill_count=True):
+    from tui_gateway.ws_legacy_fallback import granted_profiles
+
+    allowed = granted_profiles()
+    # A grant-scoped caller (``access:`` policy) lists only the profiles it may use.
+    for p in (p for p in list_profiles(lazy_skill_count=True) if allowed is None or p.name in allowed):
         row = {"name": p.name, "path": str(p.path), "is_default": bool(p.is_default), "model": p.model,
                "provider": p.provider, "description": p.description or "",
                "display_name": p.display_name or "", "skill_count": p.skill_count or 0,

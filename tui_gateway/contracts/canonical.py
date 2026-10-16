@@ -294,6 +294,8 @@ class SessionCreateDescriptor(Result):
 
 
 class RuntimeDescribeResult(Result):
+    #: Profiles this caller may use under an access policy; absent when the caller is not grant-scoped.
+    allowed_profiles: list[str] | None = None
     instance_id: str
     profile_id: str
     authority_epoch: int

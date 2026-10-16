@@ -141,3 +141,32 @@ def test_the_profile_resolver_refuses_an_ungranted_home_as_a_backstop(tmp_path, 
             with pytest.raises(server.ProfileUnavailableError):
                 server._profile_home(name)
     assert server._profile_home('beta') is not None  # the scope does not leak past the request
+
+
+def test_the_legacy_roster_is_filtered_to_the_grant(tmp_path, monkeypatch):
+    from tui_gateway import server
+    from tui_gateway.ws_legacy_fallback import granted_profiles_scope
+
+    root = tmp_path / '.hermes'
+    for name in ('alpha', 'beta'):
+        (root / 'profiles' / name).mkdir(parents=True)
+        (root / 'profiles' / name / 'config.yaml').write_text('{}')
+    (root / 'config.yaml').write_text('{}')
+    monkeypatch.setattr(Path, 'home', lambda: tmp_path)
+    monkeypatch.setenv('HERMES_HOME', str(root))
+
+    def names():
+        reply = server.handle_request({'jsonrpc': '2.0', 'id': 1, 'method': 'profiles.list',
+                                 'params': {'include_sessions': False}})
+        return sorted(row['name'] for row in reply['result']['profiles'])
+
+    assert names() == ['alpha', 'beta', 'default']
+    with granted_profiles_scope(frozenset({'alpha'})):
+        assert names() == ['alpha']
+    with granted_profiles_scope(frozenset()):
+        assert names() == []
+
+
+def test_the_roster_verb_is_not_refused_when_the_launch_profile_is_not_granted(world):
+    root, server = world
+    assert 'result' in _call(server, _actor(root, ['alpha']), method='profiles.list')

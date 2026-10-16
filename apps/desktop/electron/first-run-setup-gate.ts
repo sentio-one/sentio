@@ -7,6 +7,8 @@ interface FirstRunSetupBackend {
 }
 
 interface FirstRunSetupGateOptions {
+  /** False for a remote-only artifact: a local-install request is ignored, never honoured. */
+  canContinueLocal?: () => boolean
   hideChoice?: () => void
   log?: (message: string) => void
   onStuck?: (backend: FirstRunSetupBackend, stuckAfterMs: number) => void
@@ -17,6 +19,7 @@ interface FirstRunSetupGateOptions {
 export type FirstRunSetupDecision = 'continue-local' | 'remote-applied' | 'reset'
 
 export function createFirstRunSetupGate({
+  canContinueLocal,
   hideChoice,
   log,
   onStuck,
@@ -100,6 +103,12 @@ export function createFirstRunSetupGate({
   }
 
   const continueLocal = () => {
+    if (canContinueLocal && !canContinueLocal()) {
+      log?.('[bootstrap] ignored a local install request: this artifact is remote-only')
+
+      return
+    }
+
     localBootstrapConfirmed = true
     settleWaiter('continue-local')
   }

@@ -2620,6 +2620,7 @@ function hideFirstRunSetupChoice() {
 function getFirstRunSetupGate() {
   if (!firstRunSetupGate) {
     firstRunSetupGate = createFirstRunSetupGate({
+      canContinueLocal: () => mayStartLocalBootstrap(INSTALL_STAMP),
       hideChoice: hideFirstRunSetupChoice,
       log: rememberLog,
       onStuck: (_backend, stuckAfterMs) => {
@@ -2663,12 +2664,6 @@ async function waitForFirstRunSetupChoice(backend) {
 }
 
 function continueFirstRunLocalBootstrap() {
-  if (!mayStartLocalBootstrap(INSTALL_STAMP)) {
-    rememberLog('[bootstrap] refused a local install request: this artifact is remote-only')
-
-    return
-  }
-
   getFirstRunSetupGate().continueLocal()
 }
 
@@ -5175,16 +5170,9 @@ async function resolveHermesBackend(backendArgs: string[]): Promise<ResolvedHerm
     }
   }
 
-  // 6. Nothing usable yet -- signal the bootstrap runner that we need to
-  //    clone+install. Phase 1D's bootstrap-runner consumes this sentinel
-  //    and drives install.ps1 stages with a progress UI. Until 1D lands,
-  //    callers see the sentinel and surface it as a user-facing error
-  //    explaining what's missing.
-  //
-  //    We deliberately do NOT throw here -- throwing inside
-  //    resolveHermesBackend was the old "no payload" path and forced the
-  //    user into a dead end. With the bootstrap protocol, "no install yet"
-  //    is a recoverable state the GUI can drive through.
+  // 6. Nothing usable yet -- return the sentinel the bootstrap runner consumes to clone+install
+  //    with a progress UI. We deliberately do NOT throw: throwing in resolveHermesBackend was the
+  //    old "no payload" path and left the user in a dead end; "no install yet" is recoverable.
   return {
     kind: 'bootstrap-needed',
     label: 'Hermes Agent not installed yet; bootstrap required',

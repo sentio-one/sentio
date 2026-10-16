@@ -60,6 +60,9 @@ def _log_refusal(profile, method, exc: RuntimeStoreError) -> None:
 
 # ``session.detach end_reason``: a short snake_case label, stored verbatim as ``sessions.end_reason``.
 _END_REASON = re.compile(r'[a-z][a-z_]{0,31}')
+# Verbs a grant-scoped caller may send without the launch profile: a liveness ping and the two that
+# describe the caller's own view (the roster and ``runtime.describe`` filter to the grant).
+_OWN_PROFILE_EXEMPT = frozenset({'ping', 'profiles.list', 'runtime.describe'})
 # Verbs whose param sets are closed and never carried a ``profile`` key.
 _PROFILE_IMPLICIT = frozenset({'session.create', 'session.list', 'session.info', 'session.resume', 'session.detach',
                                'prompt.submit', 'prompt.receipt', 'prompt.cancel', 'prompt.resolve_unknown',
@@ -221,7 +224,7 @@ class AuthorityConnection:
             # unknown keys; every other handler validates ``profile`` itself.
             if method in _PROFILE_IMPLICIT:
                 params = {key: value for key, value in params.items() if key != 'profile'}
-        if method != 'ping':
+        if method not in _OWN_PROFILE_EXEMPT:
             # Past routing, the verb runs on this connection's own authority, with or without a
             # ``profile`` key: a grant-scoped caller needs that profile granted too.
             try:
@@ -415,7 +418,8 @@ class AuthorityConnection:
         await self.ping(ref, params)
         from gateway.session_policy import CREATE_FIELDS, SURFACES
         from gateway.session_skin import resolved_skin
-        return {'instance_id': self.authority.instance_id, 'profile_id': self.authority.profile_id,
+        access = {} if self._allowed is None else {'allowed_profiles': sorted(self._allowed)}
+        return {**access, 'instance_id': self.authority.instance_id, 'profile_id': self.authority.profile_id,
                 'authority_epoch': self.authority.epoch,
                 'capabilities': ['durable-admission-v1', 'event-replay-v1', 'local-cli-create-v1', 'acp-editor-policy-v1', 'acp-session-mcp-v1'],
                 'session_create': {'sources': sorted(SURFACES),

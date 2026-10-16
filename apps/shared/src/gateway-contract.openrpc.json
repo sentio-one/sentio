@@ -33655,6 +33655,21 @@
       "RuntimeDescribeResult": {
         "additionalProperties": false,
         "properties": {
+          "allowed_profiles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Allowed Profiles"
+          },
           "instance_id": {
             "title": "Instance Id",
             "type": "string"

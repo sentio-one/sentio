@@ -26,7 +26,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from hermes_cli.session_listing import subagent_listing_scope
 from hermes_cli.web_deps import late
@@ -798,8 +798,13 @@ def _read_profiles():
 
 
 @router.get("/api/profiles")
-async def list_profiles_endpoint():
-    return await _read_profiles()
+async def list_profiles_endpoint(request: Request):
+    listing = await _read_profiles()
+    allowed = getattr(request.state, "access_allowed_profiles", None)
+    if allowed is None:
+        return listing
+    # A grant-scoped caller (``access:`` policy) sees only the profiles it may use.
+    return {**listing, "profiles": [p for p in listing["profiles"] if p.get("name") in allowed]}
 
 
 @router.post("/api/profiles")

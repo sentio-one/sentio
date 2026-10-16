@@ -4664,6 +4664,7 @@ export interface SessionDetachResult {
 }
 export type RuntimeDescribeParams = Record<string, never>
 export interface RuntimeDescribeResult {
+  allowed_profiles?: string[] | null
   instance_id: string
   profile_id: string
   authority_epoch: number

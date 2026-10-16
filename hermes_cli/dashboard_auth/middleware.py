@@ -132,12 +132,21 @@ def _verify_access_token(
         phase="verify" if audit else "bearer verify", log=_log, on_unreachable=_audit_unreachable)
 
 
+async def _authorized_call(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """Serve the request unless the access policy (``access:``) refuses this user for this route."""
+    from hermes_cli.dashboard_auth.access import policy_for_app
+    from hermes_cli.dashboard_auth.access_http import enforce
+
+    refusal = await enforce(request, request.state.session, policy_for_app(request.app))
+    return refusal if refusal is not None else await call_next(request)
+
+
 async def _serve_refreshed(request: Request, call_next, new_session, provider: str) -> Response:
     """Serve the request under a just-rotated session and write the rotated cookies back. Writing
     the ROTATED RT is mandatory: Portal runs reuse detection, so replaying the stale RT would
     revoke the session."""
     request.state.session = new_session
-    response = await call_next(request)
+    response = await _authorized_call(request, call_next)
     set_session_cookies(
         response, access_token=new_session.access_token, refresh_token=new_session.refresh_token,
         access_token_expires_in=_expires_in_seconds(new_session), use_https=detect_https(request),
@@ -180,7 +189,7 @@ async def gated_auth_middleware(
             return unreachable_response(str(e))
         if bearer_session is not None:
             request.state.session = bearer_session
-            return await call_next(request)
+            return await _authorized_call(request, call_next)
         return _unauth_response(request, reason="invalid_or_expired_session")
 
     at, _rt = read_session_cookies(request)
@@ -211,7 +220,7 @@ async def gated_auth_middleware(
         return await _serve_refreshed(request, call_next, *refreshed)
 
     request.state.session = session
-    response = await call_next(request)
+    response = await _authorized_call(request, call_next)
     if not provider_hint and session.provider:
         set_session_provider_cookie(
             response, provider=session.provider, use_https=detect_https(request),

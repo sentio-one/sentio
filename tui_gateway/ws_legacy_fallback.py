@@ -34,12 +34,19 @@ ADMIN_ONLY_METHODS = frozenset({
     "profiles.create", "display.install", "diagnostics.share_nous", "machine.facts", "system.battery",
     "wake.feed", "wake.pause", "wake.resume", "wake.start", "wake.status", "wake.stop"})
 # Handshakes a client sends on connect, before it names a profile; refusing them would read as an old build.
-_HANDSHAKE_METHODS = frozenset({"ping", "client.capabilities", "gateway.capabilities", "groups.capabilities"})
+# ``profiles.list`` names no profile and filters its own output to the grant.
+_HANDSHAKE_METHODS = frozenset({"ping", "client.capabilities", "gateway.capabilities", "groups.capabilities",
+                                "profiles.list"})
 
 # The grant of the request being dispatched (None = not grant-scoped). ``tui_gateway.server._profile_home``
 # reads it, so a handler that resolves a profile on its own still cannot leave the grant.
 _granted_profiles: contextvars.ContextVar[frozenset | None] = contextvars.ContextVar(
     "hermes_ws_granted_profiles", default=None)
+
+
+def granted_profiles() -> frozenset | None:
+    """The bound grant of the request being dispatched; None when it is not grant-scoped."""
+    return _granted_profiles.get()
 
 
 @contextlib.contextmanager

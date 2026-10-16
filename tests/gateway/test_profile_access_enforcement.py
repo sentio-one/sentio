@@ -158,3 +158,30 @@ async def test_a_denied_profile_is_logged_with_the_subject(served, caplog):
     with caplog.at_level('WARNING'):
         await call(alice, 'session.list', profile='beta')
     assert any('u-alice' in r.getMessage() and 'beta' in r.getMessage() for r in caplog.records)
+
+
+def _names(reply):
+    return sorted(row['name'] for row in reply['result']['profiles'])
+
+
+@pytest.mark.asyncio
+async def test_the_roster_lists_only_granted_profiles_even_without_the_launch_profile(served):
+    """Phase 4: ``profiles.list`` filters instead of refusing, so the desktop can paint a non-admin's roster."""
+    _, _, connect, call = served
+    assert _names(await call(connect(_identity(allowed_profiles=['alpha'])), 'profiles.list',
+                             include_sessions=False)) == ['alpha']
+    assert _names(await call(connect(_identity(allowed_profiles=['default', 'beta'])), 'profiles.list',
+                             include_sessions=False)) == ['beta', 'default']
+    assert _names(await call(connect(_identity(allowed_profiles=[])), 'profiles.list',
+                             include_sessions=False)) == []
+    admin = connect(_identity(profile_scope='host'), operator=True)
+    assert _names(await call(admin, 'profiles.list', include_sessions=False)) == ['alpha', 'beta', 'default']
+
+
+@pytest.mark.asyncio
+async def test_describe_advertises_the_grant_so_the_desktop_can_hide_the_rest(served):
+    _, _, connect, call = served
+    reply = await call(connect(_identity(allowed_profiles=['beta', 'alpha'])), 'runtime.describe')
+    assert reply['result']['allowed_profiles'] == ['alpha', 'beta'], reply
+    assert 'allowed_profiles' not in (await call(connect(_identity(profile_scope='host')), 'runtime.describe'))['result']
+    assert (await call(connect(_identity(allowed_profiles=[])), 'runtime.describe'))['result']['allowed_profiles'] == []

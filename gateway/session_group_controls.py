@@ -345,4 +345,7 @@ def _profiles(authority, actor, home, params):
     if service is not None:
         for configured, target in service.profile_homes().items():
             discovered(configured, target)
+    if actor.allowed_profiles is not None:
+        # A grant-scoped caller (``access:`` policy) sees only the profiles it may use.
+        profiles = [row for row in profiles if row['name'] in actor.allowed_profiles]
     return {'profiles': profiles, 'bot_mode_protocol': True}
