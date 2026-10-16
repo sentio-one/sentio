@@ -65,3 +65,83 @@ use it directly and only add a broker if it cannot emit a groups claim. Requirem
   `git checkout private/main && git merge main` (merge, not rebase, so published history is stable).
 - Keep the diff small and in new files where possible (`gateway/access_policy.py`) to ease merges.
 - Never run `gh pr create` against upstream. Disable the pre-push hook's upstream targets.
+
+## 8. Phase 0 results: attack-surface inventory
+
+Evidence: `docs/private-fork/phase0-routes.txt` (297 route handlers from an AST scan of
+`hermes_cli/web_routers/*`, `web_server*.py`, `dashboard_auth/routes.py`). Method limits: "takes a
+profile param" is a syntactic signal, not proof of correct scoping. Nothing here was run.
+
+### 8.1 Gate model (verified)
+`dashboard_auth/middleware.py` is a single authenticated-or-not gate over every `/api/*` path; only
+`_GATE_PUBLIC_PREFIXES` bypass it. There is no per-route role, group or profile check. So any
+authenticated user reaches every route below unless this plan adds a check.
+
+### 8.2 WebSocket routes
+| Route | Reads `?profile=` | Identity today | Gap |
+|---|---|---|---|
+| `/api/ws` | via RPC params | stamped `profile_scope: host`, `operator=True` for all | the core change (changes 8, 9) |
+| `/api/pty` | yes, unauthenticated | gate only; spawns a TUI child as the server OS user | any user can launch an agent in any profile; child reconnects with internal credential |
+| `/api/console` | yes | gate only | same class as `/api/pty` (not read in detail) |
+| `/api/pub`, `/api/events` | no (channel id) | channel-keyed fan-out of the child's events | unverified: how secret the channel id is; events may carry another user's tool output |
+| `/api/display/ws` | no | gate only | unverified |
+| `/api/audio/transcribe-stream`, `/speak-stream` | yes | gate only | profile selects provider credentials, so a user can spend another profile's keys |
+| kanban plugin `/events` | no | plugin route | unverified |
+
+### 8.3 REST routes with no profile parameter (91 handlers, host-level)
+These need an admin role gate, not an allowlist:
+- `files.py` (10): list, read, download, stream, upload, mkdir, delete on the host filesystem.
+- `git.py` (21): status, branch switch, commit, push, create-PR, worktrees.
+- `dashboard_ui.py` (6): agent-plugin install, enable, disable, update, delete. Installing a plugin is host code execution.
+- `actions.py`: `POST /api/hermes/update`, `/api/gateway/drain`, `/api/gateway/migrate`.
+- `local_models.py` (13): model download, server start, sideload.
+- `messaging.py`: Telegram and WhatsApp onboarding.
+- `status.py`: `/api/host/identity`, `/api/ssh/ownership`, `/api/system/stats`, health.
+- `profiles.py` mutations: `POST /api/profiles`, `DELETE`, `PATCH`, `/import`, `/export`, `/open-terminal`, `/active`.
+- `/api/auth/ws-ticket` is the mint point (change 6).
+
+### 8.4 REST routes that take a profile (171 explicit, 35 indirect)
+By file (total, explicit param, indirect): config_env 15/12/0, cron 13/12/1, sessions 18/13/5,
+skills 13/13/0, tools 12/12/0, mcp 12/9/0, models 7/7/0, oauth 6/6/0, ops 28/26/2, status 20/14/0,
+analytics 4/4/0, messaging 11/5/1, memory_providers 3/3/0, audio 10/8/2, profiles 20/3/17.
+Each needs an allowlist check after resolving the effective profile. Absent profile resolves to the
+launch or active profile (finding A4), so resolution must happen before the check.
+High risk inside this set: `config_env` (reads and writes `.env`, config), `oauth` (provider tokens),
+`cron` (scheduled agent execution), `mcp` (spawns processes), `tools`, `skills`.
+Note `files.py` has 8 handlers with a profile argument and 10 without, so the host-wide filesystem
+routes are reachable both ways.
+
+### 8.5 Legacy RPC plane (verified, changes the plan)
+`tui_gateway/ws.py::_dispatch_request` falls back to the legacy `server.dispatch` for any method
+the authority answers `-32601` to. The fallback requires only the interactive capability set
+(`legacy_fallback_allowed`). It then honours an explicit `profile` param through
+`server._profile_home(explicit)`, with no allowlist (`ws_legacy_fallback.py::_ticket_profile_request`).
+Reachable this way: `profiles.create`, `profiles.configure`, `profiles.set_asset`, `profiles.list`,
+`config.get/set`, connectors, and other sidecar verbs. So change 9 alone does not close the hole;
+change 14 is mandatory and must sit in `_profile_home` (the single resolver) plus a deny-list for
+host-level legacy verbs (`profiles.create`, `reload.*`, `config.set` on host keys).
+
+### 8.6 Internal credential
+`consume_internal_credential` returns `{user_id: server-internal, provider: server-internal}` with no
+profile or capability limits. It is minted once per process, never expires, and is handed to the PTY
+child via env (`web_server_chat.py:459-461`). Used by `/api/ws` and `/api/pub` from the child. Any
+design must give this identity an explicit, narrow grant bound to the PTY's profile (server-side),
+not host scope.
+
+### 8.7 What `session:operator` does today (verified)
+- `session_authority.py:138`: lets the holder act on sessions owned by other subjects.
+- `session_group_controls.py:300-306`: removes the owner filter on the Bot Chat roster, so the holder sees every user's sessions.
+- `session_bot.py:653`, `session_prune.py:28`: bot-chat delivery and prune.
+So today every dashboard user is effectively an operator and can read other users' sessions inside a
+profile. Setting `operator = is_admin` is therefore required for per-user session privacy, and the
+Desktop's behaviour for non-operators needs a test pass (item A9).
+
+### 8.8 Decisions this forces
+1. Role gate for the 91 host-level handlers: a single `require_admin` dependency applied by route
+   table, not per handler, so a new route defaults to admin-only.
+2. Resolve the effective profile once in middleware (query, body, path, absent) and attach it to
+   the request before the allowlist check.
+3. Put the legacy-plane check in `_profile_home`, and treat `profiles.create` and similar as admin verbs.
+4. Decide whether `/api/pty` and `/api/console` stay at all for non-admins; they run an agent as the
+   server OS user, so they are the sandbox decision (A6) in route form.
+5. Verify the three "unverified" WebSocket rows before phase 3.
