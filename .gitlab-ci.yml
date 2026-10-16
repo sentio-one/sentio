@@ -1,0 +1,89 @@
+# Private-fork CI (GitLab). Upstream's CI lives in .github/ and does not run here.
+#
+# Light desktop installer: the remote-only Hermes Desktop client (no Python, no local agent; one
+# installer serves every company). It needs a Windows machine, so it runs on a self-hosted runner
+# tagged `windows`. Setup: docs/private-fork/CI_WINDOWS_RUNNER.md.
+#
+# The SAST / Secret Detection templates below are the ones GitLab generated for this project; they run
+# on GitLab's shared runners (which count against the free-tier minutes). Drop `Security/SAST` if that
+# becomes a problem; keep Secret Detection.
+
+stages:
+  - test
+  - secret-detection
+  - build
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
+variables:
+  SECRET_DETECTION_ENABLED: 'true'
+
+sast:
+  stage: test
+
+secret_detection:
+  stage: secret-detection
+
+desktop-light-windows:
+  stage: build
+  tags: [windows]
+  # Self-hosted runners do not use GitLab's minutes. A cold first run downloads the whole toolchain.
+  timeout: 2h
+  # Build the exact pushed commit from a full, fresh clone: the builder packages HEAD, refuses a dirty
+  # tree, and reads history, so no shallow clone and no reused workspace.
+  variables:
+    GIT_STRATEGY: clone
+    GIT_DEPTH: '0'
+    GIT_SUBMODULE_STRATEGY: none
+    # Persistent, build-owned input cache on the runner machine (outside the checkout). Delete the
+    # folder to force a cold build.
+    HERMES_BUILD_CACHE: 'C:\hermes-build-cache'
+  rules:
+    # Tagged releases build automatically; everything else is started by hand (Run pipeline / play).
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - when: manual
+      allow_failure: true
+  script:
+    - |
+      $ErrorActionPreference = 'Stop'
+
+      # --- preflight: fail in seconds with a clear reason, not an hour into the build -------------
+      git --version
+      $py = (Get-Command python -CommandType Application -ErrorAction SilentlyContinue |
+        Where-Object { $_.Source -notlike '*\WindowsApps\*' } | Select-Object -First 1)
+      if (-not $py) { throw 'python 3.11+ is required on PATH (the WindowsApps stub does not count)' }
+      & $py.Source -c 'import sys; sys.exit(sys.version_info < (3, 11))'
+      if ($LASTEXITCODE -ne 0) { throw "python 3.11+ is required, found: $(& $py.Source --version)" }
+      if ((Get-Location).Path.Length -gt 40) {
+        Write-Warning "Checkout path is long: $((Get-Location).Path). Set builds_dir to something short such as C:\b."
+      }
+      $free = (Get-PSDrive -Name (Get-Location).Drive.Name).Free / 1GB
+      if ($free -lt 15) { throw "Need at least 15 GB free on the build drive, found $([int]$free) GB" }
+      # Unsigned unless signing is configured on purpose (see the runner doc). Never inherit it by accident.
+      if ($env:AZURE_SIGN_ENDPOINT -or $env:AZURE_SIGN_ACCOUNT) { Write-Host 'Azure signing variables are set: the installer will be signed.' }
+
+      # --- build -------------------------------------------------------------------------------
+      New-Item -ItemType Directory -Force -Path $env:HERMES_BUILD_CACHE | Out-Null
+      & $py.Source scripts/bundles/desktop.py --commit $env:CI_COMMIT_SHA --variant light --clean --cache $env:HERMES_BUILD_CACHE
+      if ($LASTEXITCODE -ne 0) { throw "desktop.py failed with exit code $LASTEXITCODE" }
+
+      # --- verify what came out ------------------------------------------------------------------
+      $out = 'apps/desktop/release'
+      $msix = Get-ChildItem $out -Filter 'HermesLight-*.msix' | Select-Object -First 1
+      if (-not $msix) { throw "No HermesLight-*.msix in $out" }
+      # Light is remote-only by definition: a payload here means the wrong variant was built.
+      if (Test-Path "$out/win-unpacked/resources/agent-payload") { throw 'Light build contains an agent-payload' }
+      $hash = (Get-FileHash $msix.FullName -Algorithm SHA256).Hash
+      Write-Host "built $($msix.Name)  $([math]::Round($msix.Length / 1MB, 1)) MB  sha256=$hash"
+      "$hash  $($msix.Name)" | Set-Content -Encoding ascii "$out/$($msix.Name).sha256"
+  artifacts:
+    name: hermes-light-$CI_COMMIT_SHORT_SHA
+    expire_in: 30 days
+    when: always
+    paths:
+      - apps/desktop/release/HermesLight-*.msix
+      - apps/desktop/release/HermesLight-*.msix.sha256
+      - apps/desktop/release/builder-debug.yml
