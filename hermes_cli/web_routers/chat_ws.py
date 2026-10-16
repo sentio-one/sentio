@@ -722,14 +722,17 @@ async def gateway_ws(ws: WebSocket) -> None:
                     'profile_id': authority.profile_id, 'instance_id': authority.instance_id,
                     'capabilities': ['session:create', 'session:read', 'session:submit',
                                      'session:control', 'session:approve', 'session:respond']}
+    operator = True  # The dashboard upgrade gate above has verified this operator.
     if identity is not None:
-        # The dashboard gate authorizes the whole host (its REST routes take ``?profile=`` for
-        # every profile), so its socket may select any served sibling too.
-        identity = {**identity, 'profile_scope': 'host'}
+        # Without an access policy the dashboard gate authorizes the whole host, so its socket may
+        # select any served sibling. With one, the socket's profiles and operator come from the
+        # verified grant (hermes_cli/dashboard_auth/access.py), and a missing grant reaches nothing.
+        from hermes_cli.dashboard_auth.access import policy_for_app, scope_for_identity
+        identity, operator = scope_for_identity(identity, policy_for_app(ws.app))
     await handle_ws(
         ws,
         auth_identity=identity,
-        operator=True,  # The dashboard upgrade gate above has verified this operator.
+        operator=operator,
         subprotocol=getattr(ws, "_hermes_ws_subprotocol", None),
     )
 

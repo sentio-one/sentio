@@ -93,10 +93,12 @@ class AuthorityConnection:
         if (not identity.get('user_id')
                 or identity.get('instance_id', authority.instance_id) != authority.instance_id):
             capabilities = frozenset()
+        from gateway.session_access import allowed_set
         from gateway.session_identity import authenticated_subject
+        self._allowed = allowed_set(identity)
         self.actor = Principal(authenticated_subject(identity),
                                identity.get('profile_id', authority.profile_id),
-                               capabilities, uuid.uuid4().hex)
+                               capabilities, uuid.uuid4().hex, self._allowed)
         from gateway.session_local_migration import bind_native_transport
         bind_native_transport(authority, self.actor, identity)
         self.native_owner = identity.get('native_bootstrap') is True
@@ -111,12 +113,16 @@ class AuthorityConnection:
         like a profile nobody here serves. Never a fallback, never a rewritten profile_id."""
         from hermes_cli.profiles import profile_matches_home
         if profile_matches_home(profile, Path(self.authority.profile_id)):
+            self._require_granted(self.authority, profile, 'profile')
             return None
-        if self._identity.get('profile_scope') != 'host':
+        # A grant-scoped identity (``allowed_profiles``) routes by grant; every other identity by
+        # the native ``profile_scope`` bit.
+        if self._allowed is None and self._identity.get('profile_scope') != 'host':
             raise RuntimeStoreError('profile_mismatch')
         registry = getattr(getattr(self.authority, 'runner', None), 'session_authorities', None)
         for sibling in (registry or ()):
             if sibling is not self.authority and profile_matches_home(profile, Path(sibling.profile_id)):
+                self._require_granted(sibling, profile, 'profile')
                 connection = self._siblings.get(sibling.profile_id)
                 # A re-served profile is a new authority under the same id: never keep routing to
                 # the retired one (it refuses every admission for the rest of this socket's life).
@@ -126,6 +132,10 @@ class AuthorityConnection:
                     self._siblings[sibling.profile_id] = connection
                 return connection
         raise RuntimeStoreError('profile_mismatch')
+
+    def _require_granted(self, authority, requested, method):
+        from gateway.session_access import require_granted
+        require_granted(self._allowed, authority, subject=self.actor.subject, requested=requested, method=method)
 
     def handlers(self):
         """Method → handler for every verb ``dispatch`` serves outside the group controls; each
@@ -211,6 +221,15 @@ class AuthorityConnection:
             # unknown keys; every other handler validates ``profile`` itself.
             if method in _PROFILE_IMPLICIT:
                 params = {key: value for key, value in params.items() if key != 'profile'}
+        if method != 'ping':
+            # Past routing, the verb runs on this connection's own authority, with or without a
+            # ``profile`` key: a grant-scoped caller needs that profile granted too.
+            try:
+                self._require_granted(self.authority, None, method)
+            except RuntimeStoreError as exc:
+                _log_refusal(getattr(self.actor, 'profile_id', None), method, exc)
+                return {'jsonrpc': '2.0', 'id': rid, 'error': {
+                    'code': 4001, 'message': exc.reason, 'data': _refusal_data(exc)}}
         ref = SessionRef(self.actor.profile_id, params.get('session_id', ''))
         from tui_gateway.contracts.registry import (
             CANONICAL_METHODS, METHODS, canonical_param_problems, check_params_accepted, check_result,

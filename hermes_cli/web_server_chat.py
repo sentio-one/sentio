@@ -238,6 +238,9 @@ def _ws_auth_reason(ws: WebSocket) -> tuple[Optional[str], str]:
                 "user_id": info.get("user_id"), "provider": info.get("provider")}
             if info.get("issuer"):
                 ws._hermes_auth_identity["issuer"] = info["issuer"]
+            if info.get("groups"):
+                # Verified IdP groups: the input to the per-profile access policy (chat_ws).
+                ws._hermes_auth_identity["groups"] = list(info["groups"])
 
         internal = ws.query_params.get("internal", "")
         if internal:
@@ -299,6 +302,8 @@ def _ws_auth_reason(ws: WebSocket) -> tuple[Optional[str], str]:
                 _stamp_identity({
                     "user_id": getattr(session, "user_id", None),
                     "provider": getattr(session, "provider", None),
+                    "issuer": getattr(session, "issuer", ""),
+                    "groups": getattr(session, "groups", ()),
                 })
                 audit_log(
                     AuditEvent.TOKEN_AUTH_SUCCESS,

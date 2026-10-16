@@ -15,6 +15,8 @@ class Principal:
     profile_id: str
     capabilities: frozenset[str]
     transport_id: str
+    # Profiles this caller may reach; None = not grant-scoped (native tickets keep ``profile_scope``).
+    allowed_profiles: frozenset[str] | None = None
 
 
 @dataclass(frozen=True)

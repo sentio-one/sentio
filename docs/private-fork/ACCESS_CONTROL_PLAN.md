@@ -169,3 +169,35 @@ Verification: new tests green; related suites green (503 passed); `scripts/check
 `TestEnvWriteDenylist` near-miss cases fail identically on base (Windows case-insensitive env names).
 `scripts/check` blob-size flags the untracked `architecture/*.html`, which is not part of this commit.
 "red on base" here means import failure (the modules did not exist), not a behavioural red.
+
+## 10. Phase 2 status (gateway enforcement): done, regression run noted below
+
+What changed:
+- `gateway/session_access.py`: `allowed_set`, `require_granted`. A denial raises `profile_mismatch`
+  (the reason an unserved profile gets, so a denial reveals nothing about what exists) and logs the
+  subject and requested selector at WARNING.
+- `Principal.allowed_profiles` (None = not grant-scoped).
+- `AuthorityConnection`: `_sibling_for` now checks the grant for the own-home match too (finding A1)
+  and routes by grant when the identity carries `allowed_profiles`; `dispatch` checks the own authority
+  for every verb except `ping`, so profile-less verbs (`session.create`, `prompt.submit`, ...) cannot
+  run on the launch profile for a caller who was not granted it.
+- `hermes_cli/dashboard_auth/access.py::scope_for_identity`: replaces the hard-coded
+  `profile_scope: host` + `operator=True` in `/api/ws`. No policy => unchanged. Policy configured =>
+  admin keeps host scope and operator; others get `allowed_profiles` (empty for an unknown user) and no
+  operator; caller-supplied scope fields are dropped (A2). The internal credential and the launch-time
+  session token are explicit trusted identities (host scope) until phase 3 binds the PTY child to a profile.
+- Groups now flow: ticket mint (`extra.groups`) -> `_stamp_identity` -> `scope_for_identity`.
+- The `?token=` WebSocket leg (token-mode Remote desktop) previously stamped identity WITHOUT issuer,
+  so the same user got a different owner subject than via the ticket leg. It now carries issuer and groups.
+  Consequence for an existing install: token-mode sessions owned under the issuer-less subject are no
+  longer visible to that user. Irrelevant for a fresh private deployment; flag it if migrating one.
+
+Known gaps left for later phases (so they are not mistaken for done):
+- `profiles.list`, `runtime.describe` and the group-control roster are refused for a caller whose own
+  (launch) profile is not granted, instead of being filtered. The desktop therefore cannot list
+  profiles for a non-admin yet. Phase 4 adds the filtered roster and the `describe` fields (which must
+  be declared in `tui_gateway/contracts/`).
+- Legacy RPC fallback (`ws_legacy_fallback`) is not yet closed: a non-admin socket can still reach
+  sidecar verbs with an explicit `profile`. Phase 3.
+- REST, `/api/pty`, `/api/console`, `/api/audio/*`: phase 3/4.
+- Grants are resolved when the socket opens; a revoked group applies to the next connection (A8).
