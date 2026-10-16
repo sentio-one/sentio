@@ -26,8 +26,6 @@ export interface RemoteCredentials {
 export interface RemoteSetupOptions {
   host: RemoteSetupHost
   enabled?: boolean
-  /** Gateway URL the form starts with (the company gateway baked into a remote-only build). */
-  initialUrl?: string
   beforeOAuthLogin?: (payload: DesktopConnectionConfigInput) => Promise<void>
   /**
    * Registry-draft identity (id, label, kind, authMode) for a sign-in that
@@ -79,11 +77,7 @@ export function useRemoteSetup(options: RemoteSetupOptions): RemoteSetup {
   const { host, enabled = true } = options
   const callbacks = useRef<RemoteSetupOptions>(options)
   callbacks.current = options
-
-  const [credentials, setCredentials] = useState<RemoteCredentials>(() =>
-    credentialsFrom({ url: options.initialUrl ?? '' })
-  )
-
+  const [credentials, setCredentials] = useState<RemoteCredentials>(credentialsFrom)
   const [revision, setRevision] = useState<number>(0)
 
   const url = coerceRemoteUrlScheme(credentials.url)
