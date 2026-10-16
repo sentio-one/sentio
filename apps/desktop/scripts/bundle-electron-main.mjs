@@ -27,6 +27,33 @@ function productIdentity(source, stamp) {
   }).trim()
 }
 
+/**
+ * The company gateway URL a remote-only (Light) artifact presets on first run:
+ * HERMES_LIGHT_GATEWAY_URL at build time, else `gatewayUrl` in light-defaults.json, else ''.
+ * The app validates it again at runtime (electron/light-first-run.ts); a malformed defaults file
+ * fails the build rather than shipping a client with no preset.
+ */
+export function lightGatewayUrl(source, env = process.env) {
+  const fromEnv = (env.HERMES_LIGHT_GATEWAY_URL || '').trim()
+  if (fromEnv) return fromEnv
+  let raw
+  try {
+    raw = readFileSync(join(source, 'apps/desktop/light-defaults.json'), 'utf8')
+  } catch (error) {
+    if (error.code === 'ENOENT') return ''
+    throw error
+  }
+  let parsed
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    throw new Error(`apps/desktop/light-defaults.json is not valid JSON: ${error.message}`)
+  }
+  const url = parsed.gatewayUrl ?? ''
+  if (typeof url !== 'string') throw new Error('apps/desktop/light-defaults.json: gatewayUrl must be a string')
+  return url.trim()
+}
+
 /** Every file bundleElectronMain writes: the only outputs that bake the install stamp. */
 export const electronOutputs = Object.freeze({
   main: 'electron-main.mjs', preload: 'electron-preload.js', previewGuestPreload: 'preview-guest-preload.js',
@@ -51,6 +78,7 @@ export async function bundleElectronMain({ source, out, stamp, dev = false }) {
     bakedStamp = metadata.builtAt ?? null
     define['process.env.HERMES_DESKTOP_IS_PACKAGED'] = JSON.stringify(true)
     define.__HERMES_INSTALL_STAMP__ = raw
+    define.__HERMES_LIGHT_GATEWAY_URL__ = JSON.stringify(lightGatewayUrl(source))
     define.__HERMES_PRODUCT_IDENTITY__ = productIdentity(source, metadata)
   }
   mkdirSync(out, { recursive: true })

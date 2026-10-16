@@ -326,6 +326,7 @@ import { linuxOzoneBackend, resolveHudWindowing } from './hud-windowing'
 import { INSTALL_STAMP, installShape } from './install-stamp'
 import type { InstallStamp } from './install-stamp'
 import { applyLaunchProfileOverride } from './launch-profile'
+import { firstRunPolicy, mayStartLocalBootstrap } from './light-first-run'
 import { fetchLinkTitle, resolveFaviconCached } from './link-metadata'
 import { CHROMIUM_LOG_FILENAME, enableLinuxCrashDiagnostics, linuxCrashDiagnostics } from './linux-crash-diagnostics'
 import {
@@ -2558,7 +2559,8 @@ function broadcastBootstrapEvent(ev) {
           platform: ev.platform,
           activeRoot: ev.activeRoot,
           local: ev.local || 'none',
-          bundled: installShape() === 'bundled'
+          bundled: installShape() === 'bundled',
+          ...firstRunPolicy(INSTALL_STAMP)
         }
       : null
     bootstrapState.unsupportedPlatform = null
@@ -2604,7 +2606,8 @@ function promptFirstRunSetupChoice(backend) {
     platform: backend.platform || process.platform,
     activeRoot: backend.activeRoot || ACTIVE_HERMES_ROOT,
     local: backend.local || 'none',
-    bundled: installShape() === 'bundled'
+    bundled: installShape() === 'bundled',
+    ...firstRunPolicy(INSTALL_STAMP)
   })
 }
 
@@ -2660,6 +2663,12 @@ async function waitForFirstRunSetupChoice(backend) {
 }
 
 function continueFirstRunLocalBootstrap() {
+  if (!mayStartLocalBootstrap(INSTALL_STAMP)) {
+    rememberLog('[bootstrap] refused a local install request: this artifact is remote-only')
+
+    return
+  }
+
   getFirstRunSetupGate().continueLocal()
 }
 

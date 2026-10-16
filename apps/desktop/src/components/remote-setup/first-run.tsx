@@ -10,13 +10,16 @@ import { RemoteSetupFields } from './fields'
 import { useRemoteSetup } from './use-remote-setup'
 
 interface FirstRunRemoteSetupProps {
-  onBack: () => void
+  /** Back to the local-or-remote choice; absent in a remote-only build, which has no choice to return to. */
+  onBack?: () => void
+  /** Gateway URL to start from (the company gateway baked into a remote-only build). */
+  initialUrl?: string
 }
 
-export function FirstRunRemoteSetup({ onBack }: FirstRunRemoteSetupProps): ReactElement {
+export function FirstRunRemoteSetup({ onBack, initialUrl }: FirstRunRemoteSetupProps): ReactElement {
   const { t } = useI18n()
   const copy = t.install
-  const setup = useRemoteSetup({ host: 'first-run' })
+  const setup = useRemoteSetup({ host: 'first-run', initialUrl })
   const [applying, setApplying] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,7 +33,7 @@ export function FirstRunRemoteSetup({ onBack }: FirstRunRemoteSetupProps): React
 
     try {
       await window.hermesDesktop.applyConnectionConfig(setup.payload)
-      onBack()
+      onBack?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err || t.settings.gateway.applyFailed))
     } finally {
@@ -53,9 +56,13 @@ export function FirstRunRemoteSetup({ onBack }: FirstRunRemoteSetupProps): React
           {error ? <div className="mt-3 text-sm text-destructive">{error}</div> : null}
         </div>
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-          <Button disabled={applying} onClick={onBack} size="sm" variant="ghost">
-            {copy.backToSetup}
-          </Button>
+          {onBack ? (
+            <Button disabled={applying} onClick={onBack} size="sm" variant="ghost">
+              {copy.backToSetup}
+            </Button>
+          ) : (
+            <span />
+          )}
           <div className="flex items-center gap-2">
             <Button
               disabled={setup.testing || applying || !setup.canTest}

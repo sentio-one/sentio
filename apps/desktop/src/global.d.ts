@@ -1455,6 +1455,10 @@ export interface DesktopBootstrapSetupChoice {
   local: 'none' | 'installed' | 'bundled'
   /** This artifact is a bundled install (payload ships in-app). */
   bundled: boolean
+  /** Remote-only artifact (Light): no local install is offered, only the remote form. */
+  remoteOnly?: boolean
+  /** Company gateway URL baked into a remote-only artifact; '' when none. */
+  defaultGatewayUrl?: string
 }
 
 export interface DesktopBootstrapState {
@@ -1480,6 +1484,8 @@ export type DesktopBootstrapEvent =
       activeRoot?: string
       local?: DesktopBootstrapSetupChoice['local']
       bundled?: boolean
+      remoteOnly?: boolean
+      defaultGatewayUrl?: string
     }
   | { type: 'manifest'; stages: DesktopBootstrapStageDescriptor[]; protocolVersion: number | null }
   | {
