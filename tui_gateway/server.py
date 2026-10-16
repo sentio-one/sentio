@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, NamedTuple, Optional
 
+from tui_gateway.ws_legacy_fallback import grant_checked
 # Several of these look unused here but are resolved BARE by split-module bodies rebound onto this
 # namespace (method_ctx.bind_module) — deleting one breaks a handler at call time, not import time.
 from agent.secret_scope import build_profile_secret_scope, reset_secret_scope, set_secret_scope
@@ -586,6 +587,7 @@ class ProfileUnavailableError(FileNotFoundError):
     so a client holding a deleted profile gets a typed error instead of a ws dispatch crash (#107829)."""
 
 
+@grant_checked
 def _profile_home(profile: str | None) -> Path | None:
     """Resolve a named profile's home on THIS host, or None for the launch profile."""
     if not (name := _canonical_profile_request((profile or "").strip())):
@@ -600,10 +602,8 @@ def _profile_home(profile: str | None) -> Path | None:
     if home.resolve() == Path(_hermes_home).resolve():
         return None  # already the launch profile (no override needed)
     if home not in _served_profile_homes:
-        # This process now hosts a second profile home: freeze the launch env as the launch
-        # profile's own and flip get_secret() to fail closed, so an unscoped read for a
-        # secondary raises instead of returning the launch profile's os.environ value
-        # (tui_gateway/launch_profile_policy.py). Must run before any secondary code.
+        # A second profile home: freeze the launch env as the launch profile's own and make
+        # get_secret() fail closed (launch_profile_policy.py). Must run before any secondary code.
         from tui_gateway.launch_profile_policy import activate_multi_profile_hosting
         activate_multi_profile_hosting()
     _served_profile_homes.add(home)  # the change watcher must stat every served sibling store too

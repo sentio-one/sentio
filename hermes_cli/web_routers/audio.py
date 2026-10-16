@@ -513,6 +513,12 @@ async def stt_lease(payload: STTLeaseRequest, profile: Optional[str] = None):
     return {"ok": True, "lease": lease, "active": payload.active, **result}
 
 
+def _ws_profile_permitted(ws: WebSocket) -> bool:
+    """The upgrade's ``?profile=`` is covered by its access grant (it picks whose keys speak/listen)."""
+    from hermes_cli.dashboard_auth.access import ws_profile_permitted
+    return ws_profile_permitted(ws)
+
+
 @router.websocket("/api/audio/transcribe-stream")
 async def transcribe_stream_ws(ws: WebSocket) -> None:
     """Live STT for Desktop dictation: mic PCM in while the user speaks, partial + final text out.
@@ -528,7 +534,7 @@ async def transcribe_stream_ws(ws: WebSocket) -> None:
     if not _ws_auth_ok(ws):
         await ws.close(code=4401)
         return
-    if not _ws_request_is_allowed(ws):
+    if not _ws_request_is_allowed(ws) or not _ws_profile_permitted(ws):
         await ws.close(code=4403)
         return
     await ws.accept()
@@ -614,7 +620,7 @@ async def speak_stream_ws(ws: WebSocket) -> None:
     if not _ws_auth_ok(ws):
         await ws.close(code=4401)
         return
-    if not _ws_request_is_allowed(ws):
+    if not _ws_request_is_allowed(ws) or not _ws_profile_permitted(ws):
         await ws.close(code=4403)
         return
     await ws.accept()

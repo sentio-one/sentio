@@ -16,11 +16,56 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
+import functools
+import logging
 from pathlib import Path
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 _connection_profile_home: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "hermes_ws_connection_profile_home", default=None)
+
+
+# Sidecar verbs that act on the HOST rather than on one profile (a new profile directory, a software
+# install, an upload of host logs, host facts, the global wake-word listener). A grant-scoped caller
+# (``Principal.allowed_profiles``) never reaches them; admins and native tickets keep them.
+ADMIN_ONLY_METHODS = frozenset({
+    "profiles.create", "display.install", "diagnostics.share_nous", "machine.facts", "system.battery",
+    "wake.feed", "wake.pause", "wake.resume", "wake.start", "wake.status", "wake.stop"})
+# Handshakes a client sends on connect, before it names a profile; refusing them would read as an old build.
+_HANDSHAKE_METHODS = frozenset({"ping", "client.capabilities", "gateway.capabilities", "groups.capabilities"})
+
+# The grant of the request being dispatched (None = not grant-scoped). ``tui_gateway.server._profile_home``
+# reads it, so a handler that resolves a profile on its own still cannot leave the grant.
+_granted_profiles: contextvars.ContextVar[frozenset | None] = contextvars.ContextVar(
+    "hermes_ws_granted_profiles", default=None)
+
+
+@contextlib.contextmanager
+def granted_profiles_scope(allowed: frozenset | None):
+    token = _granted_profiles.set(allowed)
+    try:
+        yield
+    finally:
+        _granted_profiles.reset(token)
+
+
+def grant_checked(resolve):
+    """Wrap ``server._profile_home``: under a bound grant, refuse a home whose profile is not granted
+    (the launch profile included) exactly like an unknown profile."""
+    @functools.wraps(resolve)
+    def wrapper(profile):
+        home = resolve(profile)
+        allowed = _granted_profiles.get()
+        if allowed is not None:
+            from hermes_constants import profile_name_for_home
+            from tui_gateway import server
+            name = profile_name_for_home(home or server._launch_home()) or "default"
+            if name not in allowed:
+                raise server.ProfileUnavailableError(f"Profile '{(profile or '').strip() or name}' does not exist.")
+        return home
+    return wrapper
 
 
 # The authority owns every session, its transcript and its admissions: a legacy handler in these
@@ -60,6 +105,9 @@ def legacy_fallback_allowed(actor: Any, method: str) -> bool:
     the authority owns nor a process-global sidecar verb."""
     from gateway.runtime_bootstrap import _PURPOSE_CAPABILITIES
     if method in _PROCESS_GLOBAL:
+        return False
+    if getattr(actor, "allowed_profiles", None) is not None and (
+            method in ADMIN_ONLY_METHODS or method == "session.active_list"):
         return False
     if method.startswith(_SESSION_NAMESPACES) and method not in _SESSION_FALLBACK_ALLOWED:
         return False
@@ -138,6 +186,40 @@ def _own_profile_read(server: Any, req: dict, home: str) -> dict:
     return {"jsonrpc": "2.0", "id": req.get("id"), "result": {"sessions": rows}}
 
 
+def _effective_profile_name(server: Any, req: dict, home: str | None) -> str | None:
+    """The profile this verb will act on, by canonical name; None when the selector is not a valid name.
+    An explicit ``profile`` wins, then the named session's home, then the connection's own home, else
+    the launch profile."""
+    from hermes_cli.profiles import normalize_profile_name, validate_profile_name
+    from hermes_constants import profile_name_for_home
+    params = req.get("params") if isinstance(req.get("params"), dict) else {}
+    if explicit := str(params.get("profile") or "").strip():
+        if explicit.lower() == "current":
+            return profile_name_for_home(server._launch_home()) or "default"
+        try:
+            name = normalize_profile_name(explicit)
+            validate_profile_name(name)
+        except ValueError:
+            return None
+        return name
+    session = server._sessions.get(str(params.get("session_id") or ""))
+    session_home = session.get("profile_home") if isinstance(session, dict) else None
+    return profile_name_for_home(session_home or home or server._launch_home()) or "default"
+
+
+def _grant_refusal(server: Any, req: dict, actor: Any, home: str | None) -> dict | None:
+    """The refusal frame for a grant-scoped actor whose verb targets an ungranted profile, else None.
+    Same code as an unknown profile, so a refusal says nothing about which profiles exist."""
+    if req.get("method") in _HANDSHAKE_METHODS:
+        return None
+    name = _effective_profile_name(server, req, home)
+    if name is not None and name in actor.allowed_profiles:
+        return None
+    logger.warning("profile access denied: subject=%s requested=%.64r method=%s",
+                   actor.subject, (req.get("params") or {}).get("profile") or name, req.get("method"))
+    return {"jsonrpc": "2.0", "id": req.get("id"), "error": {"code": 4064, "message": "profile unavailable"}}
+
+
 def dispatch_legacy(server: Any, req: dict, transport: Any, actor: Any) -> dict | None:
     """Run ``server.dispatch`` with the ticket's profile home bound (call from a worker thread;
     the pool path copies this context, so long handlers see it too)."""
@@ -148,6 +230,9 @@ def dispatch_legacy(server: Any, req: dict, transport: Any, actor: Any) -> dict 
         home = _foreign_profile_home(server, getattr(actor, "profile_id", None))
     except OSError:
         return {"jsonrpc": "2.0", "id": req.get("id"), "error": {"code": 4064, "message": "profile unavailable"}}
+    allowed = getattr(actor, "allowed_profiles", None)
+    if allowed is not None and (refusal := _grant_refusal(server, req, actor, home)) is not None:
+        return refusal
     scope = contextlib.nullcontext()
     if home is not None and req.get("method") in _SESSION_FALLBACK_ALLOWED:
         scoped = _own_profile_read(server, req, home)
@@ -162,7 +247,7 @@ def dispatch_legacy(server: Any, req: dict, transport: Any, actor: Any) -> dict 
             scope = server._session_profile_runtime_scope({"profile_home": target})
     token = _connection_profile_home.set(home)
     try:
-        with scope:
+        with scope, granted_profiles_scope(allowed):
             return server.dispatch(req, transport)
     finally:
         _connection_profile_home.reset(token)

@@ -40,3 +40,44 @@ def scope_for_identity(identity: dict, policy: Any) -> tuple[dict, bool]:
     if grant.admin:
         return {**forwarded, 'profile_scope': 'host'}, True
     return {**forwarded, 'allowed_profiles': sorted(grant.profiles)}, False
+
+
+def _requested_profile_name(raw: Any):
+    """The canonical profile a ``?profile=`` selector names, or None when it is not a valid name.
+    Absent, empty and ``current`` mean the launch profile, as in the routes that read the param."""
+    from hermes_cli.profiles import normalize_profile_name, validate_profile_name
+    from hermes_constants import get_routing_process_hermes_home, profile_name_for_home
+
+    text = str(raw or '').strip()
+    if not text or text.lower() == 'current':
+        return profile_name_for_home(get_routing_process_hermes_home()) or 'default'
+    try:
+        name = normalize_profile_name(text)
+        validate_profile_name(name)
+    except ValueError:
+        return None
+    return name
+
+
+def _ws_allowed_profiles(ws: Any):
+    """The upgrade's granted profiles, ``None`` when it is not grant-scoped (admin, no policy, ungated
+    host). A gated host with no stamped identity is never trusted: it gets an empty grant."""
+    identity = getattr(ws, '_hermes_auth_identity', None)
+    app = ws.app
+    if identity is None:
+        return frozenset() if getattr(app.state, 'auth_required', False) else None
+    scoped, _ = scope_for_identity(identity, policy_for_app(app))
+    allowed = scoped.get('allowed_profiles')
+    return None if allowed is None else frozenset(allowed)
+
+
+def ws_is_grant_scoped(ws: Any) -> bool:
+    return _ws_allowed_profiles(ws) is not None
+
+
+def ws_profile_permitted(ws: Any) -> bool:
+    """True when the upgrade's ``?profile=`` is one its caller may use."""
+    allowed = _ws_allowed_profiles(ws)
+    if allowed is None:
+        return True
+    return _requested_profile_name(ws.query_params.get('profile')) in allowed

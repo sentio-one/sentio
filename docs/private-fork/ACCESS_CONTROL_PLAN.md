@@ -201,3 +201,29 @@ Known gaps left for later phases (so they are not mistaken for done):
   sidecar verbs with an explicit `profile`. Phase 3.
 - REST, `/api/pty`, `/api/console`, `/api/audio/*`: phase 3/4.
 - Grants are resolved when the socket opens; a revoked group applies to the next connection (A8).
+
+## 11. Phase 3 status (legacy RPC plane, host verbs, WebSocket profile routes): done
+
+- `tui_gateway/ws_legacy_fallback.py`: a grant-scoped actor's verb is refused (4064, the code an unknown
+  profile gets) unless the profile it will act on is granted: explicit `profile`, else the named
+  session's home, else the connection's home, else the launch profile. `ADMIN_ONLY_METHODS`
+  (`profiles.create`, `display.install`, `diagnostics.share_nous`, `machine.facts`, `system.battery`,
+  `wake.*`) and `session.active_list` are unreachable for grant-scoped actors. Handshake verbs stay open.
+  The selection of those verbs is a judgement from their names; revisit if the desktop needs one.
+- `server._profile_home` is wrapped by `grant_checked`: under a bound grant (contextvar set by
+  `dispatch_legacy`) it refuses an ungranted home, the launch profile included. Backstop for handlers
+  that resolve a profile themselves.
+- `/api/pty`, `/api/console` (via `_ws_gate`) and `/api/audio/*` refuse an ungranted `?profile=` with
+  close 4403 reason "profile not granted", before accept. An unstamped identity on a gated host gets an
+  empty grant. A grant-scoped PTY ignores `?cwd=`.
+- Tests: `test_legacy_fallback_access.py` (9), `test_dashboard_ws_profile_gate.py` (10, includes the real
+  routes through the app; an earlier version passed for the wrong reason, the host/origin check shares
+  close code 4403, so the test now asserts the close reason and has a granted-profile control).
+
+Verification: new tests green; health ratchet clean. Broad run (324 files): 60 failures in 32 files; 28
+fail identically on the base commit (Windows: no `fcntl`, path separators, slow peer processes); the other
+4 pass when run alone (load flakes). No regression attributable to this change.
+
+Residual, not fixed: `/api/pub` and `/api/events` are keyed by a client-chosen channel id (a random UUID
+in the shipped clients), so they are a capability secret, not an authorization check. A granted user's PTY
+still runs as the server OS user (decision A6). REST routes and the roster are phase 4.

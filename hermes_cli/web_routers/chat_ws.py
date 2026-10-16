@@ -155,6 +155,10 @@ async def _ws_gate(ws: WebSocket, kind: str) -> Optional[tuple[str, str, str]]:
         _log.warning("%s refused: %s", kind, client_reason)
         await ws.close(code=4408, reason=_ws_close_reason(client_reason))
         return None
+
+    if not _profile_granted(ws, kind):
+        await ws.close(code=4403, reason="profile not granted")
+        return None
     return peer, mode, cred
 
 
@@ -535,6 +539,21 @@ async def _pty_channel_marker_state(
     return active_session_file, marker_preexisting, resume
 
 
+def _profile_granted(ws: WebSocket, kind: str) -> bool:
+    """The upgrade's ``?profile=`` is covered by its access grant (hermes_cli/dashboard_auth/access.py)."""
+    from hermes_cli.dashboard_auth.access import ws_profile_permitted
+    granted = ws_profile_permitted(ws)
+    if not granted:
+        _log.warning("%s refused: profile not granted peer=%s", kind, ws.client.host if ws.client else "?")
+    return granted
+
+
+def _pty_cwd_param(ws: WebSocket) -> Optional[str]:
+    """The ``?cwd=`` a PTY may start in: a grant-scoped caller never picks a host path."""
+    from hermes_cli.dashboard_auth.access import ws_is_grant_scoped
+    return None if ws_is_grant_scoped(ws) else ws.query_params.get("cwd")
+
+
 @router.websocket("/api/pty")
 async def pty_ws(ws: WebSocket) -> None:
     from hermes_cli.web_server_chat import PTY_REGISTRY, PtyBridge, PtyUnavailableError, _PTY_BRIDGE_AVAILABLE, _RESIZE_RE
@@ -579,7 +598,7 @@ async def pty_ws(ws: WebSocket) -> None:
     if not resume:
         from hermes_cli.web_routers.chat_workspaces import resolve_chat_cwd
         try:
-            workspace_cwd = resolve_chat_cwd(ws.query_params.get("cwd"))
+            workspace_cwd = resolve_chat_cwd(_pty_cwd_param(ws))
         except HTTPException as exc:  # dead/relative path: fail closed, never the launch dir
             await _pty_fail(ws, exc)
             return
