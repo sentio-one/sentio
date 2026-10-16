@@ -212,8 +212,7 @@ function applyEvent(state: DesktopBootstrapState, ev: DesktopBootstrapEvent): De
             activeRoot: ev.activeRoot || state.setupChoice?.activeRoot || '',
             local: ev.local || state.setupChoice?.local || 'none',
             bundled: Boolean(ev.bundled),
-            remoteOnly: Boolean(ev.remoteOnly),
-            defaultGatewayUrl: ev.defaultGatewayUrl || ''
+            remoteOnly: Boolean(ev.remoteOnly)
           }
         : null,
       unsupportedPlatform: null,
@@ -439,9 +438,9 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
   }
 
   // A remote-only build (Light) has no local install to choose: the remote form IS the first-run
-  // screen, preset with the company gateway, and there is nowhere to go back to.
+  // screen, and there is nowhere to go back to.
   if (state.setupChoice?.remoteOnly) {
-    return <FirstRunRemoteSetup initialUrl={state.setupChoice.defaultGatewayUrl} />
+    return <FirstRunRemoteSetup />
   }
 
   if (remoteOpen) {

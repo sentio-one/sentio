@@ -233,8 +233,7 @@ describe('DesktopInstallOverlay first-run setup', () => {
           activeRoot: '/home/me/.hermes/hermes-agent',
           local: 'none',
           bundled: false,
-          remoteOnly: true,
-          defaultGatewayUrl: 'https://gateway.corp.example'
+          remoteOnly: true
         }
       })
     )
@@ -242,28 +241,13 @@ describe('DesktopInstallOverlay first-run setup', () => {
     render(<DesktopInstallOverlay />)
 
     expect(await screen.findByText('Gateway URL')).toBeTruthy()
-    expect((screen.getByDisplayValue('https://gateway.corp.example') as HTMLInputElement).value).toBe(
-      'https://gateway.corp.example'
-    )
+    expect((screen.getByLabelText('Gateway URL') as HTMLInputElement).value).toBe('')
     expect(screen.queryByText('Install Hermes locally')).toBeNull()
     // The form's own heading shares the choice card's title; the card (a second match) is gone.
     expect(screen.getAllByText('Connect to existing Hermes')).toHaveLength(1)
     expect(screen.queryByText(/Will install to/i)).toBeNull()
     expect(screen.queryByText('Back to setup')).toBeNull()
     expect(desktop.continueBootstrapLocal).not.toHaveBeenCalled()
-  })
-
-  it('leaves the gateway URL empty in a remote-only build with no preset', async () => {
-    installDesktopMock(
-      bootstrapState({
-        setupChoice: { platform: 'win32', activeRoot: '/home/me/.hermes/hermes-agent', local: 'none', bundled: false, remoteOnly: true }
-      })
-    )
-
-    render(<DesktopInstallOverlay />)
-
-    expect(await screen.findByText('Gateway URL')).toBeTruthy()
-    expect(screen.queryByText('Back to setup')).toBeNull()
   })
 
   it('opens the remote connection form from the first-run choice', async () => {

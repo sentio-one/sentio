@@ -28,28 +28,6 @@ afterEach(() => {
 })
 
 describe('remote setup owner', () => {
-  it('starts from a preset gateway URL and probes it without any typing', async () => {
-    const probeConnectionConfig = vi.fn().mockResolvedValue(probeResult('oauth', 'corp'))
-    Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: { probeConnectionConfig } })
-
-    const { result } = renderHook(() =>
-      useRemoteSetup({ host: 'first-run', initialUrl: 'https://gateway.corp.example', onNotice: () => {} })
-    )
-
-    expect(result.current.credentials.url).toBe('https://gateway.corp.example')
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(500)
-    })
-    expect(probeConnectionConfig).toHaveBeenCalledWith('https://gateway.corp.example')
-    expect(result.current.credentials.authMode).toBe('oauth')
-  })
-
-  it('starts empty when no preset is given', () => {
-    const { result } = renderHook(() => useRemoteSetup({ host: 'first-run', onNotice: () => {} }))
-
-    expect(result.current.credentials.url).toBe('')
-  })
-
   it.each<RemoteSetupHost>(['first-run', 'settings', 'registry'])(
     'rejects stale probe results in %s despite fresh host callbacks',
     async (host: RemoteSetupHost): Promise<void> => {

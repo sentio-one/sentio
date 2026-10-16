@@ -12,14 +12,12 @@ import { useRemoteSetup } from './use-remote-setup'
 interface FirstRunRemoteSetupProps {
   /** Back to the local-or-remote choice; absent in a remote-only build, which has no choice to return to. */
   onBack?: () => void
-  /** Gateway URL to start from (the company gateway baked into a remote-only build). */
-  initialUrl?: string
 }
 
-export function FirstRunRemoteSetup({ onBack, initialUrl }: FirstRunRemoteSetupProps): ReactElement {
+export function FirstRunRemoteSetup({ onBack }: FirstRunRemoteSetupProps): ReactElement {
   const { t } = useI18n()
   const copy = t.install
-  const setup = useRemoteSetup({ host: 'first-run', initialUrl })
+  const setup = useRemoteSetup({ host: 'first-run' })
   const [applying, setApplying] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
