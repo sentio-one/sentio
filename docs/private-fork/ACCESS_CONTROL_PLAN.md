@@ -151,7 +151,7 @@ Desktop's behaviour for non-operators needs a test pass (item A9).
 Added `gateway/access_policy.py` (`parse_access_policy`, `AccessPolicy.grant_for`, `Grant.allows`),
 `GatewayConfig.access`, the `access` bridge and root key, `Session.groups`, `groups_from_claims`, and
 `session_identity.dashboard_subject` (the one subject string both session ownership and the policy use).
-Tests: `tests/gateway/test_access_policy.py` (25), `tests/plugins/dashboard_auth/test_session_groups.py` (9).
+Tests: `tests/gateway/test_access_policy.py` (25), `tests/plugins/dashboard_auth/test_session_groups.py` (10).
 
 Deviations from section 3, with reasons:
 - **`users`/`admins` are lists of `{provider, issuer, sub}` rows**, not `host|sub` keys. The key is the
