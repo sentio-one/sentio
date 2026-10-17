@@ -160,6 +160,7 @@ import { WslgWindowControls } from '../shell/wslg-window-controls'
 import { UpdatesOverlay } from '../updates-overlay'
 
 import { ContribWiringContext } from './context'
+import { DeepLinkDialogs } from './deep-link-dialogs'
 import {
   hydrateStoredSessionTranscript,
   profileScopeForTranscriptSession,
@@ -172,7 +173,6 @@ import { useDesktopMetrics } from './hooks/use-desktop-metrics'
 import { usePetBridge } from './hooks/use-pet-bridge'
 import { useQuickEntryBridge } from './hooks/use-quick-entry-bridge'
 import { useSessionTileDelegate } from './hooks/use-session-tile-delegate'
-import { McpInstallDeepLinkDialog } from './mcp-install-deeplink-dialog'
 import { useTitlebarToolContributions } from './panes'
 import { type AmbientGatewayRequest, createSessionRpcDispatcher } from './session-rpc-dispatcher'
 import { ChatRoutesSurface, SidebarSurface, StatusbarSurface, TerminalSurface } from './surfaces'
@@ -1334,7 +1334,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       <PetGenerateOverlay />
       <SessionSwitcher />
       <FileActionDialogs />
-      <McpInstallDeepLinkDialog />
+      <DeepLinkDialogs />
       <RemoteFolderPicker />
       <FindBar />
 

@@ -13,6 +13,7 @@ import { resolveDeepLinkAction } from '@/lib/deeplink-routes'
 import { pathFromHermesDeepLink, resolveHermesOpenPath } from '@/lib/hermes-open-target'
 import { storedSessionIdForNotification } from '@/lib/session-ids'
 import { announceNewSessionDraftKey } from '@/store/composer'
+import { requestConnectFromDeepLink } from '@/store/connect-link'
 import { recordAction } from '@/store/desktop-metrics'
 import { requestMcpInstallFromDeepLink } from '@/store/mcp-deeplink-install'
 import { startMcpHealthChecker, stopMcpHealthChecker } from '@/store/mcp-health'
@@ -423,6 +424,13 @@ export function useDesktopIntegrations({
 
       if (payload.kind === 'mcp' && payload.name === 'install') {
         requestMcpInstallFromDeepLink(payload.params || {})
+
+        return
+      }
+
+      // A company admin's link to their gateway (optionally with an invitation): confirm first, never auto-connect.
+      if (payload.kind === 'connect') {
+        requestConnectFromDeepLink(payload.params || {})
 
         return
       }

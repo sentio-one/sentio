@@ -114,3 +114,16 @@ from a template (the JIT idea in the main plan). Off by default; separate from t
 
 Not built: the desktop `hermes://connect` handler and confirmation screen; mail sending; JIT profile creation;
 a UI for admins (the API is what a UI would call).
+
+## Built (desktop)
+
+- `apps/desktop/src/lib/connect-link.ts`: strict parser for `hermes://connect?url=&invite=` (https only, http for loopback;
+  no credentials/query/fragment; invite token shape-checked; unknown params ignored; lookalike hosts shown in punycode) and
+  `redeemInvite` (retries transport/sign-in errors while the new connection settles; the gateway's own refusals are final).
+- `src/store/connect-link.ts` + `src/app/contrib/connect-link-dialog.tsx`: the link goes to a confirmation screen showing the
+  host; Continue opens the ordinary remote form pointed at that server; after "Apply and reconnect" the invitation is redeemed
+  once. The token is held in memory only and dropped on cancel or after redeeming. Cancel makes no request.
+- Wired through the existing `hermes://` deep-link channel (`use-desktop-integrations.ts`), no main-process change. The dialog sits
+  above the first-run overlay so a remote-only (Light) build can show it while waiting for a server.
+- Known limits: a link replaces the current server instead of adding a second connection; the strings are English only (other locales
+  fall back, listed in `overlay-gaps.json`); tested against mocks, not yet against a gateway with invites enabled.

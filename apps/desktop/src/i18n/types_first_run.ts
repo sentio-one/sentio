@@ -1,6 +1,25 @@
+/** `hermes://connect` links: the confirmation screen and the outcome of an invitation. */
+export interface ConnectLinkCopy {
+  title: string
+  serverLabel: string
+  trustWarning: string
+  inviteNote: string
+  switchNote: string
+  cancel: string
+  continue: string
+  invalidTitle: string
+  invalidBody: string
+  redeemedTitle: string
+  redeemedBody: (profile: string) => string
+  failedTitle: string
+  failed: { invalid: string; rate_limited: string; not_supported: string; unreachable: string }
+}
+
 /** First-run onboarding: the setup_beat cards and their receipts, Skip setup, the local-model offer
  *  at the end, and the Settings row that runs it again. */
 export interface FirstRunCopy {
+  /** Optional: the other locales' whole-block files predate it, and overlays fall back to English. */
+  connectLink?: ConnectLinkCopy
   /** Receipt labels, one per beat. */
   beats: {
     name: string

@@ -12,12 +12,16 @@ import { useRemoteSetup } from './use-remote-setup'
 interface FirstRunRemoteSetupProps {
   /** Back to the local-or-remote choice; absent in a remote-only build, which has no choice to return to. */
   onBack?: () => void
+  /** Gateway URL to start from (a `hermes://connect` link's server). */
+  initialUrl?: string
+  /** Called once the connection is applied, before `onBack`; not awaited. */
+  onApplied?: () => void
 }
 
-export function FirstRunRemoteSetup({ onBack }: FirstRunRemoteSetupProps): ReactElement {
+export function FirstRunRemoteSetup({ onBack, initialUrl, onApplied }: FirstRunRemoteSetupProps): ReactElement {
   const { t } = useI18n()
   const copy = t.install
-  const setup = useRemoteSetup({ host: 'first-run' })
+  const setup = useRemoteSetup({ host: 'first-run', initialUrl })
   const [applying, setApplying] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -31,6 +35,7 @@ export function FirstRunRemoteSetup({ onBack }: FirstRunRemoteSetupProps): React
 
     try {
       await window.hermesDesktop.applyConnectionConfig(setup.payload)
+      onApplied?.()
       onBack?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err || t.settings.gateway.applyFailed))
