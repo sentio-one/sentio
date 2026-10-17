@@ -1,9 +1,7 @@
 import { atom } from 'nanostores'
 
-import { translateNow } from '@/i18n'
 import { type ConnectLink, parseConnectLink } from '@/lib/connect-link'
 
-import { notify } from './notifications'
 
 /**
  * The `hermes://connect` link awaiting the user's confirmation, or null. In memory only: the invitation token it
@@ -11,25 +9,27 @@ import { notify } from './notifications'
  */
 export const $connectLinkRequest = atom<ConnectLink | null>(null)
 
+/**
+ * A link that arrived but is not valid. Shown by the dialog itself: a toast would sit behind the first-run
+ * overlay of a remote-only build, so the user would see nothing happen.
+ */
+export const $connectLinkInvalid = atom(false)
+
 /** Validate a deep link's params into a pending request, or tell the user the link is not valid. */
 export function requestConnectFromDeepLink(params: Record<string, string | undefined>): boolean {
   const link = parseConnectLink(params)
 
-  if (!link) {
-    notify({
-      kind: 'error',
-      title: translateNow('firstRun.connectLink.invalidTitle'),
-      message: translateNow('firstRun.connectLink.invalidBody')
-    })
+  $connectLinkRequest.set(link)
+  $connectLinkInvalid.set(!link)
 
+  if (!link) {
     return false
   }
-
-  $connectLinkRequest.set(link)
 
   return true
 }
 
 export function clearConnectLink(): void {
   $connectLinkRequest.set(null)
+  $connectLinkInvalid.set(false)
 }

@@ -629,6 +629,7 @@
   "firstRun.connectLink.failed.rate_limited": ["ar","de","es","fr","ja","ru","zh","zh-hant"],
   "firstRun.connectLink.failed.unreachable": ["ar","de","es","fr","ja","ru","zh","zh-hant"],
   "firstRun.connectLink.failedTitle": ["ar","de","es","fr","ja","ru","zh","zh-hant"],
+  "firstRun.connectLink.ok": ["ar","de","es","fr","ja","ru","zh","zh-hant"],
   "firstRun.connectLink.invalidBody": ["ar","de","es","fr","ja","ru","zh","zh-hant"],
   "firstRun.connectLink.invalidTitle": ["ar","de","es","fr","ja","ru","zh","zh-hant"],
   "firstRun.connectLink.inviteNote": ["ar","de","es","fr","ja","ru","zh","zh-hant"],

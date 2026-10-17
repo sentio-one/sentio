@@ -10,6 +10,7 @@ export const enConnectLink: ConnectLinkCopy = {
   switchNote: 'Hermes will use this server instead of the one it is connected to now.',
   cancel: 'Cancel',
   continue: 'Continue',
+  ok: 'OK',
   invalidTitle: 'Link not recognised',
   invalidBody: 'That Hermes link is not valid or is not safe to open.',
   redeemedTitle: 'Invitation accepted',

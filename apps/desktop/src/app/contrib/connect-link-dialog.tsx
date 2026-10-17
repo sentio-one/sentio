@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { enConnectLink } from '@/i18n/en_first_run'
 import { redeemInvite } from '@/lib/connect-link'
-import { $connectLinkRequest, clearConnectLink } from '@/store/connect-link'
+import { $connectLinkInvalid, $connectLinkRequest, clearConnectLink } from '@/store/connect-link'
 import { notify } from '@/store/notifications'
 
 /**
@@ -20,11 +20,28 @@ export function ConnectLinkDialog() {
   const { t } = useI18n()
   const copy = t.firstRun.connectLink ?? enConnectLink
   const link = useStore($connectLinkRequest)
+  const invalid = useStore($connectLinkInvalid)
   const [connecting, setConnecting] = useState(false)
 
   useEffect(() => {
     setConnecting(false)
   }, [link])
+
+  if (invalid) {
+    return (
+      <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-background/90 p-4 backdrop-blur-md">
+        <div className="w-full max-w-md rounded-xl border border-(--stroke-nous) bg-card p-8 shadow-nous" role="alertdialog">
+          <h2 className="text-xl font-semibold tracking-tight">{copy.invalidTitle}</h2>
+          <p className="mt-3 text-sm text-muted-foreground">{copy.invalidBody}</p>
+          <div className="mt-6 flex justify-end">
+            <Button onClick={clearConnectLink} size="sm">
+              {copy.ok}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!link) {
     return null

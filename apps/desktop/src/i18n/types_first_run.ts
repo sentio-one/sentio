@@ -7,6 +7,7 @@ export interface ConnectLinkCopy {
   switchNote: string
   cancel: string
   continue: string
+  ok: string
   invalidTitle: string
   invalidBody: string
   redeemedTitle: string

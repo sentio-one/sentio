@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { $connectLinkRequest, requestConnectFromDeepLink } from '@/store/connect-link'
+import { $connectLinkInvalid, $connectLinkRequest, requestConnectFromDeepLink } from '@/store/connect-link'
 import { $notifications } from '@/store/notifications'
 
 import { ConnectLinkDialog } from './connect-link-dialog'
@@ -52,6 +52,7 @@ function receive(params: Record<string, string>) {
 
 beforeEach(() => {
   $connectLinkRequest.set(null)
+  $connectLinkInvalid.set(false)
   $notifications.set([])
 })
 
@@ -170,8 +171,9 @@ describe('ConnectLinkDialog', () => {
     expect($connectLinkRequest.get()).toBeNull()
   })
 
-  it('rejects a malformed link with a notice instead of opening anything', () => {
-    installDesktop()
+  it('rejects a malformed link inside the dialog (a toast would sit behind the first-run overlay)', async () => {
+    const desktop = installDesktop()
+
     render(<ConnectLinkDialog />)
 
     let accepted = true
@@ -182,6 +184,27 @@ describe('ConnectLinkDialog', () => {
 
     expect(accepted).toBe(false)
     expect($connectLinkRequest.get()).toBeNull()
-    expect($notifications.get().some(n => /not valid/i.test(String(n.message)))).toBe(true)
+    expect(await screen.findByText('Link not recognised')).toBeTruthy()
+    expect(screen.getByText(/not valid or is not safe/)).toBeTruthy()
+    expect(screen.queryByText('Continue')).toBeNull()
+    expect($notifications.get()).toEqual([])
+    expect(desktop.probeConnectionConfig).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByText('OK'))
+    await waitFor(() => expect($connectLinkInvalid.get()).toBe(false))
+    expect(screen.queryByText('Link not recognised')).toBeNull()
+  })
+
+  it('a valid link replaces an earlier rejection', async () => {
+    installDesktop()
+    render(<ConnectLinkDialog />)
+    act(() => {
+      requestConnectFromDeepLink({ url: 'ftp://nope' })
+    })
+    await screen.findByText('Link not recognised')
+    receive({ url: GATEWAY })
+
+    expect(await screen.findByText('Continue')).toBeTruthy()
+    expect(screen.queryByText('Link not recognised')).toBeNull()
   })
 })
