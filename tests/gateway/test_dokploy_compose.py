@@ -1,0 +1,67 @@
+"""Invariants of the per-company Dokploy compose file (deploy/dokploy/docker-compose.yml).
+
+Docker is not needed: these pin the properties that make the deployment safe to expose through Traefik and a
+Cloudflare Tunnel, so an edit that weakens one fails here instead of in production.
+"""
+import re
+from pathlib import Path
+
+import pytest
+
+import hermes_yaml
+
+DEPLOY = Path(__file__).resolve().parents[2] / "deploy" / "dokploy"
+REPO = DEPLOY.parents[1]
+
+
+@pytest.fixture(scope="module")
+def compose():
+    return hermes_yaml.safe_load((DEPLOY / "docker-compose.yml").read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def service(compose):
+    return compose["services"]["hermes"]
+
+
+def test_the_image_is_built_from_this_repository_root(service):
+    context = (DEPLOY / service["build"]["context"]).resolve()
+    assert context == REPO and (context / service["build"]["dockerfile"]).is_file()
+
+
+def test_nothing_is_published_on_the_host_and_the_network_is_not_the_hosts(service):
+    assert "ports" not in service and service.get("network_mode") != "host"
+    assert service["expose"] == ["9119"]
+
+
+def test_the_web_gateway_is_enabled_and_bound_for_the_proxy(service):
+    env = service["environment"]
+    assert env["HERMES_DASHBOARD"] == "1" and env["HERMES_DASHBOARD_HOST"] == "0.0.0.0"
+    assert service["command"] == ["gateway", "run"]
+
+
+def test_per_company_settings_are_required_so_a_deploy_cannot_start_half_configured(service):
+    env = service["environment"]
+    for key in ("HERMES_DASHBOARD_PUBLIC_URL", "HERMES_DASHBOARD_OIDC_ISSUER", "HERMES_DASHBOARD_OIDC_CLIENT_ID",
+                "HERMES_ADMIN_GROUP"):
+        assert re.search(r"\$\{[A-Z_]+:\?", env[key]), key  # `${VAR:?message}` aborts the deploy when unset
+
+
+def test_the_secrets_come_from_the_environment_never_the_file(service):
+    for key, value in service["environment"].items():
+        if any(word in key for word in ("SECRET", "API_KEY", "TOKEN", "PASSWORD")):
+            assert re.fullmatch(r"\$\{[A-Z_]+:-\}", str(value)), key
+
+
+def test_the_pinned_policy_and_healthcheck_are_mounted_read_only_and_data_is_persistent(service, compose):
+    mounts = {entry.split(":")[1]: entry for entry in service["volumes"]}
+    assert mounts["/etc/hermes"].endswith(":ro") and mounts["/opt/healthcheck.py"].endswith(":ro")
+    assert mounts["/opt/data"].startswith("hermes-data:") and "hermes-data" in compose["volumes"]
+    assert (DEPLOY / "managed" / "config.yaml").is_file() and (DEPLOY / "healthcheck.py").is_file()
+    assert service["environment"]["HERMES_MANAGED_DIR"] == "/etc/hermes"
+
+
+def test_the_container_goes_unhealthy_when_the_policy_is_missing(service):
+    check = service["healthcheck"]
+    assert check["test"][-1] == "/opt/healthcheck.py" and int(check["retries"]) >= 1
+    assert re.fullmatch(r"\d+s", check["start_period"]) and int(check["start_period"][:-1]) >= 120

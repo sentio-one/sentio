@@ -1,0 +1,56 @@
+# One company's Hermes gateway, for Dokploy (Compose, source: Git, compose path deploy/dokploy/docker-compose.yml).
+# One Dokploy compose project per company: same repo and branch, different Environment values. Setup: README.md.
+#
+# No `ports:` and no TLS here: Dokploy's Domains tab points Traefik at service `hermes`, container port 9119, and the
+# Cloudflare Tunnel terminates TLS in front of Traefik. The dashboard binds 0.0.0.0 inside the container, which makes
+# its auth gate mandatory (it refuses to start without a sign-in provider), so there is no unauthenticated path.
+services:
+  hermes:
+    # Built by Dokploy from this repository on each deploy. The context is the repository root.
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: hermes-agent:${COMPANY_SLUG:-gateway}
+    restart: unless-stopped
+    command: ["gateway", "run"]
+    environment:
+      HERMES_UID: "10000"
+      HERMES_GID: "10000"
+
+      # Runs the web gateway (dashboard + desktop API) next to `gateway run`, supervised by the image's s6.
+      HERMES_DASHBOARD: "1"
+      HERMES_DASHBOARD_HOST: 0.0.0.0
+      HERMES_DASHBOARD_PORT: "9119"
+      # The address users reach (through the tunnel): OAuth redirects and hermes://connect invite links use it.
+      HERMES_DASHBOARD_PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL, e.g. https://acme.gw.example.com}
+
+      # The company's own OIDC provider (must emit a `groups` claim in the ID token).
+      HERMES_DASHBOARD_OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER}
+      HERMES_DASHBOARD_OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?set OIDC_CLIENT_ID}
+      HERMES_DASHBOARD_OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+
+      # Pinned access policy: managed/config.yaml reads this. Members of this IdP group are admins.
+      HERMES_MANAGED_DIR: /etc/hermes
+      HERMES_ADMIN_GROUP: ${ADMIN_GROUP:?set ADMIN_GROUP, e.g. hermes-admins}
+
+      # Model provider keys for this company's agents (add the ones in use in Dokploy's Environment tab).
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      # Profiles, sessions, the grant store: everything this company owns. BACK THIS VOLUME UP.
+      - hermes-data:/opt/data
+      - ./managed:/etc/hermes:ro
+      - ./healthcheck.py:/opt/healthcheck.py:ro
+    expose:
+      - "9119"
+    healthcheck:
+      test: ["CMD", "/opt/hermes/.venv/bin/python", "/opt/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # First boot builds caches and discovers plugins; do not mark it unhealthy while it settles.
+      start_period: 180s
+
+volumes:
+  hermes-data:

@@ -1,0 +1,15 @@
+# Pinned, per-company access policy. Mounted read-only at /etc/hermes/config.yaml inside the container and
+# applied ON TOP of the profile's own config.yaml (managed scope: hermes_cli/managed_scope.py), so neither a
+# granted user nor an agent editing /opt/data/config.yaml can change who is an admin or which groups map to
+# profiles. ${VAR} refs resolve against the container environment, which Dokploy fills per company.
+#
+# Every key of `access:` is pinned on purpose: a key left out here would stay editable by the profile.
+# Per-user grants come from the IdP's `groups` claim and from invites (stored in access_grants.db), not from here.
+access:
+  admin_groups:
+    - "${HERMES_ADMIN_GROUP}"
+  profile_group_prefix: "hermes-profile-"
+  group_providers:
+    - self_hosted
+  admins: []
+  users: []
