@@ -3,6 +3,9 @@
 </p>
 
 # Hermes Agent ☤
+
+> **Sentio One fork.** Upstream Hermes Agent plus per-company hosting, per-user profile access and a remote-only desktop client. [Jump to what the fork adds](#sentio-one-this-fork).
+
 <p align="center">
   <a href="https://hermes-agent.nousresearch.com/">Hermes Agent</a> | <a href="https://hermes-agent.nousresearch.com/">Hermes Desktop</a>
 </p>
@@ -29,6 +32,67 @@ Use any model you want — [Nous Portal](https://portal.nousresearch.com), OpenR
 <tr><td><b>Runs anywhere, not just your laptop</b></td><td>Seven terminal backends — local, Docker, SSH, Singularity, Modal, Daytona, and Vercel Sandbox. Daytona and Modal offer serverless persistence — your agent's environment hibernates when idle and wakes on demand, costing nearly nothing between sessions. Run it on a $5 VPS or a GPU cluster.</td></tr>
 <tr><td><b>Research-ready</b></td><td>Batch trajectory generation, trajectory compression for training the next generation of tool-calling models.</td></tr>
 </table>
+
+---
+
+## Sentio One: this fork
+
+This repository is **Sentio One**, a private fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) (MIT,
+by Nous Research; everything below the fork section is upstream's README). The fork turns Hermes into something a company
+can host once and give to many people: **one central gateway per company, a thin desktop client, and per-user access to
+individual profiles.** We take updates from upstream and never send changes back.
+
+```
+  Light desktop client (no local agent)          Company gateway, one per company (Dokploy)
+  ┌──────────────────────────────┐   https    ┌─────────────────────────────────────────────┐
+  │ hermes://connect?url=&invite= │ ────────▶ │ Cloudflare Tunnel → Traefik → hermes container│
+  │ confirm host → sign in (OIDC) │            │  • company SSO (OIDC), groups claim          │
+  │ remote-only, nothing local    │ ◀──────── │  • access policy (admins / profile groups)   │
+  └──────────────────────────────┘ websocket  │  • invites, REST role gate, profile roster   │
+                                               │  • profiles + sessions on a persistent volume│
+                                               └─────────────────────────────────────────────┘
+```
+
+### What the fork adds
+
+| Area | What it does | Where |
+|---|---|---|
+| **Per-user profile access** | A signed-in user reaches only the profiles their IdP groups (or an invite) grant. Admins are an IdP group. Unknown users reach nothing. Enforced on the gateway WebSocket, the legacy RPC plane, the profile-selecting sockets and REST. | `gateway/access_policy.py`, `gateway/session_access.py`, `hermes_cli/dashboard_auth/access*.py` |
+| **REST role gate** | Host-level routes (files, git, plugin install, update, profile lifecycle) are admin-only; profile routes check every profile the request names; unclassified routes default to admin-only. | `hermes_cli/dashboard_auth/access_http.py` |
+| **Invite links** | An admin invites a person to one profile and gets a `hermes://connect` link. Single-use by default, hashed at rest, rate-limited, never grants admin. | `gateway/access_grants.py`, `hermes_cli/web_routers/access_invites.py` |
+| **Light desktop client** | The desktop app built remote-only: no Python, no local agent, never offers a local install. Opens a confirmation screen for `hermes://connect` links, then the ordinary sign-in. | `apps/desktop` (`HERMES_DESKTOP_VARIANT=light`), `src/lib/connect-link.ts` |
+| **Per-company deployment** | A Dokploy compose project per company with the policy pinned read-only and a healthcheck that fails closed if the policy is missing. | `deploy/dokploy/` |
+| **CI** | A GitLab job builds the Light installer on a self-hosted Windows runner. | `.gitlab-ci.yml`, `docs/private-fork/CI_WINDOWS_RUNNER.md` |
+
+### Honest status
+
+Built and unit-tested: the access policy and enforcement, the REST gate, the invite store and API, the desktop link
+parser and confirmation screen, the compose file's safety properties and the policy loading.
+**Not yet exercised:** the container (no Docker where this was written), an invite redeemed end to end against a live
+gateway, the CI job on a real GitLab runner, installer signing (the installer is unsigned), and WebSocket keepalive
+through a Cloudflare Tunnel. A granted user's agent still runs as the container's OS user, so the container is the
+boundary between companies, not between people in one company. The full list is in
+[`docs/private-fork/ACCESS_CONTROL_PLAN.md`](docs/private-fork/ACCESS_CONTROL_PLAN.md).
+
+### Run it
+
+1. **Deploy a company gateway.** Create a Dokploy Compose project from this repo (`deploy/dokploy/docker-compose.yml`), fill in
+   `PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `ADMIN_GROUP`, add the domain and tunnel hostname.
+   Steps and checklist: [`deploy/dokploy/README.md`](deploy/dokploy/README.md).
+2. **Build the Light client.** `scripts/bundles/desktop.py --commit <sha> --variant light` from a clean checkout, or let the
+   GitLab job do it. Runner setup: [`docs/private-fork/CI_WINDOWS_RUNNER.md`](docs/private-fork/CI_WINDOWS_RUNNER.md).
+3. **Invite someone.** As an admin, `POST /api/access/invites {"profile": "alpha"}` returns a link; the person opens it, confirms the
+   server, signs in, and lands on that profile. Design and API: [`docs/private-fork/INVITES_DESIGN.md`](docs/private-fork/INVITES_DESIGN.md).
+
+### Working on the fork
+
+- Branches: `private/main` is ours; GitLab's `main` is only the default-branch placeholder; `upstream-main` mirrors upstream.
+- Take upstream updates without sending anything back: `git fetch upstream && git checkout main && git merge --ff-only upstream/main`,
+  then merge `main` into `private/main`. The `upstream` remote has push disabled. Run `scripts/run_tests.sh tests/gateway tests/hermes_cli`
+  and the desktop tests after a merge; a new `/api/*` route is admin-only until it is classified in `access_http.py`.
+- Tests: always `scripts/run_tests.sh`, never bare `pytest` (see `AGENTS.md`). Desktop: `npm run typecheck` and `npx vitest run` in `apps/desktop`.
+- Fork documents live in [`docs/private-fork/`](docs/private-fork/): the access control plan and audit, the invite design, the CI runner guide and
+  the Phase 0 route inventory.
 
 ---
 
