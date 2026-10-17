@@ -111,6 +111,8 @@ import { isDashboardEmbeddedChatEnabled } from "@/lib/dashboard-flags";
 import { latchChatActivation } from "@/lib/chat-activation";
 import { sharedGatewayProfiles, sharedGatewayRestartDescription } from "@/lib/shared-gateway";
 import { api } from "@/lib/api";
+import { withoutAccessNav } from "@/lib/access-nav";
+import { useAccessSummary } from "@/hooks/useAccessSummary";
 import type { StatusResponse, UpdateCheckResponse } from "@/lib/api";
 
 function RouteFallback({ label = "Loading…" }: { label?: string }) {
@@ -462,15 +464,11 @@ export default function App() {
     }),
     [embeddedChat],
   );
-
+  const { canManageAccess } = useAccessSummary();
   const builtinNav = useMemo(() => {
-    const base = embeddedChat
-      ? [CHAT_NAV_ITEM, ...BUILTIN_NAV_REST]
-      : BUILTIN_NAV_REST;
-    return showTokenAnalytics
-      ? base
-      : base.filter((n) => n.path !== "/analytics");
-  }, [embeddedChat, showTokenAnalytics]);
+    const base = withoutAccessNav(embeddedChat ? [CHAT_NAV_ITEM, ...BUILTIN_NAV_REST] : BUILTIN_NAV_REST, canManageAccess);
+    return showTokenAnalytics ? base : base.filter((n) => n.path !== "/analytics");
+  }, [embeddedChat, showTokenAnalytics, canManageAccess]);
 
   const sidebarNav = useMemo(
     () => partitionSidebarNav(builtinNav, manifests),

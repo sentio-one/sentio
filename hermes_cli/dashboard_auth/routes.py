@@ -33,6 +33,7 @@ from starlette.concurrency import run_in_threadpool
 from hermes_cli.dashboard_auth import (
     get_provider, list_providers, list_session_providers, native_flow)
 from hermes_cli.dashboard_auth import prefix as _prefix_mod
+from hermes_cli.dashboard_auth.access import access_summary
 from hermes_cli.dashboard_auth.audit import AuditEvent, audit_log
 from hermes_cli.dashboard_auth.base import (
     InvalidCodeError, InvalidCredentialsError, ProviderError, Session)
@@ -547,10 +548,12 @@ async def api_auth_me(request: Request):
             "org_id": "",
             "provider": "loopback",
             "expires_at": 0,
+            "access": access_summary(request.app, None),
         }
     return {
         "user_id": sess.user_id, "email": sess.email, "display_name": sess.display_name,
-        "org_id": sess.org_id, "provider": sess.provider, "expires_at": sess.expires_at}
+        "org_id": sess.org_id, "provider": sess.provider, "expires_at": sess.expires_at,
+        "access": access_summary(request.app, sess)}
 
 
 @router.post("/api/auth/ws-ticket", name="auth_ws_ticket")

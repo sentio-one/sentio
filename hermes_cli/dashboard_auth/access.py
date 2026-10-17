@@ -45,6 +45,18 @@ def grant_for_identity(policy: Any, *, provider: str, issuer: str, sub: str, gro
     return policy.grant_for(provider=provider, issuer=issuer, sub=sub, groups=groups, extra_profiles=extra)
 
 
+def access_summary(app: Any, session: Any) -> dict:
+    """The caller's own standing under the access policy, for the dashboard to hide admin-only navigation.
+    A hint, never a gate: the routes enforce the same policy themselves. Without a session (an ungated host's
+    trusted token owner) or without a policy the caller is unrestricted."""
+    policy = policy_for_app(app)
+    if not policy.configured or session is None:
+        return {"configured": policy.configured, "admin": True, "profiles": []}
+    grant = grant_for_identity(policy, provider=session.provider, issuer=session.issuer, sub=session.user_id,
+                               groups=session.groups)
+    return {"configured": True, "admin": grant.admin, "profiles": [] if grant.admin else sorted(grant.profiles)}
+
+
 def scope_for_identity(identity: dict, policy: Any) -> tuple[dict, bool]:
     """``(identity to hand the gateway, operator)`` for one authenticated dashboard socket."""
     if not policy.configured or (identity.get('provider'), identity.get('user_id')) in _TRUSTED:
