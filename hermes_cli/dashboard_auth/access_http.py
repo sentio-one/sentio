@@ -29,7 +29,9 @@ _ADMIN_PREFIXES = (
     "/api/providers/validate", "/api/providers/custom-endpoints/validate",
     "/api/messaging/telegram/onboarding", "/api/messaging/whatsapp/onboarding")
 _OPEN_PREFIXES = ("/api/auth",)
-_OPEN_EXACT = frozenset({("GET", "/api/health"), ("GET", "/api/health/idle"), ("GET", "/api/config/defaults")})
+_OPEN_EXACT = frozenset({("GET", "/api/health"), ("GET", "/api/health/idle"), ("GET", "/api/config/defaults"),
+                         # Any signed-in user redeems their own invite; managing invites stays admin.
+                         ("POST", "/api/access/invites/redeem")})
 _PROFILE_PREFIXES = (
     "/api/config", "/api/env", "/api/sessions", "/api/skills", "/api/tools", "/api/mcp", "/api/model",
     "/api/memory", "/api/curator", "/api/learning", "/api/cron", "/api/analytics", "/api/credentials",
@@ -128,8 +130,10 @@ async def enforce(request: Any, session: Any, policy: Any) -> Optional[Response]
     request.state.access_allowed_profiles = None
     if not policy.configured:
         return None
-    grant = policy.grant_for(provider=session.provider, issuer=session.issuer, sub=session.user_id,
-                             groups=session.groups)
+    from hermes_cli.dashboard_auth.access import grant_for_identity
+
+    grant = grant_for_identity(policy, provider=session.provider, issuer=session.issuer, sub=session.user_id,
+                               groups=session.groups)
     if grant.admin:
         return None
     request.state.access_allowed_profiles = grant.profiles

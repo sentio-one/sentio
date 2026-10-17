@@ -1,6 +1,7 @@
 # Invite links: admin invites a user to a profile (design, not yet built)
 
-Status: design for review. Builds on `ACCESS_CONTROL_PLAN.md` (phases 0-3 done). Nothing here is implemented.
+Status: backend built (store, policy merge, admin API, redeem; section "Built" below). The desktop deep link and
+confirm screen are not built yet. Builds on `ACCESS_CONTROL_PLAN.md` (phases 0-4 done).
 
 ## Goal
 
@@ -90,3 +91,26 @@ from a template (the JIT idea in the main plan). Off by default; separate from t
 - **Token guessing:** 256-bit tokens, hashed at rest, rate-limited redeem, generic errors.
 - **Invite privilege escalation:** invites grant only named profiles, never admin; admin only via config/groups.
 - **Replay after revocation:** grants are re-read at each WebSocket connect (A8); open sockets live until they close.
+
+
+## Built (backend)
+
+- `gateway/access_grants.py`: SQLite store (`access_grants.db` in the launch home) with `invites`, `grants` and
+  `redemptions`. Only the token's SHA-256 is stored. Redemption is one `BEGIN IMMEDIATE` transaction (a
+  single-use invite admits exactly one person under concurrency). One redemption per person per invite: a
+  revoked person cannot walk back in with the same link, a fresh invite restores access. All refusals are one
+  `InviteError`. Limits: TTL 1 hour to 30 days (default 7 days), 1 to 1000 uses (default 1).
+- `AccessPolicy.grant_for(..., extra_profiles=)` merges stored grants (validated, never admin, only when a policy is
+  configured). `hermes_cli/dashboard_auth/access.py::grant_for_identity` reads the store for the REST gate and the
+  WebSocket scope; an unreadable store fails closed (logged, no stored access).
+- `hermes_cli/web_routers/access_invites.py`, mounted from `dashboard_auth/routes.py`:
+  `POST/GET /api/access/invites`, `DELETE /api/access/invites/{id}?revoke_grants=`, `GET/DELETE /api/access/grants`
+  (admin-only by the gate's default) and `POST /api/access/invites/redeem` (any signed-in user; 10 failures per
+  10 minutes per person, 30 per client address, then 429).
+- The create response returns the link once: `hermes://connect?url=<public_url or request base>&invite=<token>`.
+  The token is never listed, logged or audited. Audit events: created, redeemed, redeem_failed, revoked.
+- An invite may name an email; redemption then needs the signed-in session's email to match (case-insensitive).
+  The session does not carry `email_verified`, so this trusts the company IdP's email claim.
+
+Not built: the desktop `hermes://connect` handler and confirmation screen; mail sending; JIT profile creation;
+a UI for admins (the API is what a UI would call).

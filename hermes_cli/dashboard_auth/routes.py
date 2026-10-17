@@ -616,3 +616,9 @@ async def auth_native_refresh(request: Request, body: _NativeRefreshBody):
     return JSONResponse(
         {"error": "session_expired",
          "detail": "Refresh token expired or invalid; start a new sign-in."}, status_code=401)
+
+
+# Per-profile invites sit beside the sign-in routes they depend on (admin API + redeem).
+from hermes_cli.web_routers.access_invites import router as _access_invites_router
+
+router.include_router(_access_invites_router)

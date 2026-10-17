@@ -124,3 +124,26 @@ def test_group_grants_count_only_for_trusted_group_providers():
     assert _grant(policy, "u1", ["hermes-admins"], provider="nous").admin is False
     wider = parse_access_policy({**RAW, "group_providers": ["nous"]})
     assert _grant(wider, "u1", ["hermes-admins"], provider="nous").admin is True
+
+
+def test_stored_invite_grants_merge_into_the_grant_and_never_make_an_admin():
+    policy = parse_access_policy(RAW)
+    grant = policy.grant_for(provider="self_hosted", issuer=ISSUER, sub="u-eve", groups=("hermes-profile-alpha",),
+                             extra_profiles={"beta", "gamma"})
+    assert grant.profiles == {"alpha", "beta", "gamma"} and grant.admin is False
+
+
+def test_stored_grants_are_validated_like_every_other_source():
+    policy = parse_access_policy(RAW)
+    grant = policy.grant_for(provider="self_hosted", issuer=ISSUER, sub="u-eve", extra_profiles={"../x", "ok", "A B"})
+    assert grant.profiles == {"ok"}
+
+
+def test_stored_grants_count_for_any_provider_because_the_subject_is_the_key():
+    policy = parse_access_policy(RAW)
+    assert policy.grant_for(provider="nous", issuer=ISSUER, sub="u", extra_profiles={"beta"}).profiles == {"beta"}
+
+
+def test_stored_grants_do_nothing_without_a_configured_policy():
+    policy = parse_access_policy(None)
+    assert policy.grant_for(provider="self_hosted", issuer=ISSUER, sub="u", extra_profiles={"beta"}).profiles == frozenset()

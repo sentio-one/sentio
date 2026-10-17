@@ -8,6 +8,7 @@ the dashboard is unchanged (single-user / local installs).
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from hermes_cli.dashboard_auth.ws_tickets import INTERNAL_PROVIDER, INTERNAL_USER_ID
@@ -30,13 +31,28 @@ def policy_for_app(app: Any):
     return load_gateway_config().access
 
 
+def grant_for_identity(policy: Any, *, provider: str, issuer: str, sub: str, groups: Any = ()):
+    """The caller's grant: IdP groups and config plus any stored grant (a redeemed invite). An unreadable
+    grant store fails closed (no stored access), never open."""
+    extra: Any = ()
+    if policy.configured and sub:
+        try:
+            from gateway.access_grants import default_store
+
+            extra = default_store().profiles_for(policy.subject_key(provider, issuer, sub))
+        except Exception:  # health: allow BLE001 -- a broken store must not take the dashboard down or widen access
+            logging.getLogger(__name__).exception("access grant store unreadable; ignoring stored grants")
+    return policy.grant_for(provider=provider, issuer=issuer, sub=sub, groups=groups, extra_profiles=extra)
+
+
 def scope_for_identity(identity: dict, policy: Any) -> tuple[dict, bool]:
     """``(identity to hand the gateway, operator)`` for one authenticated dashboard socket."""
     if not policy.configured or (identity.get('provider'), identity.get('user_id')) in _TRUSTED:
         return {**identity, 'profile_scope': 'host'}, True
     forwarded = {key: identity[key] for key in _FEDERATED_FIELDS if identity.get(key)}
-    grant = policy.grant_for(provider=str(identity.get('provider') or ''), issuer=str(identity.get('issuer') or ''),
-                             sub=str(identity.get('user_id') or ''), groups=identity.get('groups') or ())
+    grant = grant_for_identity(policy, provider=str(identity.get('provider') or ''),
+                               issuer=str(identity.get('issuer') or ''), sub=str(identity.get('user_id') or ''),
+                               groups=identity.get('groups') or ())
     if grant.admin:
         return {**forwarded, 'profile_scope': 'host'}, True
     return {**forwarded, 'allowed_profiles': sorted(grant.profiles)}, False

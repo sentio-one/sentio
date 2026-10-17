@@ -53,6 +53,11 @@ class AuditEvent(enum.Enum):
     NATIVE_CODE_ISSUED = "native_code_issued"
     NATIVE_TOKEN_SUCCESS = "native_token_success"
     NATIVE_TOKEN_FAILURE = "native_token_failure"
+    # Per-profile invites (gateway/access_grants.py). Never carries the token.
+    ACCESS_INVITE_CREATED = "access_invite_created"
+    ACCESS_INVITE_REDEEMED = "access_invite_redeemed"
+    ACCESS_INVITE_REDEEM_FAILED = "access_invite_redeem_failed"
+    ACCESS_INVITE_REVOKED = "access_invite_revoked"
 
 
 def _resolve_log_path() -> Path:

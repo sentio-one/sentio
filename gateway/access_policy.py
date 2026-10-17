@@ -72,11 +72,14 @@ class AccessPolicy:
 
         return dashboard_subject(provider, issuer, sub)
 
-    def grant_for(self, *, provider: str, issuer: str, sub: str, groups: Iterable[str] = ()) -> Grant:
+    def grant_for(self, *, provider: str, issuer: str, sub: str, groups: Iterable[str] = (),
+                  extra_profiles: Iterable[str] = ()) -> Grant:
+        """``extra_profiles`` are stored grants (``gateway/access_grants.py``, e.g. redeemed invites): validated
+        like every other source, and never an admin grant."""
         if not self.configured or not sub:
             return Grant()
         subject = self.subject_key(provider, issuer, sub)
-        profiles = set(self.users.get(subject, ()))
+        profiles = set(self.users.get(subject, ())) | {p for p in map(_profile, extra_profiles) if p}
         admin = subject in self.admins
         if provider in self.group_providers:
             groups = tuple(groups)
