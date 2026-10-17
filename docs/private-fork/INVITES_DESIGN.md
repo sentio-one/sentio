@@ -127,3 +127,12 @@ a UI for admins (the API is what a UI would call).
   above the first-run overlay so a remote-only (Light) build can show it while waiting for a server.
 - Known limits: a link replaces the current server instead of adding a second connection; the strings are English only (other locales
   fall back, listed in `overlay-gaps.json`); tested against mocks, not yet against a gateway with invites enabled.
+
+## Built (admin page)
+
+`web/src/pages/AccessPage.tsx` (route `/access`, sidebar entry "Access") over `web/src/lib/api-access.ts`: create an invite
+(profile with suggestions, validity hours, maximum uses, optional email), copy the link (shown once, not stored), list invites
+with status, uses and time left, list the grants that came from invites, and revoke either one after a confirmation (an invite can
+also take back the access it created). A non-admin sees an admins-only notice; a gateway with no access policy gets an explanation.
+Limits: it shows only invite-created grants (group access is managed in the IdP), hardcoded English, and the sidebar entry is not
+hidden for non-admins.

@@ -65,12 +65,13 @@ A missing required value aborts the deploy (`${VAR:?...}`), so a project cannot 
   seconds; the gateway has keepalive code but it has not been tested through a tunnel here).
 - Stop the container and start it again; profiles and sessions are still there (the `hermes-data` volume).
 
-## Inviting people (API only for now)
+## Inviting people
 
-`POST /api/access/invites {"profile": "alpha"}` as an admin returns a `hermes://connect?...` link once; the person opens
+As an admin, open the dashboard's **Access** page: create an invite, copy the link it shows once, and revoke invites or
+person-level access later. The same thing over HTTP: `POST /api/access/invites {"profile": "alpha"}` as an admin returns a `hermes://connect?...` link once; the person opens
 it in the desktop app, confirms the server, signs in, and the invitation is redeemed. List and revoke with
-`GET /api/access/invites`, `DELETE /api/access/invites/{id}?revoke_grants=true`, `GET /api/access/grants`. There is no
-admin screen yet, so today this is an authenticated HTTP call.
+`GET /api/access/invites`, `DELETE /api/access/invites/{id}?revoke_grants=true`, `GET /api/access/grants`. Access that comes from IdP groups is not listed on that page;
+manage it in the IdP.
 
 ## Operating it
 
