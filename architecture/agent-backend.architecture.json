@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Hermes Agent Backend",
+    "quality_profile": "showcase",
+    "repository": { "url": "https://github.com/NousResearch/hermes-agent", "revision": "e5eb6b36fe78eb012cefd1f5f436cd458411b8b3" },
+    "views": [
+      { "id": "turn-path", "label": "Turn path", "focus": ["cli", "agent", "turnloop", "providers", "llms"], "note": "Every entry surface builds one AIAgent and drives a turn out to a provider." },
+      { "id": "tools", "label": "Tools", "focus": ["agent", "turnloop", "tools", "registry", "delegate"], "note": "The turn loop runs tool rounds; a tool call can spawn a child agent." },
+      { "id": "learning", "label": "State and learning", "focus": ["agent", "state", "learning"], "note": "Durable session state, memory providers and the background curator." }
+    ]
+  },
+  "components": [
+    { "id": "cli", "type": "frontend", "label": "Entry Surfaces", "sublabel": "CLI · Gateway · Cron · ACP", "pos": [30, 40], "size": [130, 56], "sources": [{ "path": "cli.py", "label": "HermesCLI" }] },
+    { "id": "agent", "type": "backend", "label": "AIAgent", "sublabel": "run_agent.py facade", "tag": "~30 mixins", "pos": [280, 32], "size": [160, 72], "sources": [{ "path": "run_agent.py", "label": "AIAgent" }, { "path": "agent/agent_init.py", "label": "init_agent" }] },
+    { "id": "turnloop", "type": "backend", "label": "Turn Loop", "sublabel": "agent/conversation_loop.py", "tag": "turn_*.py phases", "pos": [540, 40], "size": [130, 56], "sources": [{ "path": "agent/conversation_loop.py", "label": "run_conversation" }] },
+    { "id": "providers", "type": "backend", "label": "Provider Runtime", "sublabel": "providers/ · model-providers", "pos": [750, 40], "size": [150, 56], "sources": [{ "path": "providers/__init__.py", "label": "registry" }] },
+    { "id": "llms", "type": "external", "label": "LLM Providers", "sublabel": "OpenAI · Anthropic · Gemini", "tag": "Bedrock · Vertex", "pos": [960, 40], "size": [130, 56] },
+    { "id": "state", "type": "database", "label": "SessionDB", "sublabel": "hermes_state.py", "tag": "SQLite · FTS5 · WAL", "pos": [30, 230], "size": [130, 56], "sources": [{ "path": "hermes_state.py", "label": "SessionDB" }] },
+    { "id": "learning", "type": "backend", "label": "Memory & Curator", "sublabel": "memory_manager · curator", "tag": "learning", "pos": [320, 230], "size": [150, 56], "sources": [{ "path": "agent/memory_manager.py", "label": "MemoryManager" }, { "path": "agent/curator.py", "label": "curator" }] },
+    { "id": "tools", "type": "backend", "label": "Tool Orchestration", "sublabel": "model_tools.py", "pos": [560, 230], "size": [140, 56], "sources": [{ "path": "model_tools.py", "label": "handle_function_call" }] },
+    { "id": "registry", "type": "backend", "label": "Tool Registry", "sublabel": "tools/registry.py", "tag": "~280 tools", "pos": [760, 230], "size": [150, 56], "sources": [{ "path": "tools/registry.py", "label": "discover_builtin_tools" }] },
+    { "id": "delegate", "type": "backend", "label": "Subagent Delegation", "sublabel": "tools/delegate_tool.py", "pos": [560, 420], "size": [140, 56], "sources": [{ "path": "tools/delegate_tool.py", "label": "child AIAgent" }] }
+  ],
+  "connections": [
+    { "id": "cli-to-agent", "from": "cli", "to": "agent", "label": "run_conversation", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "id": "agent-to-turn", "from": "agent", "to": "turnloop", "label": "drive", "fromSide": "right", "toSide": "left" },
+    { "id": "turn-to-providers", "from": "turnloop", "to": "providers", "label": "resolve", "fromSide": "right", "toSide": "left" },
+    { "id": "providers-to-llms", "from": "providers", "to": "llms", "label": "HTTPS", "fromSide": "right", "toSide": "left" },
+    { "id": "agent-to-learning", "from": "agent", "to": "learning", "label": "memory · skills", "fromSide": "bottom", "toSide": "top" },
+    { "id": "turn-to-tools", "from": "turnloop", "to": "tools", "label": "tool rounds", "fromSide": "bottom", "toSide": "top" },
+    { "id": "tools-to-registry", "from": "tools", "to": "registry", "label": "dispatch", "fromSide": "right", "toSide": "left" },
+    { "id": "tools-to-delegate", "from": "tools", "to": "delegate", "label": "spawn", "fromSide": "bottom", "toSide": "top", "labelAt": [630, 350] },
+    { "id": "agent-to-state", "from": "agent", "to": "state", "label": "persist", "variant": "dashed", "fromSide": "left", "toSide": "top" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Entry & turn loop", "items": ["CLI, gateway, cron and ACP all construct the same AIAgent facade", "The turn loop runs ordered turn_*.py phases per iteration", "Provider adapters translate to each OpenAI, Anthropic and Gemini wire API"] },
+    { "dot": "emerald", "title": "Tools & state", "items": ["model_tools dispatches calls into the self-registering tool registry", "Delegation spawns child AIAgents with scoped toolsets", "SessionDB persists history as SQLite with FTS5 under WAL"] },
+    { "dot": "violet", "title": "Learning", "items": ["MemoryManager fans hooks out to one external memory provider", "The curator runs background skill maintenance without a cron daemon"] }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Hermes Desktop App",
+    "quality_profile": "showcase",
+    "repository": { "url": "https://github.com/NousResearch/hermes-agent", "revision": "e5eb6b36fe78eb012cefd1f5f436cd458411b8b3" },
+    "views": [
+      { "id": "renderer", "label": "Renderer", "focus": ["renderer", "store", "ipc"], "note": "The React renderer is contribution-driven and keeps state in feature atoms." },
+      { "id": "backend-path", "label": "Backend path", "focus": ["main", "gateway", "serve", "tuigw", "agentcore"], "note": "Electron attaches to one local gateway that hosts the agent runtime." },
+      { "id": "channels", "label": "Two channels", "focus": ["renderer", "ipc", "main", "gateway", "serve"], "note": "REST rides IPC through main; JSON-RPC streams directly over WebSocket." }
+    ]
+  },
+  "components": [
+    { "id": "store", "type": "frontend", "label": "Nanostores", "sublabel": "src/store/*", "tag": "feature atoms", "pos": [30, 40], "size": [140, 56], "sources": [{ "path": "apps/desktop/src/store/gateway.ts", "label": "gateway atom" }] },
+    { "id": "renderer", "type": "frontend", "label": "React Renderer", "sublabel": "src/main.tsx · src/contrib", "tag": "React 19 · Vite", "pos": [30, 230], "size": [140, 56], "sources": [{ "path": "apps/desktop/src/main.tsx", "label": "boot" }, { "path": "apps/desktop/src/contrib/registry.ts", "label": "registry" }] },
+    { "id": "ipc", "type": "frontend", "label": "Preload Bridge", "sublabel": "electron/preload.ts", "tag": "contextBridge", "pos": [260, 230], "size": [140, 56], "sources": [{ "path": "apps/desktop/electron/preload.ts", "label": "bridge" }] },
+    { "id": "main", "type": "backend", "label": "Electron Main", "sublabel": "electron/main.ts", "tag": "machine authority", "pos": [490, 222], "size": [140, 72], "sources": [{ "path": "apps/desktop/electron/main.ts", "label": "main process" }] },
+    { "id": "gateway", "type": "backend", "label": "Local Gateway", "sublabel": "hermes gateway ensure", "tag": "one per home", "pos": [720, 230], "size": [140, 56] },
+    { "id": "serve", "type": "backend", "label": "hermes serve", "sublabel": "FastAPI · /api/ws", "pos": [950, 230], "size": [140, 56], "sources": [{ "path": "hermes_cli/web_server.py", "label": "FastAPI app" }] },
+    { "id": "state", "type": "database", "label": "SQLite state", "sublabel": "state.db", "tag": "per profile", "pos": [490, 420], "size": [140, 56] },
+    { "id": "agentcore", "type": "backend", "label": "AIAgent + tools", "sublabel": "sessions · model · streaming", "pos": [720, 420], "size": [140, 56], "sources": [{ "path": "run_agent.py", "label": "AIAgent" }, { "path": "model_tools.py", "label": "tools" }] },
+    { "id": "tuigw", "type": "backend", "label": "tui_gateway", "sublabel": "server.py · methods_*.py", "tag": "JSON-RPC", "pos": [950, 420], "size": [140, 56], "sources": [{ "path": "tui_gateway/server.py", "label": "facade" }, { "path": "tui_gateway/ws.py", "label": "WebSocket" }] }
+  ],
+  "connections": [
+    { "id": "renderer-to-store", "from": "renderer", "to": "store", "label": "atoms", "fromSide": "top", "toSide": "bottom" },
+    { "id": "renderer-to-ipc", "from": "renderer", "to": "ipc", "label": "IPC", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "id": "ipc-to-main", "from": "ipc", "to": "main", "label": "handlers", "fromSide": "right", "toSide": "left" },
+    { "id": "main-to-gateway", "from": "main", "to": "gateway", "label": "ensure · proxy", "fromSide": "right", "toSide": "left" },
+    { "id": "gateway-to-serve", "from": "gateway", "to": "serve", "label": "hosts runtime", "fromSide": "right", "toSide": "left" },
+    { "id": "serve-to-tuigw", "from": "serve", "to": "tuigw", "label": "ws", "fromSide": "bottom", "toSide": "top", "labelAt": [1050, 353] },
+    { "id": "tuigw-to-agentcore", "from": "tuigw", "to": "agentcore", "label": "session RPC", "fromSide": "left", "toSide": "right" },
+    { "id": "agentcore-to-state", "from": "agentcore", "to": "state", "label": "persist", "fromSide": "left", "toSide": "right" },
+    { "id": "renderer-to-gateway", "from": "renderer", "to": "gateway", "label": "WS · shared", "variant": "dashed", "fromSide": "bottom", "toSide": "bottom", "via": [[100, 350], [790, 350]], "labelAt": [445, 350] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Renderer", "items": ["React 19 with nanostores atoms and React Query for server data", "A contribution registry drives panes, routes and title bar", "Core surfaces register through the same registry plugins use"] },
+    { "dot": "emerald", "title": "Backend", "items": ["Electron main owns windows, connections, updates and native FS/git", "The app attaches to one multiplexing gateway per home via hermes gateway ensure", "hermes serve hosts tui_gateway, which owns sessions, tools and streaming"] },
+    { "dot": "violet", "title": "Channels", "items": ["REST goes renderer -> IPC -> main -> gateway with native ticket auth", "JSON-RPC events stream renderer -> WebSocket via @hermes/shared", "Ink TUI and the web dashboard are separate consumers of the same backend"] }
+  ]
+}

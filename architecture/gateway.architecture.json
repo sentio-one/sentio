@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Hermes Messaging Gateway",
+    "quality_profile": "showcase",
+    "repository": { "url": "https://github.com/NousResearch/hermes-agent", "revision": "e5eb6b36fe78eb012cefd1f5f436cd458411b8b3" },
+    "views": [
+      { "id": "inbound-path", "label": "Inbound path", "focus": ["platforms", "adapters", "inbound", "runner", "turn"], "note": "A platform message is admitted through both guards and dispatched to a turn." },
+      { "id": "agent-and-reply", "label": "Agent and reply", "focus": ["turn", "agentcore", "response", "adapters"], "note": "The turn runs in AIAgent and its output streams back to the platform." },
+      { "id": "state", "label": "State", "focus": ["runner", "sessions", "state"], "note": "Routing identity and a durable delivery ledger persist across turns." }
+    ]
+  },
+  "components": [
+    { "id": "platforms", "type": "external", "label": "Messaging Platforms", "sublabel": "Telegram · Discord · Slack", "tag": "+ ~20 more", "pos": [30, 40], "size": [140, 56] },
+    { "id": "adapters", "type": "backend", "label": "Platform Adapters", "sublabel": "platforms/base.py · registry", "pos": [260, 40], "size": [140, 56], "sources": [{ "path": "gateway/platforms/base.py", "label": "BasePlatformAdapter" }, { "path": "gateway/platform_registry.py", "label": "registry" }] },
+    { "id": "inbound", "type": "backend", "label": "Inbound & Guards", "sublabel": "run_inbound.py · run_busy.py", "tag": "two guards", "pos": [490, 40], "size": [140, 56], "sources": [{ "path": "gateway/run_inbound.py", "label": "inbound" }, { "path": "gateway/run_busy.py", "label": "busy queue" }] },
+    { "id": "runner", "type": "backend", "label": "GatewayRunner", "sublabel": "gateway/run.py facade", "tag": "~20 mixins", "pos": [720, 32], "size": [140, 72], "sources": [{ "path": "gateway/run.py", "label": "GatewayRunner" }] },
+    { "id": "turn", "type": "backend", "label": "Agent Turn", "sublabel": "run_turn.py", "pos": [950, 40], "size": [130, 56], "sources": [{ "path": "gateway/run_turn.py", "label": "lazy AIAgent" }] },
+    { "id": "state", "type": "database", "label": "state.db", "sublabel": "routing index · ledger", "tag": "SQLite", "pos": [490, 230], "size": [140, 56], "sources": [{ "path": "gateway/delivery_ledger.py", "label": "ledger" }] },
+    { "id": "sessions", "type": "backend", "label": "Session Store", "sublabel": "session.py · authority", "pos": [720, 230], "size": [140, 56], "sources": [{ "path": "gateway/session.py", "label": "SessionStore" }, { "path": "gateway/session_authority.py", "label": "authority" }] },
+    { "id": "response", "type": "backend", "label": "Response Delivery", "sublabel": "stream_consumer · delivery", "pos": [260, 420], "size": [140, 56], "sources": [{ "path": "gateway/stream_consumer.py", "label": "stream" }, { "path": "gateway/delivery.py", "label": "delivery" }] },
+    { "id": "agentcore", "type": "backend", "label": "AIAgent core", "sublabel": "run_agent.py", "pos": [950, 420], "size": [130, 56], "sources": [{ "path": "run_agent.py", "label": "AIAgent" }] }
+  ],
+  "connections": [
+    { "id": "platforms-to-adapters", "from": "platforms", "to": "adapters", "label": "poll / hook", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "id": "adapters-to-inbound", "from": "adapters", "to": "inbound", "label": "event", "fromSide": "right", "toSide": "left" },
+    { "id": "inbound-to-runner", "from": "inbound", "to": "runner", "label": "admitted turn", "fromSide": "right", "toSide": "left" },
+    { "id": "runner-to-turn", "from": "runner", "to": "turn", "label": "dispatch", "fromSide": "right", "toSide": "left" },
+    { "id": "turn-to-agentcore", "from": "turn", "to": "agentcore", "label": "run_conversation", "fromSide": "bottom", "toSide": "top", "labelAt": [1060, 262] },
+    { "id": "runner-to-sessions", "from": "runner", "to": "sessions", "label": "identity", "fromSide": "bottom", "toSide": "top", "labelAt": [850, 167] },
+    { "id": "sessions-to-state", "from": "sessions", "to": "state", "label": "load / save", "fromSide": "left", "toSide": "right" },
+    { "id": "agentcore-to-response", "from": "agentcore", "to": "response", "label": "typed events", "fromSide": "left", "toSide": "right" },
+    { "id": "response-to-adapters", "from": "response", "to": "adapters", "label": "platform send", "variant": "dashed", "fromSide": "top", "toSide": "bottom", "labelAt": [385, 353] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Inbound", "items": ["One adapter per platform, loaded lazily from the platform registry", "Two sequential guards queue a session and intercept slash commands", "A frozen routing identity is resolved once per message"] },
+    { "dot": "emerald", "title": "Runtime", "items": ["GatewayRunner is a facade over ~20 run_*.py phase mixins", "run_turn lazily imports and constructs AIAgent", "Streaming edits and final sends return to the platform"] },
+    { "dot": "violet", "title": "State & transport", "items": ["Session scope, routing index and a durable delivery ledger", "The same process exposes a WS + REST API to Desktop and the dashboard"] }
+  ]
+}
