@@ -1,0 +1,111 @@
+name: Release Light Desktop
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build Light MSIX & Publish Release
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Preflight checks
+        shell: powershell
+        run: |
+          git --version
+          python --version
+          $free = (Get-PSDrive -Name (Get-Location).Drive.Name).Free / 1GB
+          Write-Host "Free disk space: $([math]::Round($free, 1)) GB"
+          if ($free -lt 15) { throw "Need at least 15 GB free on build drive" }
+
+      - name: Build Light Desktop (MSIX)
+        shell: powershell
+        env:
+          HERMES_BUILD_CACHE: 'C:\hermes-build-cache'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $commit = git rev-parse HEAD
+          Write-Host "Building Light desktop client at commit: $commit"
+          New-Item -ItemType Directory -Force -Path $env:HERMES_BUILD_CACHE | Out-Null
+          python scripts/bundles/desktop.py --commit $commit --variant light --clean --cache $env:HERMES_BUILD_CACHE
+          if ($LASTEXITCODE -ne 0) { throw "desktop.py failed with exit code $LASTEXITCODE" }
+
+      - name: Verify build outputs
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = 'apps/desktop/release'
+          $msix = Get-ChildItem $out -Filter 'HermesLight-*.msix' | Select-Object -First 1
+          if (-not $msix) { throw "No HermesLight-*.msix found in $out" }
+          if (Test-Path "$out/win-unpacked/resources/agent-payload") {
+            throw 'Light build contains an unexpected agent-payload'
+          }
+          $hash = (Get-FileHash $msix.FullName -Algorithm SHA256).Hash
+          Write-Host "Successfully built $($msix.Name) ($([math]::Round($msix.Length / 1MB, 1)) MB), SHA256: $hash"
+          "$hash  $($msix.Name)" | Set-Content -Encoding ascii "$out/$($msix.Name).sha256"
+
+      - name: Upload run artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes-light-desktop
+          path: |
+            apps/desktop/release/HermesLight-*.msix
+            apps/desktop/release/HermesLight-*.msix.sha256
+            apps/desktop/release/builder-debug.yml
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME:-v0.1.0}"
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            TAG_NAME="v0.1.0"
+          fi
+          echo "Publishing release for tag: $TAG_NAME"
+
+          RELEASE_NOTES="### Sentio One Light Desktop Client ($TAG_NAME)
+
+          Remote-only desktop client for Sentio One and Hermes Agent gateways.
+
+          - **No local agent runtime**: Lightweight client connecting directly to remote gateways.
+          - **Seamless onboarding**: First run opens remote gateway configuration.
+          - **Deep-linking support**: Supports \`hermes://connect?url=&invite=\` links with confirmation dialogs.
+
+          #### Installation
+          Download and install \`HermesLight-*.msix\`. Note: As an unsigned MSIX for internal/testing distributions, enable Windows Developer Mode (\`Settings > System > For developers > Developer Mode\`) or install via PowerShell:
+          \`\`\`powershell
+          Add-AppxPackage -Path .\\HermesLight-*.msix -AllowUnsigned
+          \`\`\`"
+
+          if gh release view "$TAG_NAME" &>/dev/null; then
+            echo "Release $TAG_NAME exists, uploading assets..."
+            gh release upload "$TAG_NAME" apps/desktop/release/HermesLight-*.msix apps/desktop/release/HermesLight-*.msix.sha256 --clobber
+          else
+            echo "Creating new release $TAG_NAME..."
+            gh release create "$TAG_NAME" \
+              apps/desktop/release/HermesLight-*.msix \
+              apps/desktop/release/HermesLight-*.msix.sha256 \
+              --title "Sentio One Light Desktop $TAG_NAME" \
+              --notes "$RELEASE_NOTES" \
+              --draft=false \
+              --prerelease=false
+          fi
