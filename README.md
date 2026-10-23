@@ -62,15 +62,17 @@ individual profiles.** We take updates from upstream and never send changes back
 | **Invite links** | An admin invites a person to one profile and gets a `hermes://connect` link. Single-use by default, hashed at rest, rate-limited, never grants admin. | `gateway/access_grants.py`, `hermes_cli/web_routers/access_invites.py` |
 | **Light desktop client** | The desktop app built remote-only: no Python, no local agent, never offers a local install. Opens a confirmation screen for `hermes://connect` links, then the ordinary sign-in. | `apps/desktop` (`HERMES_DESKTOP_VARIANT=light`), `src/lib/connect-link.ts` |
 | **Per-company deployment** | A Dokploy compose project per company with the policy pinned read-only and a healthcheck that fails closed if the policy is missing. | `deploy/dokploy/` |
-| **CI** | A GitLab job builds the Light installer on a self-hosted Windows runner. | `.gitlab-ci.yml`, `docs/private-fork/CI_WINDOWS_RUNNER.md` |
+| **Sandboxed agents** | Every company gets its own Docker-in-Docker daemon; non-main profiles run their tools in containers on it, never on the host. | `deploy/dokploy/docker-compose.yml`, `deploy/dokploy/managed/config.yaml` |
+| **CI** | `Fork CI` guards the fork's changes on GitHub-hosted runners; a tag `v*` builds and publishes the Light installer. Upstream's workflows are switched off. | `.github/workflows/fork-ci.yml`, `release-light.yml`, `scripts/fork/` |
 
 ### Honest status
 
 Built and unit-tested: the access policy and enforcement, the REST gate, the invite store and API, the desktop link
 parser and confirmation screen, the compose file's safety properties and the policy loading.
 **Not yet exercised:** the container (no Docker where this was written), an invite redeemed end to end against a live
-gateway, the CI job on a real GitLab runner, installer signing (the installer is unsigned), and WebSocket keepalive
-through a Cloudflare Tunnel. A granted user's agent still runs as the container's OS user, so the container is the
+gateway, the Light release workflow on a real run, installer signing (the installer is unsigned), and WebSocket keepalive
+through a Cloudflare Tunnel. Agents of non-main profiles are meant to run in the company's own Docker sandbox, but nothing yet
+stops a granted user switching their profile back to the local backend, so until that is closed the container is the
 boundary between companies, not between people in one company. The full list is in
 [`docs/private-fork/ACCESS_CONTROL_PLAN.md`](docs/private-fork/ACCESS_CONTROL_PLAN.md).
 
@@ -79,19 +81,19 @@ boundary between companies, not between people in one company. The full list is 
 1. **Deploy a company gateway.** Create a Dokploy Compose project from this repo (`deploy/dokploy/docker-compose.yml`), fill in
    `PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `ADMIN_GROUP`, add the domain and tunnel hostname.
    Steps and checklist: [`deploy/dokploy/README.md`](deploy/dokploy/README.md).
-2. **Build the Light client.** `scripts/bundles/desktop.py --commit <sha> --variant light` from a clean checkout, or let the
-   GitLab job do it. Runner setup: [`docs/private-fork/CI_WINDOWS_RUNNER.md`](docs/private-fork/CI_WINDOWS_RUNNER.md).
+2. **Build the Light client.** `scripts/bundles/desktop.py --commit <sha> --variant light` from a clean checkout, or push a
+   `v*` tag and let `Release Light Desktop` build and publish `HermesLight-*.msix` (a manual run builds and uploads the artifact only).
 3. **Invite someone.** As an admin, `POST /api/access/invites {"profile": "alpha"}` returns a link; the person opens it, confirms the
    server, signs in, and lands on that profile. Design and API: [`docs/private-fork/INVITES_DESIGN.md`](docs/private-fork/INVITES_DESIGN.md).
 
 ### Working on the fork
 
-- Branches: `private/main` is ours; GitLab's `main` is only the default-branch placeholder; `upstream-main` mirrors upstream.
-- Take upstream updates without sending anything back: `git fetch upstream && git checkout main && git merge --ff-only upstream/main`,
-  then merge `main` into `private/main`. The `upstream` remote has push disabled. Run `scripts/run_tests.sh tests/gateway tests/hermes_cli`
-  and the desktop tests after a merge; a new `/api/*` route is admin-only until it is classified in `access_http.py`.
+- Hosting: GitHub (`sentio-one/sentio`), `main` is ours. `upstream` is `NousResearch/hermes-agent` with push disabled; nothing goes back.
+- Take upstream updates on a branch, never straight on `main`: `git fetch upstream && git switch -c merge-upstream-$(date +%F) && git merge upstream/main`.
+  Then follow [`FORK_DECISIONS.md`](docs/private-fork/FORK_DECISIONS.md) section 3 (new routes are admin-only until classified in `access_http.py`),
+  run `scripts/fork/disable-upstream-workflows.sh --apply` (new upstream workflows arrive enabled) and `python scripts/check`.
 - Tests: always `scripts/run_tests.sh`, never bare `pytest` (see `AGENTS.md`). Desktop: `npm run typecheck` and `npx vitest run` in `apps/desktop`.
-- Fork documents live in [`docs/private-fork/`](docs/private-fork/): the access control plan and audit, the invite design, the CI runner guide and
+- Fork documents live in [`docs/private-fork/`](docs/private-fork/); start with [`FORK_DECISIONS.md`](docs/private-fork/FORK_DECISIONS.md) (every difference from upstream and the post-merge checklist). Also: the access control plan and audit, the invite design, and
   the Phase 0 route inventory.
 
 ---

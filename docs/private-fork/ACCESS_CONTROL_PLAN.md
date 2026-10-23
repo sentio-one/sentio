@@ -59,7 +59,7 @@ use it directly and only add a broker if it cannot emit a groups claim. Requirem
 
 ## 7. Private fork workflow
 
-- `origin` = private GitLab. `upstream` = NousResearch/hermes-agent, push disabled.
+- (Superseded: hosting moved to GitHub, see `FORK_DECISIONS.md` D11.) `origin` = the fork, `upstream` = NousResearch/hermes-agent, push disabled.
 - `main` mirrors upstream. All work lives on `private/main` (or `private/access-control`).
 - Update: `git fetch upstream && git checkout main && git merge --ff-only upstream/main`, then
   `git checkout private/main && git merge main` (merge, not rebase, so published history is stable).
