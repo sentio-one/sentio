@@ -93,8 +93,10 @@ manage it in the IdP.
 
 - **Sandbox: how it is meant to work.** The main (launch) profile runs its tools inside the `hermes` container, because its
   agent provisions the other profiles. Every other profile is created with `terminal.backend: docker`, so its commands run in
-  containers on the company's `dockerd`, which has no access to `/opt/data`. The pinned `managed/config.yaml` also fixes
-  `docker_volumes`, `docker_extra_args` and `docker_mount_cwd_to_workspace`, so a profile cannot widen its own sandbox.
+  containers on the company's `dockerd`, which has no access to `/opt/data`. **This is the intended design, not what is
+  enforced today:** the pinned `docker_*` keys in `managed/config.yaml` do not reach a routed profile's terminal policy (found by
+  test, 2026-10-23), so a profile can still choose the local backend, add volumes or `--privileged`, or forward the gateway's
+  environment into its container. The enforcement plan is `docs/private-fork/SANDBOX_PLAN.md`.
 - **Sandbox: what is not enforced yet.** Nothing stops a granted user from setting their profile's `terminal.backend` back to
   `local`, which runs commands as the container's `hermes` user with every profile's files in reach. Until that is closed
   (`FORK_DECISIONS.md` O1) treat a grant as host-level trust inside the company; the container is the boundary **between
