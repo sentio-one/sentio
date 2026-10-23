@@ -153,7 +153,8 @@ editable. If a new `access:` key is added, add it to this file.
   typecheck and the fork's JS tests. Keep its file lists equal to section 3.
 - **Upstream's 55 workflows are disabled on GitHub, not deleted** (they target Blacksmith runners we do not have, and deleting
   them would make every merge a modify/delete conflict). `scripts/fork/disable-upstream-workflows.sh --apply` re-applies it;
-  workflows added by a merge arrive enabled. Kept active: `Fork CI`, `Release Light Desktop`.
+  workflows added by a merge arrive enabled. A workflow is upstream's when its file exists in `upstream/main`, so every fork-owned
+  workflow (`fork-ci.yml`, `release-light.yml`, `tag-release.yml`, `protection-drift.yml`, anything added later) is kept without a list.
 - **`Release Light Desktop`** (`release-light.yml`): every push to `main` (except docs-only) builds the MSIX and keeps it as an
   artifact named after the commit for 30 days; a `v*` tag also publishes it as a GitHub release, from a separate job. The build job
   is read-only; only the publish job holds a write token. Actions pinned to the SHAs upstream uses. The installer is unsigned.
