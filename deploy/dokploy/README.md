@@ -99,9 +99,14 @@ manage it in the IdP.
   `local`, which runs commands as the container's `hermes` user with every profile's files in reach. Until that is closed
   (`FORK_DECISIONS.md` O1) treat a grant as host-level trust inside the company; the container is the boundary **between
   companies**.
-- **`dockerd` is privileged** (Docker-in-Docker needs it). It holds no company data and no secrets, publishes no port, and no
-  domain points at it. Do not mount the host's `docker.sock` into any service: that would be root on the Dokploy host and
-  reach other companies' containers (`tests/gateway/test_dokploy_compose.py` fails if you do).
+- **`dockerd` is privileged** (Docker-in-Docker needs it), so whoever can speak to its API owns the Dokploy host. It holds no
+  company data and no secrets, has no domain, and listens on **no network port at all**: only a unix socket in a volume shared
+  with `hermes`, restricted to the gateway user's gid. This matters because a sandboxed container runs on the daemon's own bridge
+  and can reach any tcp port it serves (it did, in an earlier version of this file that used port 2375). Do not add a `ports`,
+  `expose` or tcp `--host`, and do not mount the host's `docker.sock` into any service.
+  `scripts/fork/verify-dind-isolation.sh` proves it against real Docker and runs in CI.
+- **What a sandbox can still reach:** the internet, and any host service bound to all interfaces (SSH on port 22 was reachable
+  from a test sandbox). Egress control is not done yet (`SANDBOX_PLAN.md`).
 - Static per-user rules (`access.users` / `access.admins`) are deliberately empty in the pinned file. If a company's IdP
   cannot emit groups, fork `managed/config.yaml` for that company rather than loosening the shared one.
 - The compose file builds with `build:`. If server builds become a problem, build in GitHub Actions, push to GHCR and switch

@@ -69,18 +69,33 @@ def test_the_container_goes_unhealthy_when_the_policy_is_missing(service):
 
 def test_agent_sandboxes_run_on_the_companys_own_docker_daemon_never_the_hosts(compose, service):
     """A host docker.sock in the gateway container would be root on the Dokploy host and reach other companies."""
-    assert service["environment"]["DOCKER_HOST"] == "tcp://dockerd:2375"
-    assert not any("docker.sock" in entry for entry in service["volumes"])
+    daemon = compose["services"]["dockerd"]
+    sock = "/var/run/dind/docker.sock"
+    assert service["environment"]["DOCKER_HOST"] == f"unix://{sock}"
+    for svc in (service, daemon):  # no bind mount of the host's docker socket (or of any host path) into either
+        assert not any(entry.split(":")[0].startswith("/") or "/var/run/docker.sock" in entry for entry in svc["volumes"])
     assert not service.get("privileged") and service.get("pid") != "host"
     assert service["depends_on"]["dockerd"]["condition"] == "service_healthy"
-    daemon = compose["services"]["dockerd"]
     assert daemon["privileged"] is True  # Docker-in-Docker needs it; this is the one privileged service
     assert [name for name, svc in compose["services"].items() if svc.get("privileged")] == ["dockerd"]
-    assert "ports" not in daemon and daemon["expose"] == ["2375"] and daemon.get("network_mode") != "host"
     assert daemon["image"].split(":", 1)[1] not in ("latest", "dind")  # pinned
-    assert daemon["volumes"] == ["dockerd-data:/var/lib/docker"] and "dockerd-data" in compose["volumes"]
-    assert not any("docker.sock" in entry for entry in daemon["volumes"])
+    assert "dockerd-data:/var/lib/docker" in daemon["volumes"] and "dockerd-data" in compose["volumes"]
     assert "environment" not in daemon or not any("KEY" in k or "SECRET" in k for k in daemon["environment"])
+
+
+def test_the_privileged_daemon_has_no_network_surface_a_sandbox_could_reach(compose, service):
+    """Verified in real Docker: a sandbox container reaches any TCP port the daemon serves (it answered /version at the
+    bridge gateway, 172.17.0.1:2375), and that API is root on the host. It cannot reach a socket file it was not given."""
+    daemon, sock = compose["services"]["dockerd"], "/var/run/dind/docker.sock"
+    assert "ports" not in daemon and "expose" not in daemon and daemon.get("network_mode") != "host"
+    command = daemon["command"]
+    assert command[0] == "dockerd"  # the image entrypoint appends a tcp listener unless the first argument is dockerd
+    assert f"--host=unix://{sock}" in command and sum(arg.startswith("--host") for arg in command) == 1
+    assert not any("tcp" in arg or "2375" in arg or "2376" in arg for arg in command)
+    assert f"--group={service['environment']['HERMES_GID']}" in command  # socket usable by the gateway user only
+    assert "dockerd-sock:/var/run/dind" in daemon["volumes"] and "dockerd-sock:/var/run/dind" in service["volumes"]
+    assert "dockerd-sock" in compose["volumes"]
+    assert "unix://" in " ".join(daemon["healthcheck"]["test"])
 
 
 def test_the_model_provider_keys_the_company_uses_reach_the_container(service):
