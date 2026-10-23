@@ -110,3 +110,16 @@ def test_the_healthcheck_reports_a_dead_dashboard_port(deployment):
     check = _healthcheck()
     assert check.port_open(1) is False
     assert check.main(port=1) == 1
+
+
+def test_a_profile_cannot_loosen_the_docker_sandbox_from_its_own_config(deployment):
+    """The docker backend's mounts and raw `docker run` flags are the sandbox's walls: pinned, not user-editable."""
+    from hermes_cli.managed_scope import apply_managed_overlay
+
+    config = apply_managed_overlay({"terminal": {
+        "backend": "docker", "docker_mount_cwd_to_workspace": True,
+        "docker_volumes": ["/:/host"], "docker_extra_args": ["--privileged"], "docker_image": "mine:latest"}})
+    terminal = config["terminal"]
+    assert terminal["docker_mount_cwd_to_workspace"] is False
+    assert terminal["docker_volumes"] == [] and terminal["docker_extra_args"] == []
+    assert terminal["backend"] == "docker" and terminal["docker_image"] == "mine:latest"  # unpinned keys stay theirs

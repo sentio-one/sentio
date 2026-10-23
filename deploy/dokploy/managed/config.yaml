@@ -13,3 +13,11 @@ access:
     - self_hosted
   admins: []
   users: []
+
+# Sandbox hardening for every profile that uses the docker terminal backend (the company's own `dockerd`, see
+# docker-compose.yml). Pinned so a granted user or an agent cannot mount the working directory, add volumes or pass
+# extra `docker run` flags (--privileged, --pid=host, ...) from their profile config.
+terminal:
+  docker_mount_cwd_to_workspace: false
+  docker_volumes: []
+  docker_extra_args: []

@@ -13,7 +13,13 @@ services:
     image: hermes-agent:${COMPANY_SLUG:-gateway}
     restart: unless-stopped
     command: ["gateway", "run"]
+    # Agent terminals run in containers on this company's own Docker daemon (the `dockerd` service), never on
+    # the host's: no docker.sock is mounted here, so nothing in this container can reach another company's.
+    depends_on:
+      dockerd:
+        condition: service_healthy
     environment:
+      DOCKER_HOST: tcp://dockerd:2375
       HERMES_UID: "10000"
       HERMES_GID: "10000"
 
@@ -37,6 +43,7 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      COMMANDCODE_API_KEY: ${COMMANDCODE_API_KEY:-}
     volumes:
       # Profiles, sessions, the grant store: everything this company owns. BACK THIS VOLUME UP.
       - hermes-data:/opt/data
@@ -52,5 +59,27 @@ services:
       # First boot builds caches and discovers plugins; do not mark it unhealthy while it settles.
       start_period: 180s
 
+  # This company's private Docker daemon: the sandbox for every profile that uses the docker terminal backend.
+  # Privileged because Docker-in-Docker needs it; it holds no company data and no secrets, and it is the only
+  # privileged service. Plain tcp is safe here only because nothing publishes the port and no domain points at this
+  # service: it is reachable solely by `hermes`, over this project's own network.
+  dockerd:
+    image: docker:27.5.1-dind
+    restart: unless-stopped
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - dockerd-data:/var/lib/docker
+    expose:
+      - "2375"
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
 volumes:
   hermes-data:
+  dockerd-data:

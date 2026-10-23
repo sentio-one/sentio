@@ -65,3 +65,24 @@ def test_the_container_goes_unhealthy_when_the_policy_is_missing(service):
     check = service["healthcheck"]
     assert check["test"][-1] == "/opt/healthcheck.py" and int(check["retries"]) >= 1
     assert re.fullmatch(r"\d+s", check["start_period"]) and int(check["start_period"][:-1]) >= 120
+
+
+def test_agent_sandboxes_run_on_the_companys_own_docker_daemon_never_the_hosts(compose, service):
+    """A host docker.sock in the gateway container would be root on the Dokploy host and reach other companies."""
+    assert service["environment"]["DOCKER_HOST"] == "tcp://dockerd:2375"
+    assert not any("docker.sock" in entry for entry in service["volumes"])
+    assert not service.get("privileged") and service.get("pid") != "host"
+    assert service["depends_on"]["dockerd"]["condition"] == "service_healthy"
+    daemon = compose["services"]["dockerd"]
+    assert daemon["privileged"] is True  # Docker-in-Docker needs it; this is the one privileged service
+    assert [name for name, svc in compose["services"].items() if svc.get("privileged")] == ["dockerd"]
+    assert "ports" not in daemon and daemon["expose"] == ["2375"] and daemon.get("network_mode") != "host"
+    assert daemon["image"].split(":", 1)[1] not in ("latest", "dind")  # pinned
+    assert daemon["volumes"] == ["dockerd-data:/var/lib/docker"] and "dockerd-data" in compose["volumes"]
+    assert not any("docker.sock" in entry for entry in daemon["volumes"])
+    assert "environment" not in daemon or not any("KEY" in k or "SECRET" in k for k in daemon["environment"])
+
+
+def test_the_model_provider_keys_the_company_uses_reach_the_container(service):
+    for key in ("COMMANDCODE_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        assert key in service["environment"]

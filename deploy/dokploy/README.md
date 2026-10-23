@@ -13,7 +13,7 @@ read the checklist at the end before putting a customer on it.
 
 | File | Role |
 |---|---|
-| `docker-compose.yml` | the service: gateway + web gateway (dashboard) in one container, nothing published on the host |
+| `docker-compose.yml` | two services: `hermes` (gateway + web gateway, nothing published on the host) and `dockerd` (the company's own Docker-in-Docker daemon, the sandbox for agent terminals) |
 | `managed/config.yaml` | the **pinned access policy**, mounted read-only at `/etc/hermes`; wins over the profile's own config |
 | `healthcheck.py` | marks the container unhealthy if the port is closed **or the access policy is not active** |
 
@@ -32,13 +32,18 @@ from adding themselves as an admin.
 | `OIDC_CLIENT_ID` | yes | client id registered at that IdP |
 | `OIDC_CLIENT_SECRET` | no | leave empty for a public (PKCE) client |
 | `ADMIN_GROUP` | yes | IdP group whose members are admins, e.g. `hermes-admins` |
-| `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | as needed | this company's model keys |
+| `COMMANDCODE_API_KEY` | as needed | this company's Command Code key (provider `commandcode`) |
+| `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | as needed | this company's other model keys |
+
+Codex is a subscription login, not an env key: one subscription per company. After the first deploy open a terminal in the
+`hermes` container (Dokploy → Terminal) and run `hermes auth` for Codex as the admin; the login is stored in that profile's
+auth file on the `hermes-data` volume.
 
 A missing required value aborts the deploy (`${VAR:?...}`), so a project cannot start half-configured.
 
 ## Create a company
 
-1. **Dokploy → Create Compose → Source: Git.** Repository: this GitLab repo, branch: the one you deploy from, compose
+1. **Dokploy → Create Compose → Source: Git.** Repository: `github.com/sentio-one/sentio` (Dokploy needs a deploy key or GitHub App if the repo is private), branch: the one you deploy from, compose
    path `./deploy/dokploy/docker-compose.yml`. Turn on auto-deploy for the branch.
 2. **Environment tab:** fill the table above.
 3. **Domains tab:** host = the company's hostname, service = `hermes`, container port = `9119`. HTTPS off at Traefik
@@ -86,10 +91,18 @@ manage it in the IdP.
 
 ## Limits that matter
 
-- **Inside one company, everyone shares one container.** Granted users' agents run as the container's `hermes` user and
-  can read all of that company's profiles' files. Profiles separate access through the app, not at the OS level. The
-  container is the boundary **between companies**.
+- **Sandbox: how it is meant to work.** The main (launch) profile runs its tools inside the `hermes` container, because its
+  agent provisions the other profiles. Every other profile is created with `terminal.backend: docker`, so its commands run in
+  containers on the company's `dockerd`, which has no access to `/opt/data`. The pinned `managed/config.yaml` also fixes
+  `docker_volumes`, `docker_extra_args` and `docker_mount_cwd_to_workspace`, so a profile cannot widen its own sandbox.
+- **Sandbox: what is not enforced yet.** Nothing stops a granted user from setting their profile's `terminal.backend` back to
+  `local`, which runs commands as the container's `hermes` user with every profile's files in reach. Until that is closed
+  (`FORK_DECISIONS.md` O1) treat a grant as host-level trust inside the company; the container is the boundary **between
+  companies**.
+- **`dockerd` is privileged** (Docker-in-Docker needs it). It holds no company data and no secrets, publishes no port, and no
+  domain points at it. Do not mount the host's `docker.sock` into any service: that would be root on the Dokploy host and
+  reach other companies' containers (`tests/gateway/test_dokploy_compose.py` fails if you do).
 - Static per-user rules (`access.users` / `access.admins`) are deliberately empty in the pinned file. If a company's IdP
   cannot emit groups, fork `managed/config.yaml` for that company rather than loosening the shared one.
-- The compose file builds with `build:`. If server builds become a problem, move the build to GitLab CI, push to the
-  GitLab registry and switch the compose `image:` to that tag (and have Dokploy pull with a read-only deploy token).
+- The compose file builds with `build:`. If server builds become a problem, build in GitHub Actions, push to GHCR and switch
+  the compose `image:` to that tag (Dokploy pulls with a read-only token).
