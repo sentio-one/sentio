@@ -35,3 +35,7 @@ docker/entrypoint.sh text eol=lf
 *.html  text eol=lf
 *.svg   text eol=lf
 *.ps1   text eol=crlf
+
+# The fork's README replaces upstream's. With `git config merge.ours.driver true` an upstream merge keeps ours
+# without a conflict (without the driver git falls back to a normal merge).
+README.md merge=ours

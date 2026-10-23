@@ -1,309 +1,98 @@
-<p align="center">
-  <img src="assets/banner.png" alt="Hermes Agent" width="100%">
-</p>
+# Sentio One
 
-# Hermes Agent ☤
+**An AI agent platform your company hosts for its own people.**
 
-> **Sentio One fork.** Upstream Hermes Agent plus per-company hosting, per-user profile access and a remote-only desktop client. [Jump to what the fork adds](#sentio-one-this-fork).
+Sentio One gives a business one central AI agent gateway, sign-in through the company's own identity provider, and a
+separate workspace for every person, so each employee gets an agent that remembers their work, uses their tools and
+never sees anyone else's. IT decides who gets which workspace from the groups it already manages.
 
-<p align="center">
-  <a href="https://hermes-agent.nousresearch.com/">Hermes Agent</a> | <a href="https://hermes-agent.nousresearch.com/">Hermes Desktop</a>
-</p>
-<p align="center">
-  <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-hermes--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
-  <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://github.com/NousResearch/hermes-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
-  <a href="https://nousresearch.com"><img src="https://img.shields.io/badge/Built%20by-Nous%20Research-blueviolet?style=for-the-badge" alt="Built by Nous Research"></a>
-  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/Lang-中文-red?style=for-the-badge" alt="中文"></a>
-  <a href="README.ur-pk.md"><img src="https://img.shields.io/badge/Lang-اردو-green?style=for-the-badge" alt="اردو"></a>
-  <a href="README.es.md"><img src="https://img.shields.io/badge/Lang-Español-orange?style=for-the-badge" alt="Español"></a>
-</p>
-
-**The self-improving AI agent built by [Nous Research](https://nousresearch.com).** It's the only agent with a built-in learning loop — it creates skills from experience, improves them during use, nudges itself to persist knowledge, searches its own past conversations, and builds a deepening model of who you are across sessions. Run it on a $5 VPS, a GPU cluster, or serverless infrastructure that costs nearly nothing when idle. It's not tied to your laptop — talk to it from Telegram while it works on a cloud VM.
-
-Use any model you want — [Nous Portal](https://portal.nousresearch.com), OpenRouter, OpenAI, your own endpoint, and [many others](https://hermes-agent.nousresearch.com/docs/integrations/providers). Switch with `hermes model` — no code changes, no lock-in.
-
-<table>
-<tr><td><b>A real terminal interface</b></td><td>Full TUI with multiline editing, slash-command autocomplete, conversation history, interrupt-and-redirect, and streaming tool output.</td></tr>
-<tr><td><b>Lives where you do</b></td><td>Telegram, Discord, Slack, WhatsApp, Signal, and CLI — all from a single gateway process. Voice memo transcription, cross-platform conversation continuity.</td></tr>
-<tr><td><b>A closed learning loop</b></td><td>Agent-curated memory with periodic nudges. Autonomous skill creation after complex tasks. Skills self-improve during use. FTS5 session search with LLM summarization for cross-session recall. <a href="https://github.com/plastic-labs/honcho">Honcho</a> dialectic user modeling. Compatible with the <a href="https://agentskills.io">agentskills.io</a> open standard.</td></tr>
-<tr><td><b>Scheduled automations</b></td><td>Built-in cron scheduler with delivery to any platform. Daily reports, nightly backups, weekly audits — all in natural language, running unattended.</td></tr>
-<tr><td><b>Delegates and parallelizes</b></td><td>Spawn isolated subagents for parallel workstreams. In Desktop, choose their provider, model, and limits under Settings → Model → Subagents, then Apply the complete route. Write Python scripts that call tools via RPC, collapsing multi-step pipelines into zero-context-cost turns.</td></tr>
-<tr><td><b>Runs anywhere, not just your laptop</b></td><td>Six built-in terminal backends — local, Docker, SSH, Modal, Daytona, and Vercel Sandbox — plus plugin backends such as Singularity/Apptainer. Daytona and Modal offer serverless persistence — your agent's environment hibernates when idle and wakes on demand, costing nearly nothing between sessions. Run it on a $5 VPS or a GPU cluster.</td></tr>
-<tr><td><b>Research-ready</b></td><td>Batch trajectory generation, trajectory compression for training the next generation of tool-calling models.</td></tr>
-</table>
+It is built on [Hermes Agent](https://github.com/NousResearch/hermes-agent) (MIT, by Nous Research): the agent itself,
+its memory, skills, scheduled jobs, browser and terminal tools, and messaging integrations are Hermes. Sentio One adds
+what a company needs to run it for many people.
 
 ---
 
-## Sentio One: this fork
+## Why a business would use it
 
-This repository is **Sentio One**, a private fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) (MIT,
-by Nous Research; everything below the fork section is upstream's README). The fork turns Hermes into something a company
-can host once and give to many people: **one central gateway per company, a thin desktop client, and per-user access to
-individual profiles.** We take updates from upstream and never send changes back.
+| You need | Sentio One |
+|---|---|
+| One deployment you control | One gateway per company, on your own infrastructure. Profiles, conversations and settings live on a volume you back up. |
+| Staff sign in with company accounts | Any OIDC provider that issues a `groups` claim (Keycloak, Authentik, Entra, Okta, ...). No separate passwords. |
+| Each person gets their own agent | A **profile** per person: its own memory, skills, settings and history. People reach only the profiles they are granted. |
+| IT controls access without a new admin tool | Access comes from IdP groups: `hermes-profile-<name>` grants a profile, one admin group grants everything. Or send an **invite link** for a single profile. |
+| A simple client for staff | A thin desktop app with no agent runtime of its own. One installer serves every company; the link tells it where to connect. |
+| Your choice of model | Bring your own provider keys or subscriptions (Command Code, Codex, OpenRouter, Anthropic, OpenAI, and the other providers Hermes supports). |
+| Agents that do real work | Everything Hermes does: persistent memory, learned skills, scheduled jobs, browser and terminal control, delegation to sub-agents, and messaging channels such as Slack, Telegram and Discord. |
+
+---
+
+## How it works
 
 ```
-  Light desktop client (no local agent)          Company gateway, one per company (Dokploy)
-  ┌──────────────────────────────┐   https    ┌─────────────────────────────────────────────┐
-  │ hermes://connect?url=&invite= │ ────────▶ │ Cloudflare Tunnel → Traefik → hermes container│
-  │ confirm host → sign in (OIDC) │            │  • company SSO (OIDC), groups claim          │
-  │ remote-only, nothing local    │ ◀──────── │  • access policy (admins / profile groups)   │
-  └──────────────────────────────┘ websocket  │  • invites, REST role gate, profile roster   │
-                                               │  • profiles + sessions on a persistent volume│
-                                               └─────────────────────────────────────────────┘
+  Desktop app (remote-first)                    Company gateway, one per company
+  ┌──────────────────────────────┐   https    ┌──────────────────────────────────────────────┐
+  │ hermes://connect?url=&invite= │ ────────▶ │ Cloudflare Tunnel → Traefik → gateway         │
+  │ confirm the server, sign in   │            │  • company sign-in (OIDC) and groups          │
+  │ (company SSO)                 │ ◀──────── │  • who may use which profile (admins, groups) │
+  │ no local agent runtime        │ websocket  │  • invites, admin Access page                 │
+  └──────────────────────────────┘            │  • profiles + sessions on a persistent volume │
+                                               │  • its own Docker daemon, for sandboxing      │
+                                               │    agent tools                                │
+                                               └──────────────────────────────────────────────┘
 ```
 
-### What the fork adds
+1. **IT deploys a gateway** for the company (one Dokploy project; a ready-made compose file is included).
+2. **IT connects the company's identity provider** and decides who is an admin and who gets which profile.
+3. **People install the desktop app** and open an invite link (or enter the gateway address). The app shows the server
+   for confirmation, they sign in with their company account, and they land in their own workspace.
 
-| Area | What it does | Where |
-|---|---|---|
-| **Per-user profile access** | A signed-in user reaches only the profiles their IdP groups (or an invite) grant. Admins are an IdP group. Unknown users reach nothing. Enforced on the gateway WebSocket, the legacy RPC plane, the profile-selecting sockets and REST. | `gateway/access_policy.py`, `gateway/session_access.py`, `hermes_cli/dashboard_auth/access*.py` |
-| **REST role gate** | Host-level routes (files, git, plugin install, update, profile lifecycle) are admin-only; profile routes check every profile the request names; unclassified routes default to admin-only. | `hermes_cli/dashboard_auth/access_http.py` |
-| **Invite links** | An admin invites a person to one profile and gets a `hermes://connect` link. Single-use by default, hashed at rest, rate-limited, never grants admin. | `gateway/access_grants.py`, `hermes_cli/web_routers/access_invites.py` |
-| **Light desktop client** | The desktop app built remote-only: no Python, no local agent, never offers a local install. Opens a confirmation screen for `hermes://connect` links, then the ordinary sign-in. | `apps/desktop` (`HERMES_DESKTOP_VARIANT=light`), `src/lib/connect-link.ts` |
-| **Per-company deployment** | A Dokploy compose project per company with the policy pinned read-only and a healthcheck that fails closed if the policy is missing. | `deploy/dokploy/` |
-| **Sandboxed agents** | Every company gets its own Docker-in-Docker daemon; non-main profiles run their tools in containers on it, never on the host. | `deploy/dokploy/docker-compose.yml`, `deploy/dokploy/managed/config.yaml` |
-| **CI** | `Fork CI` guards the fork's changes on GitHub-hosted runners; a tag `v*` builds and publishes the Light installer. Upstream's workflows are switched off. | `.github/workflows/fork-ci.yml`, `release-light.yml`, `scripts/fork/` |
-
-### Honest status
-
-Built and unit-tested: the access policy and enforcement, the REST gate, the invite store and API, the desktop link
-parser and confirmation screen, the compose file's safety properties and the policy loading.
-**Not yet exercised:** the container (no Docker where this was written), an invite redeemed end to end against a live
-gateway, the Light release workflow on a real run, installer signing (the installer is unsigned), and WebSocket keepalive
-through a Cloudflare Tunnel. Agents of non-main profiles are meant to run in the company's own Docker sandbox, but nothing yet
-stops a granted user switching their profile back to the local backend, so until that is closed the container is the
-boundary between companies, not between people in one company. The full list is in
-[`docs/private-fork/ACCESS_CONTROL_PLAN.md`](docs/private-fork/ACCESS_CONTROL_PLAN.md).
-
-### Run it
-
-1. **Deploy a company gateway.** Create a Dokploy Compose project from this repo (`deploy/dokploy/docker-compose.yml`), fill in
-   `PUBLIC_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `ADMIN_GROUP`, add the domain and tunnel hostname.
-   Steps and checklist: [`deploy/dokploy/README.md`](deploy/dokploy/README.md).
-2. **Build the Light client.** `scripts/bundles/desktop.py --commit <sha> --variant light` from a clean checkout, or push a
-   `v*` tag and let `Release Light Desktop` build and publish `HermesLight-*.msix` (a manual run builds and uploads the artifact only).
-3. **Invite someone.** As an admin, `POST /api/access/invites {"profile": "alpha"}` returns a link; the person opens it, confirms the
-   server, signs in, and lands on that profile. Design and API: [`docs/private-fork/INVITES_DESIGN.md`](docs/private-fork/INVITES_DESIGN.md).
-
-### Working on the fork
-
-- Hosting: GitHub (`sentio-one/sentio`), `main` is ours. `upstream` is `NousResearch/hermes-agent` with push disabled; nothing goes back.
-- Take upstream updates on a branch, never straight on `main`: `git fetch upstream && git switch -c merge-upstream-$(date +%F) && git merge upstream/main`.
-  Then follow [`FORK_DECISIONS.md`](docs/private-fork/FORK_DECISIONS.md) section 3 (new routes are admin-only until classified in `access_http.py`),
-  run `scripts/fork/disable-upstream-workflows.sh --apply` (new upstream workflows arrive enabled) and `python scripts/check`.
-- Tests: always `scripts/run_tests.sh`, never bare `pytest` (see `AGENTS.md`). Desktop: `npm run typecheck` and `npx vitest run` in `apps/desktop`.
-- Fork documents live in [`docs/private-fork/`](docs/private-fork/); start with [`FORK_DECISIONS.md`](docs/private-fork/FORK_DECISIONS.md) (every difference from upstream and the post-merge checklist). Also: the access control plan and audit, the invite design, and
-  the Phase 0 route inventory.
+The desktop app is **remote-first**: connecting to the company gateway is the default experience, and running an agent
+locally is an optional extra, not a requirement.
 
 ---
 
-## Quick Install
+## What Sentio One adds to Hermes
 
-### Linux, macOS, WSL2
+- **Per-user, per-profile access control** enforced across live sessions, the REST API and the profile-selecting sockets,
+  failing closed: an unknown person reaches nothing.
+- **Invite links** that grant one profile, single-use by default, expiring, revocable, never granting admin.
+- **An admin Access page** to create and revoke invites and to see the access they granted.
+- **A pinned per-company policy** the people using it cannot edit, with a healthcheck that fails if the policy is missing.
+- **A per-company deployment** for Dokploy: the gateway plus its own Docker daemon, so agent tools can be sandboxed per company.
+- **A remote-first desktop client** with a confirm-before-connect screen for `hermes://connect` links.
+- **Fork CI** that tests the access model, invites, desktop client and deployment file on every change.
 
-```bash
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
-```
-
-### Windows (native, PowerShell)
-
-> **Heads up:** Native Windows runs Hermes without WSL — CLI, gateway, TUI, and tools all work natively. If you'd rather use WSL2, the Linux/macOS one-liner above works there too. Found a bug? Please [file issues](https://github.com/NousResearch/hermes-agent/issues).
-
-Run this in PowerShell:
-
-```powershell
-iex (irm https://hermes-agent.nousresearch.com/install.ps1)
-```
-
-The source installer delegates Python 3.14, Node.js, npm, ripgrep, FFmpeg,
-and Python dependencies to PM. If Git is absent, it stages the verified Git
-for Windows archive in Hermes' tool store. It does not replace your system Git.
-See [installation methods](https://hermes-agent.nousresearch.com/docs/getting-started/installation)
-for the separate MSIX/App Installer package and its update ownership.
-
-> **Android / Termux:** A signed APT repository is available for aarch64 devices, with a `stable` channel (tagged releases) and a prerelease `canary` channel. The package includes Python, Node.js, and the TUI. Use the [Termux guide](https://hermes-agent.nousresearch.com/docs/getting-started/termux), not the desktop/server installer script.
->
-> **Windows:** Native Windows is fully supported — the PowerShell one-liner above installs everything. If you'd rather use WSL2, the Linux command works there too. Native Windows install lives under `%LOCALAPPDATA%\hermes`; WSL2 installs under `~/.hermes` as on Linux.
-
-After installation:
-
-```bash
-source ~/.bashrc    # reload shell (or: source ~/.zshrc)
-hermes              # start chatting!
-```
-
-### Troubleshooting
-
-#### Windows Defender or antivirus flags `uv.exe` as malware
-
-If your antivirus (Bitdefender, Windows Defender, etc.) quarantines `uv.exe` from the Hermes `bin` folder (`%LOCALAPPDATA%\hermes\bin\uv.exe`), this is a **false positive**. The file is Astral's `uv` — the Rust Python package manager Hermes bundles to manage its Python environment. ML-based antivirus engines commonly flag unsigned Rust binaries that download and install packages.
-
-**To verify your copy is authentic:**
-
-```powershell
-# Install GitHub CLI if needed
-winget install --id GitHub.cli
-
-# Login to GitHub
-gh auth login
-
-# Run verification
-$uv = "$env:LOCALAPPDATA\hermes\bin\uv.exe"
-$ver = (& $uv --version).Split(' ')[1]
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$zip = "$env:TEMP\uv.zip"
-Invoke-WebRequest "https://github.com/astral-sh/uv/releases/download/$ver/uv-x86_64-pc-windows-msvc.zip" -OutFile $zip -UseBasicParsing
-gh attestation verify $zip --repo astral-sh/uv
-Expand-Archive $zip "$env:TEMP\uv_x" -Force
-(Get-FileHash "$env:TEMP\uv_x\uv.exe").Hash -eq (Get-FileHash $uv).Hash
-```
-
-If attestation says "Verification succeeded" and the last line prints `True`, you're good.
-
-**To whitelist Hermes:**
-- **Windows Defender:** Run PowerShell as Admin → `Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\hermes\bin"`
-- **Bitdefender:** Add an exception in the Bitdefender console (Protection > Antivirus > Settings > Manage Exceptions)
-- Whitelist the **folder**, not the file hash — Hermes updates `uv` and the hash changes every version
-
-For more context, see the upstream Astral reports: [astral-sh/uv#13553](https://github.com/astral-sh/uv/issues/13553), [astral-sh/uv#15011](https://github.com/astral-sh/uv/issues/15011), [astral-sh/uv#10079](https://github.com/astral-sh/uv/issues/10079).
+Every difference from upstream, and why, is recorded in
+[`docs/private-fork/FORK_DECISIONS.md`](docs/private-fork/FORK_DECISIONS.md).
 
 ---
 
-## Getting Started
+## Status
 
-```bash
-hermes              # Interactive CLI — start a conversation
-hermes model        # Choose your LLM provider and model
-hermes tools        # Configure which tools are enabled
-hermes config set   # Set individual config values
-hermes config get   # Print individual config values
-hermes gateway      # Start the messaging gateway (Telegram, Discord, etc.)
-hermes setup        # Run the full setup wizard (configures everything at once)
-hermes update       # Update to the latest version
-hermes doctor       # Diagnose any issues
-```
-
-📖 **[Full documentation →](https://hermes-agent.nousresearch.com/docs/)**
+**Pre-release.** The access model, invites, admin page, desktop client and deployment files are built and covered by
+automated tests that run on every change. Sentio One has not yet been deployed for a customer, and some items are still
+open before that happens, chiefly making the sandbox mandatory for everyone's agent tools. The checklist is in section 5 of
+[`FORK_DECISIONS.md`](docs/private-fork/FORK_DECISIONS.md).
 
 ---
 
-## Skip the API-key collection — Nous Portal
+## Run it
 
-Hermes works with whatever provider you want — that's not changing. But if you'd rather not collect five separate API keys for the model, web search, image generation, TTS, and a cloud browser, **[Nous Portal](https://portal.nousresearch.com)** covers all of them under one subscription:
+- **Deploy a company gateway:** [`deploy/dokploy/README.md`](deploy/dokploy/README.md) (environment, domain, tunnel, IdP, first-deploy checklist).
+- **Invite someone:** as an admin, open the dashboard's **Access** page and create an invite for a profile; send the link.
+  Design and API: [`docs/private-fork/INVITES_DESIGN.md`](docs/private-fork/INVITES_DESIGN.md).
+- **Build the desktop client:** push a `v*` tag and the `Release Light Desktop` workflow builds and publishes it, or run
+  `scripts/bundles/desktop.py --commit <sha> --variant light` from a clean checkout.
 
-- **300+ models** — pick any of them with `/model <name>`
-- **Tool Gateway** — web search, image generation (FAL), text-to-speech (OpenAI), cloud browser (Browser Use), all routed through your sub. No extra accounts.
+## Working on it
 
-One command from a fresh install:
-
-```bash
-hermes setup --portal
-```
-
-That logs you in via OAuth, sets Nous as your provider, and turns on the Tool Gateway. Check what's wired up any time with `hermes portal info`. Full details on the [Tool Gateway docs page](https://hermes-agent.nousresearch.com/docs/user-guide/features/tool-gateway).
-
-You can still bring your own keys per-tool whenever you want — the gateway is per-backend, not all-or-nothing.
-
----
-
-## CLI vs Messaging Quick Reference
-
-Hermes has two entry points: start the terminal UI with `hermes`, or run the gateway and talk to it from Telegram, Discord, Slack, WhatsApp, Signal, or Email. Once you're in a conversation, many slash commands are shared across both interfaces.
-
-| Action                         | CLI                                           | Messaging platforms                                                              |
-| ------------------------------ | --------------------------------------------- | -------------------------------------------------------------------------------- |
-| Start chatting                 | `hermes`                                      | Run `hermes gateway setup` + `hermes gateway start`, then send the bot a message |
-| Start fresh conversation       | `/new` or `/reset`                            | `/new` or `/reset`                                                               |
-| Change model                   | `/model [provider:model]`                     | `/model [provider:model]`                                                        |
-| Set a personality              | `/personality [name]`                         | `/personality [name]`                                                            |
-| Retry or undo the last turn    | `/retry`, `/undo`                             | `/retry`, `/undo`                                                                |
-| Compress context / check usage | `/compress`, `/usage`, `/insights [--days N]` | `/compress`, `/usage`, `/insights [days]`                                        |
-| Browse skills                  | `/skills` or `/<skill-name>`                  | `/<skill-name>`                                                                  |
-| Interrupt current work         | `Ctrl+C` or send a new message                | `/stop` or send a new message                                                    |
-| Platform-specific status       | `/platforms`                                  | `/status`, `/sethome`                                                            |
-
-For the full command lists, see the [CLI guide](https://hermes-agent.nousresearch.com/docs/user-guide/cli) and the [Messaging Gateway guide](https://hermes-agent.nousresearch.com/docs/user-guide/messaging).
-
----
-
-## Documentation
-
-All documentation lives at **[hermes-agent.nousresearch.com/docs](https://hermes-agent.nousresearch.com/docs/)**:
-
-| Section                                                                                             | What's Covered                                             |
-| --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| [Quickstart](https://hermes-agent.nousresearch.com/docs/getting-started/quickstart)                 | Install → setup → first conversation in 2 minutes          |
-| [CLI Usage](https://hermes-agent.nousresearch.com/docs/user-guide/cli)                              | Commands, keybindings, personalities, sessions             |
-| [Configuration](https://hermes-agent.nousresearch.com/docs/user-guide/configuration)                | Config file, providers, models, all options                |
-| [Messaging Gateway](https://hermes-agent.nousresearch.com/docs/user-guide/messaging)                | Telegram, Discord, Slack, WhatsApp, Signal, Home Assistant |
-| [Security](https://hermes-agent.nousresearch.com/docs/user-guide/security)                          | Command approval, DM pairing, container isolation          |
-| [Tools & Toolsets](https://hermes-agent.nousresearch.com/docs/user-guide/features/tools)            | 40+ tools, toolset system, terminal backends               |
-| [Skills System](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills)              | Procedural memory, Skills Hub, creating skills             |
-| [Memory](https://hermes-agent.nousresearch.com/docs/user-guide/features/memory)                     | Persistent memory, user profiles, best practices           |
-| [MCP Integration](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp)               | Connect any MCP server for extended capabilities           |
-| [Cron Scheduling](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron)              | Scheduled tasks with platform delivery                     |
-| [Context Files](https://hermes-agent.nousresearch.com/docs/user-guide/features/context-files)       | Project context that shapes every conversation             |
-| [Architecture](https://hermes-agent.nousresearch.com/docs/developer-guide/architecture)             | Project structure, agent loop, key classes                 |
-| [Contributing](https://hermes-agent.nousresearch.com/docs/developer-guide/contributing)             | Development setup, PR process, code style                  |
-| [CLI Reference](https://hermes-agent.nousresearch.com/docs/reference/cli-commands)                  | All commands and flags                                     |
-| [Environment Variables](https://hermes-agent.nousresearch.com/docs/reference/environment-variables) | Complete env var reference                                 |
-
----
-
-## Migrating from OpenClaw or another agent
-
-If you're coming from OpenClaw, Claude Code, Codex CLI or Cursor, Hermes can import your settings, memories and skills (and, for OpenClaw, API keys when you ask for them).
-
-**During setup:** `hermes setup` asks whether to import from another agent, pre-selects the ones it finds (`~/.openclaw`, `~/.claude`, `~/.codex`, `~/.cursor`), installs the official `agent-importers` plugin and runs the import with a preview first.
-
-**Anytime after install:**
-
-```bash
-hermes plugins install agent-importers          # once per profile
-hermes import-agent openclaw                    # interactive migration (full preset)
-hermes import-agent openclaw --dry-run          # preview what would be migrated
-hermes import-agent openclaw --migrate-secrets  # also bring allowlisted API keys
-hermes import-agent claude-code                 # or codex / cursor
-```
-
-What gets imported from OpenClaw:
-
-- **SOUL.md** — persona file
-- **Memories** — MEMORY.md and USER.md entries
-- **Skills** — user-created skills → `~/.hermes/skills/openclaw-imports/`
-- **Command allowlist** — approval patterns
-- **Messaging settings** — platform configs, allowed users, working directory
-- **API keys** — allowlisted secrets (Telegram, OpenRouter, OpenAI, Anthropic, ElevenLabs), only with `--migrate-secrets`
-- **TTS assets** — workspace audio files
-- **Workspace instructions** — AGENTS.md (with `--workspace-target`)
-
-`hermes claw migrate` still works as the older spelling. See the [OpenClaw migration guide](https://hermes-agent.nousresearch.com/docs/guides/migrate-from-openclaw) and [Import from Other Agents](https://hermes-agent.nousresearch.com/docs/user-guide/import-from-other-agents).
-
----
-
-## Contributing
-
-We welcome contributions! See the [Contributing Guide](https://hermes-agent.nousresearch.com/docs/developer-guide/contributing) for development setup, code style, and PR process.
-
-Start with the [PM developer workflow](website/docs/reference/package-management.md#developer-workflow)
-for activation, daily use, dependency changes, and leaving the environment.
-[Development Setup](CONTRIBUTING.md#development-setup) covers the separate test environment and verification commands.
-
----
-
-## Community
-
-- 💬 [Discord](https://discord.gg/NousResearch)
-- 📚 [Skills Hub](https://agentskills.io)
-- 🐛 [Issues](https://github.com/NousResearch/hermes-agent/issues)
-- 🔌 [computer-use-linux](https://github.com/avifenesh/computer-use-linux) — Linux desktop-control MCP server for Hermes and other MCP hosts, with AT-SPI accessibility trees, Wayland/X11 input, screenshots, and compositor window targeting.
-- 🔌 [HermesClaw](https://github.com/AaronWong1999/hermesclaw) — Community WeChat bridge: Run Hermes Agent and OpenClaw on the same WeChat account.
-
----
+- Hosted on GitHub; `upstream` is `NousResearch/hermes-agent` (read-only, nothing is sent back). Upstream updates arrive on
+  the `upstream-merge` branch through a pull request, following the checklist in
+  [`FORK_DECISIONS.md`](docs/private-fork/FORK_DECISIONS.md) section 3.
+- Tests: always `scripts/run_tests.sh`, never bare `pytest`. Lint: `python scripts/check`. Desktop and web: `npm run typecheck`
+  and `npx vitest run` in `apps/desktop` and `web`. See [`AGENTS.md`](AGENTS.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Fork documents: [`docs/private-fork/`](docs/private-fork/) (access control plan and audit, invite design, route inventory).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
-Built by [Nous Research](https://nousresearch.com).
+MIT. Hermes Agent is © Nous Research; Sentio One's additions are released under the same license. See [`LICENSE`](LICENSE).
