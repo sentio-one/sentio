@@ -12,8 +12,19 @@ scripts/fork/bump-version.sh 0.2.0      one command, four files
    release-light.yml  the tag push builds HermesLight-0.2.0-win-x64.msix and publishes the GitHub release
 ```
 
-Every other merge to `main` (no version change) still builds the installer, kept as a workflow artifact for 30 days and not
-published. Docs-only merges skip the build.
+## Finding the newest build
+
+| You want | Go to | Notes |
+|---|---|---|
+| The newest build of `main`, including every merge since the last version bump | **Releases**, the pre-release titled *Light desktop, newest main build (`<commit>`)*, tag `main-latest` | Replaced on every merge to `main`, so it is always the same address. It is a **pre-release** and is never marked *Latest*. Its notes show the commit, the merge it came from, and the installer's SHA-256. |
+| The newest *stable* version | **Releases**, the one marked *Latest* | Only changes when a version bump is merged. |
+| To be told when something new exists | **Watch** > **Custom** > tick **Releases** (on the repository page) | A fresh release is published on each merge, so watchers should be notified each time. Not yet confirmed to arrive; check the first one. |
+| A build that has not been replaced yet, or an older one | **Actions** > *Release Light Desktop* > the run > **Artifacts** | Needs a GitHub login; kept 30 days; named `hermes-light-desktop-<commit>`. |
+
+The installer inside a `main-latest` build is still named for the version in `package.json` (for example `0.1.0`), because that
+only changes on a version bump. The commit in the title and notes is what tells two main builds apart.
+
+Every merge to `main` that is not docs-only builds and refreshes `main-latest`. Docs-only merges skip the build and leave it as it was.
 
 ## One-time setup (the repository owner, account `sentio-one`)
 
