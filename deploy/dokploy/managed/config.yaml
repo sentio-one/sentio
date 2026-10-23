@@ -14,9 +14,11 @@ access:
   admins: []
   users: []
 
-# Sandbox hardening for every profile that uses the docker terminal backend (the company's own `dockerd`, see
-# docker-compose.yml). Pinned so a granted user or an agent cannot mount the working directory, add volumes or pass
-# extra `docker run` flags (--privileged, --pid=host, ...) from their profile config.
+# Intended sandbox hardening for the docker terminal backend (the company's own `dockerd`, see docker-compose.yml): no
+# working-directory mount, no extra volumes, no raw `docker run` flags (--privileged, --pid=host, ...).
+# NOT YET EFFECTIVE for a routed profile's terminal: tools/terminal_scope.build_profile_terminal_scope reads each profile's
+# own config.yaml and .env raw and ignores this overlay (verified 2026-10-23; docs/private-fork/SANDBOX_PLAN.md, phase 1).
+# These keys only apply where the config is loaded through load_config. Do not rely on them as a security boundary.
 terminal:
   docker_mount_cwd_to_workspace: false
   docker_volumes: []

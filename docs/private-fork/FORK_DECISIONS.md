@@ -161,8 +161,12 @@ Resolves A6 in direction. Built:
   no domain, own `dockerd-data` volume) and `hermes` gets `DOCKER_HOST=tcp://dockerd:2375` and waits for it to be healthy.
   **No host `docker.sock` anywhere**: it would be root on the Dokploy host and reach other companies' containers.
   `test_agent_sandboxes_run_on_the_companys_own_docker_daemon_never_the_hosts` fails if that changes.
-- `managed/config.yaml` pins `terminal.docker_volumes: []`, `docker_extra_args: []`, `docker_mount_cwd_to_workspace: false`
-  (the overlay is global, so it covers every profile and a user cannot loosen their sandbox).
+- `managed/config.yaml` pins `terminal.docker_volumes: []`, `docker_extra_args: []`, `docker_mount_cwd_to_workspace: false`.
+  *Correction (2026-10-23):* this was written as if the overlay covered every profile. It does not on the path that decides execution:
+  `tools/terminal_scope.build_profile_terminal_scope` reads a routed profile's `config.yaml` and `.env` raw and ignores the managed
+  overlay, so a hostile profile config still yields `docker_volumes ["/:/host"]`, `--privileged`, `docker_forward_env` of the gateway's
+  secrets and the local backend (shown by `tests/tools/test_terminal_scope_sandbox_gap.py`). The pins only apply where config is
+  loaded through `load_config`. Enforcement design: `SANDBOX_PLAN.md`.
 - Not pinned on purpose: `terminal.backend`. The main profile must keep the local backend because its agent provisions the
   others (D13), and the managed overlay cannot differ per profile.
 Not built, so **not yet a boundary between people in one company**:
@@ -266,6 +270,8 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
   `_tenv("TERMINAL_ENV")`): when an access policy is configured and the active profile is not the launch profile, force
   `docker`. That edits a ratcheted upstream file, so it needs a small sibling module and a test on the real resolver. Then
   run D12's verify list on a throwaway company.
+  **Plan written: `SANDBOX_PLAN.md`** (findings G1-G8, phases 0-5, decisions for the owner). Finding G1 supersedes the seam suggested
+  above: the policy is decided in `tools/terminal_scope.build_profile_terminal_scope`.
 - **O2. PTY child still uses the host-scoped internal credential.** Binding it to the PTY's profile server-side
   (`mint_ticket(extra=...)`) was planned (A3) and is not done.
 - **O3. A "create a profile" skill/convention for the main agent** that creates the profile with the docker backend, a
@@ -278,7 +284,9 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
 - **O6. Merge upstream.** 3,200 commits behind with 3 known conflicts (header). Do it on a branch, then section 3.
 - **O7. Strings** for the Access page and connect dialog are English only.
 - **O8.** `.commandcode/taste/taste.md` is an empty tracked file; likely stray.
-- **O9. How "remote-first, optional local" is delivered (L1).** What exists: upstream builds three desktop variants
+- **O9. How "remote-first, optional local" is delivered (L1). DECIDED 2026-10-23: option A, one remote-first installer** with an
+  on-demand local install; options B and C are rejected. What is still open is the design of A (the two questions at the end of this item).
+  Original analysis follows. What exists: upstream builds three desktop variants
   (`bundled`, `store`, `light`, `scripts/bundles/desktop.py --variant`) and a first-run card offering "connect to existing" or
   "install/use local" (`SetupChoice`); non-bundled builds install the runtime on demand ("bootstrap"). The fork's only addition is
   `apps/desktop/electron/light-first-run.ts`: for `payload === 'light'` the card is skipped and local install is refused.

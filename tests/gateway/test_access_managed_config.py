@@ -113,7 +113,8 @@ def test_the_healthcheck_reports_a_dead_dashboard_port(deployment):
 
 
 def test_a_profile_cannot_loosen_the_docker_sandbox_from_its_own_config(deployment):
-    """The docker backend's mounts and raw `docker run` flags are the sandbox's walls: pinned, not user-editable."""
+    """Scope: the overlay applied to a config dict, as ``load_config`` does. It does NOT cover a routed profile's terminal policy,
+    which ``build_profile_terminal_scope`` builds from the raw files (tests/tools/test_terminal_scope_sandbox_gap.py)."""
     from hermes_cli.managed_scope import apply_managed_overlay
 
     config = apply_managed_overlay({"terminal": {
