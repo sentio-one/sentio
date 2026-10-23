@@ -1,0 +1,24 @@
+# Weekly check that the repository protection still matches .github/rulesets/*.json (scripts/fork/check-github-protection.sh).
+# Goes red when a ruleset is edited, removed, or was never applied. Docs: docs/private-fork/REPO_PROTECTION.md.
+name: Protection drift
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Repository protection matches the rulesets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
+
+      - name: Check
+        run: scripts/fork/check-github-protection.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
