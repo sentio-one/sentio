@@ -10,7 +10,10 @@
 set -euo pipefail
 
 KEEP=("Fork CI" "Release Light Desktop")
-repo="${HERMES_FORK_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
+# The fork is `origin`. Never `gh repo view`: with an `upstream` remote present, gh may resolve to NousResearch/hermes-agent.
+fork_repo() { git remote get-url origin | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##'; }
+repo="${HERMES_FORK_REPO:-$(fork_repo)}"
+echo "repository: $repo"
 apply=0
 [[ "${1:-}" == "--apply" ]] && apply=1
 

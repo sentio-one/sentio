@@ -44,7 +44,8 @@ jobs:
             tests/gateway/test_legacy_fallback_access.py tests/gateway/test_dokploy_compose.py \
             tests/hermes_cli/test_dashboard_rest_access.py tests/hermes_cli/test_dashboard_ws_profile_gate.py \
             tests/hermes_cli/test_dashboard_access_scope.py tests/hermes_cli/test_access_invites_api.py \
-            tests/hermes_cli/test_auth_me_access.py tests/plugins/dashboard_auth/test_session_groups.py
+            tests/hermes_cli/test_auth_me_access.py tests/plugins/dashboard_auth/test_session_groups.py \
+            tests/scripts/test_check_github_protection.py
         env:
           OPENROUTER_API_KEY: ""
           OPENAI_API_KEY: ""

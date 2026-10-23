@@ -241,7 +241,8 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
      tests/gateway/test_legacy_fallback_access.py tests/gateway/test_dokploy_compose.py \
      tests/hermes_cli/test_dashboard_rest_access.py tests/hermes_cli/test_dashboard_ws_profile_gate.py \
      tests/hermes_cli/test_dashboard_access_scope.py tests/hermes_cli/test_access_invites_api.py \
-     tests/hermes_cli/test_auth_me_access.py tests/plugins/dashboard_auth/test_session_groups.py
+     tests/hermes_cli/test_auth_me_access.py tests/plugins/dashboard_auth/test_session_groups.py \
+     tests/scripts/test_check_github_protection.py
    scripts/run_tests.sh tests/gateway tests/hermes_cli
    python scripts/check
    cd apps/desktop && npm run typecheck && npx vitest run
@@ -302,6 +303,14 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
   `@{profile}`, `host_scoped`) and decide per feature. Candidate for the delegation case: pin `delegation.backend: default` in
   `managed/config.yaml`.
 
+- **O11. Repository protection is not in force yet** (found 2026-10-23). Both existing rulesets target a branch named `protect-main`,
+  which does not exist, so `main` was unprotected; tags and `upstream-merge` had no rules; squash and rebase merging were on. The
+  rules now exist as code (`.github/rulesets/`), with an apply script, a read-only checker (also run weekly) and a walkthrough:
+  `docs/private-fork/REPO_PROTECTION.md`. **Only the owner account `sentio-one` can apply them** (the `TheophilusChinomona` account
+  has write, not admin). Order: merge the sandbox-isolation CI job first, apply, run the checker, and only then consider going
+  private (rulesets on a private repository need a paid plan). One-time per clone: `gh repo set-default sentio-one/sentio`, because
+  with an `upstream` remote `gh` resolves to NousResearch/hermes-agent and a bare `gh pr create` would target upstream.
+
 ## 5. Go-live gate (all must be true before a customer is on a gateway)
 
 - [ ] Sandbox enforced (O1): non-main profiles cannot run on the local backend; verified on a throwaway company with D12's list.
@@ -312,6 +321,7 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
 - [ ] Repository private, branch protection on, README rewritten for the business audience (O0).
 - [ ] Desktop delivery decided and built (O9); installer signing decision made.
 - [ ] A backup and restore of `hermes-data` and `dockerd-data` tested.
+- [ ] Repository protection applied and `scripts/fork/check-github-protection.sh` green (O11).
 
 ## 6. Upstream merge log
 
