@@ -133,7 +133,10 @@ editable. If a new `access:` key is added, add it to this file.
 ### D10. Release and housekeeping
 - Version `0.0.0` to `0.1.0` in `pyproject.toml`, `uv.lock` and `apps/desktop/package.json`. `uv.lock` had been left
   at `0.0.0`, which made `python scripts/run_tests.sh`'s environment bootstrap fail (`uv lock --check`); fixed with `uv lock`.
-- README: fork section above upstream's README. `architecture/` (diagrams) and `.plugin-skills/` (plugin builder
+- README: rewritten for a business audience (what Sentio One is, why a company would use it, how it works, honest status);
+  upstream's README is gone from `README.md` and `.gitattributes` marks it `merge=ours`. Run `git config merge.ours.driver true` once per clone
+  so upstream merges keep ours without a conflict. The translated `README.es.md`, `README.zh-CN.md`, `README.ur-pk.md` still describe upstream
+  Hermes and are not updated. (Earlier: fork section above upstream's README.) `architecture/` (diagrams) and `.plugin-skills/` (plugin builder
   skills, verified against upstream `e5eb6b36`) are fork-only documentation.
 - Comment-only trims in upstream files: `apps/desktop/electron/main.ts` **keeps** its trimmed comment, because restoring
   upstream's longer one puts the file 7 lines over its health-ratchet cap (`scripts/check` fails). `tui_gateway/server.py`
@@ -250,6 +253,7 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
    Baseline on 2026-10-23 (Linux): the 12 Python files above pass (174 tests), web 31, desktop UI 59, electron 13, both
    typechecks and `python scripts/check` (12 checks) are clean. Failures seen earlier on the Windows dev host
    (`TestEnvWriteDenylist`, `test_profiles.py`/`test_web_server.py`, `fcntl`) did not reproduce on Linux: treat them as host noise.
+   Once per clone: `git config merge.ours.driver true` (keeps the fork's `README.md` through upstream merges, see `.gitattributes`).
 9. **Merge the PR with a merge commit, never squash or rebase.** A squash drops upstream's commits from our ancestry, so the next
    `git merge upstream/main` re-conflicts on every file the fork touched. (Turn off squash and rebase merging in the repo settings.)
 10. **Update this file:** new base commit, new decisions, anything resolved by hand.
@@ -259,8 +263,7 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
 - **O0. The GitHub repository is public** (`sentio-one/sentio`, checked 2026-10-23), while the README and these docs call the
   fork private. It publishes the access-control audit, the known gaps (D9), the deployment layout and the invite design.
   Decided (L3): go private after cleanup and the upstream merge; until then do not add anything more sensitive to it. At that
-  point also: enable branch protection with required `Fork CI` (L2), give Dokploy a deploy key, and rewrite the README for a
-  business audience.
+  point also: enable branch protection with required `Fork CI` (L2) and give Dokploy a deploy key. (The business README rewrite is done.)
 - **O1. Make the sandbox real (deferred on purpose, must be done before go-live, L4).** Needed: non-main profiles get `terminal.backend: docker`, and a granted user cannot flip it
   to `local`. Candidate seam: where the terminal backend is resolved (`tools/terminal_tool.py::_get_env_config`, scope-aware
   `_tenv("TERMINAL_ENV")`): when an access policy is configured and the active profile is not the launch profile, force
