@@ -17,12 +17,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11'
 
@@ -62,7 +62,7 @@ jobs:
           "$hash  $($msix.Name)" | Set-Content -Encoding ascii "$out/$($msix.Name).sha256"
 
       - name: Upload run artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hermes-light-desktop
           path: |
@@ -71,15 +71,14 @@ jobs:
             apps/desktop/release/builder-debug.yml
           retention-days: 30
 
+      # A manual run only builds and uploads the workflow artifact; a release exists only for a pushed `v*` tag.
       - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="${GITHUB_REF_NAME:-v0.1.0}"
-          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
-            TAG_NAME="v0.1.0"
-          fi
+          TAG_NAME="$GITHUB_REF_NAME"
           echo "Publishing release for tag: $TAG_NAME"
 
           RELEASE_NOTES="### Sentio One Light Desktop Client ($TAG_NAME)

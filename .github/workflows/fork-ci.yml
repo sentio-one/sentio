@@ -1,0 +1,115 @@
+# Sentio One fork CI. Upstream's workflows target Blacksmith runners this organisation does not have, so they are
+# disabled (scripts/fork/disable-upstream-workflows.sh); this is the fast lane that guards what the fork changed:
+# per-user profile access, invites, the Light desktop client and the per-company Dokploy deployment.
+#
+# Keep the file lists in step with docs/private-fork/FORK_DECISIONS.md (section 3).
+name: Fork CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Access, invites and deployment (Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
+
+      - name: Set up locked Python and test dependencies
+        uses: ./.github/actions/setup-pm
+        with:
+          extras: '["all"]'
+          test-environment: 'true'
+
+      # Fails when uv.lock disagrees with pyproject.toml (a version bump without `hermes pm lock`).
+      - name: Check uv.lock is current
+        run: uv lock --check
+
+      - name: Run the fork's tests
+        run: |
+          scripts/run_tests.sh \
+            tests/gateway/test_access_policy.py tests/gateway/test_access_grants.py \
+            tests/gateway/test_access_managed_config.py tests/gateway/test_profile_access_enforcement.py \
+            tests/gateway/test_legacy_fallback_access.py tests/gateway/test_dokploy_compose.py \
+            tests/hermes_cli/test_dashboard_rest_access.py tests/hermes_cli/test_dashboard_ws_profile_gate.py \
+            tests/hermes_cli/test_dashboard_access_scope.py tests/hermes_cli/test_access_invites_api.py \
+            tests/hermes_cli/test_auth_me_access.py tests/plugins/dashboard_auth/test_session_groups.py
+        env:
+          OPENROUTER_API_KEY: ""
+          OPENAI_API_KEY: ""
+          NOUS_API_KEY: ""
+
+      - name: Check the checkout is clean
+        uses: ./.github/actions/check-clean-worktree
+
+  compose:
+    name: Dokploy compose is valid
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
+
+      # Real `docker compose` parsing and interpolation: catches what the YAML-level tests cannot.
+      - name: Validate deploy/dokploy/docker-compose.yml
+        run: docker compose -f deploy/dokploy/docker-compose.yml config --quiet
+        env:
+          PUBLIC_URL: https://acme.gw.example.com
+          OIDC_ISSUER: https://sso.acme.example
+          OIDC_CLIENT_ID: ci
+          ADMIN_GROUP: hermes-admins
+
+      - name: Required settings abort a deploy when unset
+        run: |
+          if docker compose -f deploy/dokploy/docker-compose.yml config --quiet 2>/dev/null; then
+            echo "compose accepted a deploy with no PUBLIC_URL/OIDC settings" >&2
+            exit 1
+          fi
+
+  js:
+    name: Access page and Light desktop (TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
+
+      - name: Set up the locked JS toolchain
+        uses: ./.github/actions/setup-pm
+        with:
+          toolchain: all
+          extras: '[]'
+          test-environment: 'true'
+
+      # Scripts are skipped: unit tests and tsc do not need the Electron binary.
+      - name: Install workspace dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Typecheck web and desktop
+        run: |
+          npm run typecheck --workspace web
+          npm run typecheck --workspace apps/desktop
+
+      - name: Web tests
+        working-directory: web
+        run: npx vitest run src/pages/AccessPage.test.tsx src/lib/access-nav.test.ts src/lib/api-access.test.ts
+
+      - name: Desktop tests
+        working-directory: apps/desktop
+        run: |
+          npx vitest run --project ui \
+            src/lib/connect-link.test.ts src/app/contrib/connect-link-dialog.test.tsx \
+            src/components/desktop-install-overlay.test.tsx
+          npx vitest run --project electron electron/light-first-run.test.ts electron/first-run-setup-gate.test.ts
+
+      - name: Check the checkout is clean
+        uses: ./.github/actions/check-clean-worktree
