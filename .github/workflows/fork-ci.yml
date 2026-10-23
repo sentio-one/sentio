@@ -36,6 +36,9 @@ jobs:
       - name: Check uv.lock is current
         run: uv lock --check
 
+      - name: Release version scripts
+        run: scripts/run_tests.sh tests/scripts/test_release_version_scripts.py
+
       - name: Run the fork's tests
         run: |
           scripts/run_tests.sh \

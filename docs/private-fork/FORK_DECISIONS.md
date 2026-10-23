@@ -26,6 +26,10 @@ to re-check when pulling upstream in. The detailed design lives in `ACCESS_CONTR
   rewritten then for what the Sentio One agent is for a business (it currently reads as a fork note on top of upstream's README).
 - **L4. The go-live gate (section 5) must be green before a real customer is on a gateway.** The unenforced sandbox (O1) is the
   biggest item on it. It is deliberately deferred, not forgotten.
+- **L5. A release is a merged version bump** (decided 2026-10-23). `scripts/fork/bump-version.sh X.Y.Z`, a PR, a merge; then
+  `tag-release.yml` tags `vX.Y.Z` and `release-light.yml` builds and publishes. Every other merge to `main` builds an artifact and
+  releases nothing. Needs the owner's `RELEASE_TOKEN` secret (`RELEASING.md`). Merges are not all version bumps: only one commit in the
+  fork era changed the version, so tagging every merge had nothing to name the tag after.
 
 ## 1. Decisions
 
@@ -147,8 +151,12 @@ editable. If a new `access:` key is added, add it to this file.
 - **Upstream's 55 workflows are disabled on GitHub, not deleted** (they target Blacksmith runners we do not have, and deleting
   them would make every merge a modify/delete conflict). `scripts/fork/disable-upstream-workflows.sh --apply` re-applies it;
   workflows added by a merge arrive enabled. Kept active: `Fork CI`, `Release Light Desktop`.
-- **`Release Light Desktop`** builds on a `v*` tag and publishes the MSIX; a manual run only builds and uploads the artifact.
-  Its actions are pinned to the same SHAs upstream uses. The installer is unsigned.
+- **`Release Light Desktop`** (`release-light.yml`): every push to `main` (except docs-only) builds the MSIX and keeps it as an
+  artifact named after the commit for 30 days; a `v*` tag also publishes it as a GitHub release, from a separate job. The build job
+  is read-only; only the publish job holds a write token. Actions pinned to the SHAs upstream uses. The installer is unsigned.
+- **`Tag release`** (`tag-release.yml`, L5): on a merge that changes `apps/desktop/package.json` or `pyproject.toml`, tags the version
+  if it has no tag. Pushed with the owner's fine-grained `RELEASE_TOKEN`, because the built-in token can neither start the release
+  workflow nor get past the `release-tags` ruleset.
 - **Remotes:** `origin` = GitHub, `upstream` = NousResearch/hermes-agent with push set to a dead URL.
 - **Deploy: Dokploy**, one Compose project per company (D1, D7).
 - **Model providers:** Command Code (`COMMANDCODE_API_KEY`, upstream `plugins/model-providers/commandcode`, now in the compose
