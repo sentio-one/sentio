@@ -602,8 +602,10 @@ def _profile_home(profile: str | None) -> Path | None:
     if home.resolve() == Path(_hermes_home).resolve():
         return None  # already the launch profile (no override needed)
     if home not in _served_profile_homes:
-        # A second profile home: freeze the launch env as the launch profile's own and make
-        # get_secret() fail closed (launch_profile_policy.py). Must run before any secondary code.
+        # This process now hosts a second profile home: freeze the launch env as the launch
+        # profile's own and flip get_secret() to fail closed, so an unscoped read for a
+        # secondary raises instead of returning the launch profile's os.environ value
+        # (tui_gateway/launch_profile_policy.py). Must run before any secondary code.
         from tui_gateway.launch_profile_policy import activate_multi_profile_hosting
         activate_multi_profile_hosting()
     _served_profile_homes.add(home)  # the change watcher must stat every served sibling store too
