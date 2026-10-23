@@ -27,7 +27,10 @@ _ADMIN_PREFIXES = (
     "/api/local-models", "/api/logs", "/api/actions", "/api/host", "/api/system", "/api/ssh",
     "/api/dashboard/agent-plugins", "/api/dashboard/plugins/catalog", "/api/dashboard/plugins/rescan",
     "/api/providers/validate", "/api/providers/custom-endpoints/validate",
-    "/api/messaging/telegram/onboarding", "/api/messaging/whatsapp/onboarding")
+    "/api/messaging/telegram/onboarding", "/api/messaging/whatsapp/onboarding",
+    # Delegation routing names every profile on the host and a ``profile_routes`` backend runs subagents in
+    # another profile's scope: a granted user must not configure or even list it.
+    "/api/delegation")
 _OPEN_PREFIXES = ("/api/auth",)
 _OPEN_EXACT = frozenset({("GET", "/api/health"), ("GET", "/api/health/idle"), ("GET", "/api/config/defaults"),
                          # Any signed-in user redeems their own invite; managing invites stays admin.

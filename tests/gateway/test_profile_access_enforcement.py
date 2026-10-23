@@ -185,3 +185,16 @@ async def test_describe_advertises_the_grant_so_the_desktop_can_hide_the_rest(se
     assert reply['result']['allowed_profiles'] == ['alpha', 'beta'], reply
     assert 'allowed_profiles' not in (await call(connect(_identity(profile_scope='host')), 'runtime.describe'))['result']
     assert (await call(connect(_identity(allowed_profiles=[])), 'runtime.describe'))['result']['allowed_profiles'] == []
+
+
+@pytest.mark.asyncio
+async def test_a_profile_on_disk_that_nothing_serves_stays_off_a_granted_roster(served):
+    """The roster also names profiles that exist under the root with no running authority (metadata only).
+    That discovery has to run before the grant filter, or an unserved profile leaks to someone never granted it."""
+    root, _, connect, call = served
+    (root / 'profiles' / 'gamma').mkdir(parents=True)
+    (root / 'profiles' / 'gamma' / 'config.yaml').write_text('model: x\n', encoding='utf-8')
+    admin = connect(_identity(profile_scope='host'), operator=True)
+    assert 'gamma' in _names(await call(admin, 'profiles.list', include_sessions=False))  # discovery really ran
+    alice = connect(_identity(allowed_profiles=['alpha']))
+    assert _names(await call(alice, 'profiles.list', include_sessions=False)) == ['alpha']

@@ -4,9 +4,10 @@ Single index of where this fork deliberately differs from upstream (NousResearch
 to re-check when pulling upstream in. The detailed design lives in `ACCESS_CONTROL_PLAN.md` and
 `INVITES_DESIGN.md`; this file is the map over them plus everything those two do not cover.
 
-- **Upstream base:** `e5eb6b36fe` (2026-10-15), the parent of the first fork commit `a2295b5f22`. On 2026-10-23 upstream
-  `main` was `cb757fac59`, 3,200 commits ahead; a dry-run merge (`git merge-tree`) conflicted in exactly three files:
-  `gateway/session_controls.py`, `session_group_controls.py`, `session_identity.py` (all hotspots in section 2).
+- **Upstream base:** `cb757fac59` (2026-10-23), merged on the `upstream-merge` branch (merge log: section 6). The first base was
+  `e5eb6b36fe` (2026-10-15), the parent of the first fork commit `a2295b5f22`; `git diff e5eb6b36fe <first-fork-merge>` is the
+  fork as first written.
+- **How upstream is pulled in (L2):** branch `upstream-merge`, `git fetch upstream && git merge upstream/main`, section 3, a PR.
   `git diff e5eb6b36fe HEAD` is the whole fork: 119 files, 39 modified upstream files, 80 added.
   After each upstream merge, record the new base here.
 - **Evidence:** every row below was read from the diff against that base, not from memory.
@@ -119,6 +120,13 @@ editable. If a new `access:` key is added, add it to this file.
 - `runtime.describe` still returns the launch authority's `profile_id` (a home path) to a non-granted caller.
 - Non-admin desktops lose the host file browser, git and update panels (admin-only by design).
 - A granted user's PTY and agent tools run as the server OS user (see O1).
+- A profile's enabled dashboard-plugin UI assets are served **without auth** at `/dashboard-plugins/@<profile>/<plugin>/...` (upstream
+  design: `<script src>` cannot carry a token). Suffix-allowlisted, traversal-checked, and an unknown profile answers 404 like an
+  unknown plugin, so there is no profile-name oracle; but anyone who can reach the gateway URL can read those static assets.
+- **Do not install the `advanced-delegation` catalog plugin on a company gateway** (`plugin-catalog/advanced-delegation.yaml`). Its
+  `profile_routes` backend runs subagents in another profile's scope, which no grant check covers. It is not in the tree, and
+  installing agent plugins is admin-only, so the hole is closed only while nobody installs it. Pinning `delegation.backend` is the
+  fix if it is ever needed (O10).
 - Token-mode WS leg now carries issuer and groups. Sessions owned under the old issuer-less subject are not
   visible to that user afterwards. Irrelevant for a fresh deployment; matters only when migrating one.
 
@@ -242,7 +250,9 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
    Baseline on 2026-10-23 (Linux): the 12 Python files above pass (174 tests), web 31, desktop UI 59, electron 13, both
    typechecks and `python scripts/check` (12 checks) are clean. Failures seen earlier on the Windows dev host
    (`TestEnvWriteDenylist`, `test_profiles.py`/`test_web_server.py`, `fcntl`) did not reproduce on Linux: treat them as host noise.
-9. **Update this file:** new base commit, new decisions, anything resolved by hand.
+9. **Merge the PR with a merge commit, never squash or rebase.** A squash drops upstream's commits from our ancestry, so the next
+   `git merge upstream/main` re-conflicts on every file the fork touched. (Turn off squash and rebase merging in the repo settings.)
+10. **Update this file:** new base commit, new decisions, anything resolved by hand.
 
 ## 4. Open items
 
@@ -287,6 +297,11 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
   limit that an invite link replaces the current server means remote plus local needs two coexisting connections.
   Recommendation, not a decision: A, with a build flag so a company that wants no local runtime can still ship Light.
 
+- **O10. Cross-profile capabilities arriving from upstream need a grant check or a pin.** Found in merge 1: `profile_routes` delegation
+  (above). Each upstream merge should grep for features that name or run in another profile (`profile_routes`, `profile_home`,
+  `@{profile}`, `host_scoped`) and decide per feature. Candidate for the delegation case: pin `delegation.backend: default` in
+  `managed/config.yaml`.
+
 ## 5. Go-live gate (all must be true before a customer is on a gateway)
 
 - [ ] Sandbox enforced (O1): non-main profiles cannot run on the local backend; verified on a throwaway company with D12's list.
@@ -297,3 +312,48 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
 - [ ] Repository private, branch protection on, README rewritten for the business audience (O0).
 - [ ] Desktop delivery decided and built (O9); installer signing decision made.
 - [ ] A backup and restore of `hermes-data` and `dockerd-data` tested.
+
+## 6. Upstream merge log
+
+### Merge 1: `e5eb6b36fe` -> `cb757fac59` (2026-10-23, 3,200 upstream commits, branch `upstream-merge`)
+
+Three textual conflicts, all resolved so the fork's rules still hold:
+- `gateway/session_controls.py` `_sibling_for`: upstream replaced the inline `profile_scope != 'host'` test with its `host_scoped`
+  property; the fork routes by grant first. Resolved as `if self._allowed is None and not self.host_scoped:`.
+- `gateway/session_identity.py`: upstream added `AUTH_SUBJECT_PREFIX`, `is_authenticated_identity`,
+  `authenticated_principal_digest`; the fork extracted `dashboard_subject`. Resolved so `authenticated_subject` calls
+  `dashboard_subject`, which builds `AUTH_SUBJECT_PREFIX + json.dumps([provider, issuer, sub])`: **the string is byte-identical**, so
+  existing grants (keyed on it) are not orphaned.
+- `gateway/session_group_controls.py` `_profiles`: upstream now appends every profile under the root to the roster (including
+  ones nothing serves) and returns `install_id`. The grant filter is placed **after** that discovery. Putting it before would have
+  leaked unserved profiles to non-admins. Guard: `test_a_profile_on_disk_that_nothing_serves_stays_off_a_granted_roster`
+  (red without the filter, green with it).
+
+Reviewed because they auto-merged in security-relevant files, and found sound:
+- `web_server_chat.py`: upstream's native-ticket WS identity (`provider: "local"`) gets no grant under a configured policy (not in
+  `group_providers`, no static row), so it fails closed.
+- `ws_legacy_fallback.py`: upstream dropped its `browser.manage` process-global refusal; the fork's per-verb grant check still runs
+  on every non-handshake verb, so a granted user cannot reach another profile's browser.
+- New `host_scoped` call sites in group controls only ever restrict a non-admin further.
+- New REST routes: `/api/providers/oauth/nous/handoff` is profile-class (takes `profile`) and correctly gated;
+  `/api/delegation/*` is now **explicitly admin-only** in `access_http.py` (it lists every profile and can configure cross-profile
+  routing), with a test; `/dashboard-plugins/@{profile}/...` is public by upstream design (D9).
+- New canonical verbs (`session.export`, `clarify.lock`, billing, free tier) go through the authority/legacy grant checks.
+- `scripts/gen_gateway_contracts.py` regenerates byte-identical output, so `allowed_profiles` and upstream's contract changes agree.
+- Upstream bumped the PM-pinned Python (3.14.7 to 3.14.9) and the toolchain lock; nothing fork-specific depends on it.
+- New upstream workflows to disable on GitHub after this lands: `catalog-tests.yml`, `windows-desktop-attach-e2e.yml`
+  (`scripts/fork/disable-upstream-workflows.sh --apply`).
+
+Verification of merge 1 (2026-10-23, Linux):
+- `python scripts/check`: 12 checks ok (health 0 blocking; the case-collisions check fails while conflicts are unstaged, because git lists
+  each unmerged path three times: stage the resolutions first).
+- Fork tests: 12 Python files, 177 tests pass (3 new guards, each shown red without its fix). Web 480/480 (68 files), desktop UI 59 and
+  Electron 13 for the fork's files, both typechecks clean, regenerated gateway contract identical.
+- Broad run (`tests/gateway tests/hermes_cli tests/tui_gateway tests/plugins/dashboard_auth`): 3,693 files, 32,627 passed, 478 skipped,
+  23 files with failures, all accounted for by running the same files on pure upstream `cb757fac59`:
+  - 21 files fail with **identical counts on pure upstream** (frozen-provider-key tests, and the plugin install/update/enable tests,
+    which error in setup on this host; most likely the machine has no git identity and no `~/.gitconfig`). Not caused by the merge.
+  - `test_session_mutation_compress_managed.py`: 150-200 s test timing out under 8-way load; passes alone.
+  - `test_update_finish.py` (2 tests): run a real TUI build when the checkout has `node_modules`; they skip on upstream's tree and on ours
+    with `node_modules` removed (14 passed, 2 skipped, identical). They failed here only because of a partial `npm ci --ignore-scripts`.
+- Test debris: a test in the broad run creates an untracked `owned/` directory in the repo root; delete it before committing.

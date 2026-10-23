@@ -114,6 +114,7 @@ def test_an_admin_group_reaches_everything():
     ("POST", "/api/gateway/drain"), ("POST", "/api/ops/backup"), ("GET", "/api/local-models/catalog"),
     ("POST", "/api/profiles"), ("DELETE", "/api/profiles/alpha"), ("POST", "/api/profiles/alpha/open-terminal"),
     ("GET", "/api/brand-new-route"),
+    ("GET", "/api/delegation/routing"), ("PUT", "/api/delegation/backends/profile_routes"),
 ])
 def test_host_level_and_unclassified_routes_are_admin_only(method, path):
     client = _client()
