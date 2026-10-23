@@ -157,8 +157,13 @@ editable. If a new `access:` key is added, add it to this file.
 
 ### D12. Sandbox: non-main profiles run tools in Docker-in-Docker (partly built)
 Resolves A6 in direction. Built:
-- `deploy/dokploy/docker-compose.yml` has a `dockerd` service (`docker:27.5.1-dind`, pinned, privileged, no published port,
-  no domain, own `dockerd-data` volume) and `hermes` gets `DOCKER_HOST=tcp://dockerd:2375` and waits for it to be healthy.
+- `deploy/dokploy/docker-compose.yml` has a `dockerd` service (`docker:27.5.1-dind`, pinned, privileged, no domain, own `dockerd-data`
+  volume). It listens on **no tcp port**, only on a unix socket (`/var/run/dind/docker.sock`, group = the gateway user's gid) in
+  a `dockerd-sock` volume shared with `hermes`, which gets `DOCKER_HOST=unix://...` and waits for it to be healthy.
+  *Correction (2026-10-23):* the first version listened on tcp 2375. Verified in real Docker that a sandboxed container reached
+  that API at the bridge gateway (`172.17.0.1:2375/version`), and the API of a privileged daemon is root on the host, so that
+  version was an escape route. Fixed by the socket-only design; `scripts/fork/verify-dind-isolation.sh` (run by `Fork CI`) fails on
+  the old design and passes on the new one.
   **No host `docker.sock` anywhere**: it would be root on the Dokploy host and reach other companies' containers.
   `test_agent_sandboxes_run_on_the_companys_own_docker_daemon_never_the_hosts` fails if that changes.
 - `managed/config.yaml` pins `terminal.docker_volumes: []`, `docker_extra_args: []`, `docker_mount_cwd_to_workspace: false`

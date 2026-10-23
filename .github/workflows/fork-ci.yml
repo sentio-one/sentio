@@ -76,6 +76,18 @@ jobs:
             exit 1
           fi
 
+  sandbox:
+    name: Sandbox cannot reach the Docker daemon
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
+
+      # Starts the real privileged `dockerd` service and runs a sandbox container against it: the property is a network
+      # fact, so a YAML test cannot prove it (scripts/fork/verify-dind-isolation.sh).
+      - name: Verify the sandbox isolation
+        run: scripts/fork/verify-dind-isolation.sh
+
   js:
     name: Access page and Light desktop (TypeScript)
     runs-on: ubuntu-latest

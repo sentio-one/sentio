@@ -14,12 +14,13 @@ services:
     restart: unless-stopped
     command: ["gateway", "run"]
     # Agent terminals run in containers on this company's own Docker daemon (the `dockerd` service), never on
-    # the host's: no docker.sock is mounted here, so nothing in this container can reach another company's.
+    # the host's: the host's docker.sock is not mounted here, so nothing in this container can reach another
+    # company's. The daemon is reached over a unix socket on a volume only these two services share.
     depends_on:
       dockerd:
         condition: service_healthy
     environment:
-      DOCKER_HOST: tcp://dockerd:2375
+      DOCKER_HOST: unix:///var/run/dind/docker.sock
       HERMES_UID: "10000"
       HERMES_GID: "10000"
 
@@ -49,6 +50,7 @@ services:
       - hermes-data:/opt/data
       - ./managed:/etc/hermes:ro
       - ./healthcheck.py:/opt/healthcheck.py:ro
+      - dockerd-sock:/var/run/dind
     expose:
       - "9119"
     healthcheck:
@@ -60,21 +62,23 @@ services:
       start_period: 180s
 
   # This company's private Docker daemon: the sandbox for every profile that uses the docker terminal backend.
-  # Privileged because Docker-in-Docker needs it; it holds no company data and no secrets, and it is the only
-  # privileged service. Plain tcp is safe here only because nothing publishes the port and no domain points at this
-  # service: it is reachable solely by `hermes`, over this project's own network.
+  # Privileged because Docker-in-Docker needs it, so whoever can talk to its API owns the Dokploy host. It therefore
+  # listens on NO network port, only on a unix socket in a volume shared with `hermes`: a sandboxed container runs on
+  # this daemon's own bridge and can reach any TCP port it serves (verified: it answered /version at the bridge
+  # gateway), but it cannot reach a socket file it was never given. The command starts with `dockerd` on purpose: the
+  # image's entrypoint adds a tcp listener only when the first argument is a flag. `--group` is the gateway user's
+  # gid (HERMES_GID above) so the socket is usable by `hermes` and by nothing else. This service holds no company
+  # data or secrets and has no domain.
   dockerd:
     image: docker:27.5.1-dind
     restart: unless-stopped
     privileged: true
-    environment:
-      DOCKER_TLS_CERTDIR: ""
+    command: ["dockerd", "--host=unix:///var/run/dind/docker.sock", "--group=10000"]
     volumes:
       - dockerd-data:/var/lib/docker
-    expose:
-      - "2375"
+      - dockerd-sock:/var/run/dind
     healthcheck:
-      test: ["CMD", "docker", "info"]
+      test: ["CMD", "docker", "-H", "unix:///var/run/dind/docker.sock", "info"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -83,3 +87,4 @@ services:
 volumes:
   hermes-data:
   dockerd-data:
+  dockerd-sock:
