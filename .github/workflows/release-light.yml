@@ -1,25 +1,49 @@
 name: Release Light Desktop
 
+# Builds the remote-only Light desktop client (HermesLight-*.msix, unsigned).
+#   push to main      -> build; the installer is kept as a workflow artifact for 30 days (no release)
+#   push of a v* tag  -> build, then publish the installer as a GitHub release
+#   manual run        -> build; the artifact is kept
+# The build job is read-only: it runs a lot of dependency code on every merge. Only the publish job, which runs for tags
+# alone, holds a write token. A tag is created by .github/workflows/tag-release.yml when a merge bumps the version
+# (docs/private-fork/RELEASING.md); pushing one by hand works too.
 on:
   push:
+    branches: [main]
     tags:
       - 'v*'
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+# A newer merge supersedes a build still running for the same ref; a tag build is never cancelled.
+concurrency:
+  group: light-desktop-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
-  build-and-release:
-    name: Build Light MSIX & Publish Release
+  build:
+    name: Build Light MSIX
     runs-on: windows-latest
     timeout-minutes: 90
+    outputs:
+      artifact: ${{ steps.artifact.outputs.name }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Name the artifact after the commit
+        id: artifact
+        shell: bash
+        run: echo "name=hermes-light-desktop-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -64,19 +88,34 @@ jobs:
       - name: Upload run artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hermes-light-desktop
+          name: ${{ steps.artifact.outputs.name }}
           path: |
             apps/desktop/release/HermesLight-*.msix
             apps/desktop/release/HermesLight-*.msix.sha256
             apps/desktop/release/builder-debug.yml
           retention-days: 30
 
-      # A manual run only builds and uploads the workflow artifact; a release exists only for a pushed `v*` tag.
+  # A release exists only for a pushed `v*` tag. The installer comes from the build job's artifact, so this job needs no checkout.
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download the built installer
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+          path: apps/desktop/release
+
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           TAG_NAME="$GITHUB_REF_NAME"
           echo "Publishing release for tag: $TAG_NAME"

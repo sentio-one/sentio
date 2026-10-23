@@ -1,0 +1,48 @@
+# Tags the release when a merge to main bumps the version (scripts/fork/tag-release.sh). The tag push starts release-light.yml,
+# which builds and publishes the installer.
+#
+# The tag is pushed with RELEASE_TOKEN, not the built-in GITHUB_TOKEN, for two reasons: a tag pushed by GITHUB_TOKEN does not start
+# other workflows, and it cannot get past the `release-tags` ruleset (only repository admins may create v* tags). The token is a
+# fine-grained token of the repository owner with Contents: read and write on this repository only.
+# Setup and rotation: docs/private-fork/RELEASING.md.
+name: Tag release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/desktop/package.json'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag the version if it has no tag yet
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the release token is configured
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "::error title=RELEASE_TOKEN is not set::Add the repository secret described in docs/private-fork/RELEASING.md, then re-run this workflow."
+            exit 1
+          fi
+
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      # Idempotent: a version that already has a tag is left alone, so a manual re-run is always safe.
+      - name: Tag
+        run: scripts/fork/tag-release.sh --push
