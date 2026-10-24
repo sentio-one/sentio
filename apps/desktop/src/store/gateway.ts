@@ -13,7 +13,6 @@ import { atom } from 'nanostores'
 import { canonicalOwnerProfile } from '@/api/canonical-protocol'
 import type { HermesConnection } from '@/global'
 import { HermesGateway, setApiRequestConnection } from '@/hermes'
-import { translateNow } from '@/i18n'
 import {
   decideLivenessForceClose,
   LIVENESS_PROBE_TIMEOUT_MS,
@@ -28,7 +27,7 @@ import {
   SOURCE_SWITCH_DIAL_TIMEOUT_MS,
   withTimeout
 } from '@/lib/with-timeout'
-import { notifyError, RECOVERY_ACTIONS } from '@/store/notifications'
+import { dismissSecondaryReauthNotice, notifySecondaryReauth } from '@/store/gateway-reauth-notice'
 import { markNativeNotifyBaseline } from '@/store/notify-baseline'
 import { setConnection, setGatewayState } from '@/store/session'
 import { stampSecondaryProfileOwner } from '@/store/session-event-provenance'
@@ -967,7 +966,7 @@ async function reconnectSecondary(entry: Secondary): Promise<void> {
     recordDialFailure(entry, error)
 
     if (isGatewayReauthRequired(error)) {
-      notifyError(error, translateNow('boot.errors.gatewaySignInRequired'), { action: RECOVERY_ACTIONS.openGateways() })
+      notifySecondaryReauth(entry.scope, error, entry.connectionId == null)
 
       return
     }
@@ -1089,6 +1088,7 @@ function createSecondary(profile: string, connectionId: null | string = null): S
       entry.stalledDials = 0
       entry.openedAt = Date.now()
       clearTimer(entry)
+      dismissSecondaryReauthNotice(scope)
     } else if (state === 'closed' || state === 'error') {
       // Same stable-open rule as the primary (#83134): an accept-then-close socket
       // is a failed attempt, so the ladder resets only after a socket that lived.
