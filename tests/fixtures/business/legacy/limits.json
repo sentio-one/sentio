@@ -1,0 +1,10 @@
+{
+  "gapMs": 1000,
+  "timezone": "Africa/Johannesburg",
+  "caps": {
+    "cold": {
+      "perDay": 20,
+      "perHour": 5
+    }
+  }
+}

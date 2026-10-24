@@ -183,7 +183,7 @@ assert draft_rejection_marks_customer_answered is False
 `ImportReport(source_digest: str, imported: int, already_imported: int, task_ids: tuple[str, ...], blockers: tuple[str, ...])`.
 The store records unique `(source_digest, legacy_id, scope)` import mappings.
 
-- [ ] **Step 1: Write** `test_import_defaults_read_only_and_repeats_safely`, `test_old_sent_is_not_delivered`, `test_missing_media_secret_or_unknown_identity_creates_task`, `test_ambiguous_old_counters_do_not_reset_capacity`:
+- [x] **Step 1: Write** `test_import_defaults_read_only_and_repeats_safely`, `test_old_sent_is_not_delivered`, `test_missing_media_secret_or_unknown_identity_creates_task`, `test_ambiguous_old_counters_do_not_reset_capacity`:
 
 ```python
 assert dry_run_database_bytes == before_database_bytes
@@ -196,10 +196,10 @@ assert unresolved_account.dispatch_ready is False
 assert imported_account.available_capacity <= provable_available_capacity
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_import_legacy.py -v`; expect absent import contracts.
-- [ ] **Step 3: Implement** bounded regular-file parsing for the actual pinned gate writers' queue records, scheduled releases, governor state, config, reviewer records, suppression and media. Reject symlinks/traversal/oversized or contradictory records into attention tasks without reading arbitrary paths. Preserve source hashes/provenance and old timestamps; reset every unsent approval and protect credentials via C3 or hold for explicit mapping. Do not infer corrections/delivery/phone identity. Import known limits/timezone exactly; require explicit timezone when absent. Existing counters may lack physical-send evidence: conservatively block remaining capacity until reconciliation/reset boundary instead of inventing a zero count. Persist source/import mappings atomically; interrupted application can resume idempotently.
-- [ ] **Step 4: Rerun** task tests with real temporary backup trees and injected transaction failures; expect no source writes, no duplicate rows, no lost unsupported records, and zero sends.
-- [ ] **Step 5: Commit** named importer/fixtures/CLI/docs files with `feat(gateway): inventory and import legacy messaging state while paused`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_import_legacy.py -v`; expect absent import contracts.
+- [x] **Step 3: Implement** bounded regular-file parsing for the actual pinned gate writers' queue records, scheduled releases, governor state, config, reviewer records, suppression and media. Reject symlinks/traversal/oversized or contradictory records into attention tasks without reading arbitrary paths. Preserve source hashes/provenance and old timestamps; reset every unsent approval and protect credentials via C3 or hold for explicit mapping. Do not infer corrections/delivery/phone identity. Import known limits/timezone exactly; require explicit timezone when absent. Existing counters may lack physical-send evidence: conservatively block remaining capacity until reconciliation/reset boundary instead of inventing a zero count. Persist source/import mappings atomically; interrupted application can resume idempotently.
+- [x] **Step 4: Rerun** task tests with real temporary backup trees and injected transaction failures; expect no source writes, no duplicate rows, no lost unsupported records, and zero sends.
+- [x] **Step 5: Commit** named importer/fixtures/CLI/docs files with `feat(gateway): inventory and import legacy messaging state while paused`.
 
 ### Task C6: Paused ownership transfer and reversible cutover tooling
 

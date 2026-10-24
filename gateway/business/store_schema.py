@@ -145,6 +145,12 @@ CREATE TABLE IF NOT EXISTS business_reviews (
  agreed INTEGER NOT NULL DEFAULT 1, false_approval INTEGER NOT NULL DEFAULT 0,
  unavailable INTEGER NOT NULL DEFAULT 0, unpaired INTEGER NOT NULL DEFAULT 0,
  reviewed_at_ms INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS business_legacy_imports (
+ source_digest TEXT NOT NULL, legacy_id TEXT NOT NULL,
+ runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL,
+ account_id TEXT NOT NULL, contact_id TEXT NOT NULL,
+ outbox_id TEXT, imported_at_ms INTEGER NOT NULL,
+ PRIMARY KEY(source_digest, legacy_id, runtime_profile, transport_profile, account_id, contact_id));
 """
 
 
