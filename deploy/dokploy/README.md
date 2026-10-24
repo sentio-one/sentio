@@ -74,9 +74,10 @@ A missing required value aborts the deploy (`${VAR:?...}`), so a project cannot 
 5. **IdP (Keycloak/Authentik/Entra/Okta...):** register a client for this gateway.
    - Redirect URI: `<PUBLIC_URL>/auth/callback`. As far as I read the auth routes, the desktop's loopback sign-in goes
      through the gateway, so the IdP does not need the desktop's loopback addresses. Verify with a real sign-in.
-   - The ID token must carry a **`groups`** claim (Keycloak: a Group Membership mapper with full path off; Entra: group
-     claims, mind the 200-group overflow; Google Workspace has no groups claim). Users who should reach a profile are in
-     `hermes-profile-<profile>`; admins are in `ADMIN_GROUP`.
+   - Admins are the verified emails in `ADMIN_EMAILS`. To use groups instead (or as well), the ID token must carry a
+     **`groups`** claim (Keycloak: a Group Membership mapper with full path off; Entra: group claims, mind the 200-group
+     overflow; Google has none): users who should reach a profile are in `hermes-profile-<profile>` and admins are in
+     `ADMIN_GROUP`. Without groups, profile access comes from invites.
 6. **Deploy**, then check the list below.
 
 ## Checklist after the first deploy
