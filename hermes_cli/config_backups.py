@@ -56,7 +56,7 @@ def backup_config(config_path: Path, reason: str, *, keep: int = DEFAULT_KEEP) -
         existing = list_config_backups(config_path, reason)
         # Not filecmp.cmp: its process-wide cache keys on (size, mtime), so an equal-size edit
         # within one mtime tick of an earlier comparison is reported identical and never backed up.
-        if existing and config_path.read_bytes() == existing[0].read_bytes():
+        if existing and _same_bytes(config_path.read_bytes(), existing[0]):
             return None
         dest = root / f"{config_path.name}.{reason}.{time.strftime('%Y%m%d-%H%M%S')}"
         if dest.is_symlink() or dest.exists():  # never write through a planted link
@@ -68,6 +68,15 @@ def backup_config(config_path: Path, reason: str, *, keep: int = DEFAULT_KEEP) -
     except OSError as exc:
         logger.warning("Could not back up %s (%s): %s", config_path, reason, exc)
         return None
+
+
+def _same_bytes(config_bytes: bytes, backup: Path) -> bool:
+    """True when *backup* holds exactly *config_bytes*. A backup this user cannot read (left root-owned by a command run as root
+    in a container) counts as different: aborting here would stop every future backup, on every start."""
+    try:
+        return config_bytes == backup.read_bytes()
+    except OSError:
+        return False
 
 
 def load_newest_good_backup(config_path: Path) -> Optional[dict]:
