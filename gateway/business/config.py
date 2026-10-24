@@ -53,7 +53,21 @@ def _positive_int(value: object) -> bool:
 
 
 def _nonnegative_number(value: object) -> bool:
-    return type(value) in (int, float) and math.isfinite(value) and value >= 0
+    if type(value) not in (int, float) or value < 0:
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def _positive_number(value: object) -> bool:
+    if type(value) not in (int, float) or value <= 0:
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 def _distinct_strings(value: object) -> tuple[str, ...]:
@@ -117,13 +131,14 @@ def _validate_governor(value: object) -> dict[str, Any] | None:
     for key in ("min_gap_seconds", "reply_min_gap_seconds", "jitter_seconds"):
         if key in value and not _nonnegative_number(value[key]):
             _fail("invalid_governor")
-    for key in ("failure_window_seconds",):
-        if type(value[key]) not in (int, float) or not math.isfinite(value[key]) or value[key] <= 0:
-            _fail("invalid_governor")
+    if not _positive_number(value["failure_window_seconds"]):
+        _fail("invalid_governor")
     for key in ("failure_count", "hard_max_per_day"):
         if not _positive_int(value[key]):
             _fail("invalid_governor")
-    return copy.deepcopy(value)
+    normalized = copy.deepcopy(value)
+    normalized.setdefault("jitter_seconds", 0)
+    return normalized
 
 
 def load_business_config(raw: dict, *, supervised_latch: bool) -> BusinessConfig:
@@ -131,7 +146,7 @@ def load_business_config(raw: dict, *, supervised_latch: bool) -> BusinessConfig
     if not isinstance(raw, dict) or set(raw) - _CONFIG_FIELDS:
         _fail()
     mode = raw.get("mode", "off")
-    if mode not in {"off", "shadow", "supervised"}:
+    if not isinstance(mode, str) or mode not in {"off", "shadow", "supervised"}:
         _fail("invalid_mode")
     if type(supervised_latch) is not bool:
         _fail("invalid_latch")

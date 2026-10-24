@@ -172,7 +172,10 @@ def parse_decision(payload: object) -> WorkDecision:
     value = _envelope(payload, fields)
     if not isinstance(value["kind"], str) or value["kind"] not in {"compose", "no_reply", "escalate", "failed"}:
         raise BusinessProtocolError("invalid_decision_kind")
-    if not all(_string(value[key]) for key in ("reason", "intent", "policy_version")):
+    required_text = ("reason", "policy_version")
+    if not all(_string(value[key]) for key in required_text):
+        raise BusinessProtocolError("invalid_decision_text")
+    if not _string(value["intent"], nonempty=value["kind"] == "compose"):
         raise BusinessProtocolError("invalid_decision_text")
     return WorkDecision(
         kind=value["kind"], reason=value["reason"], intent=value["intent"],
@@ -181,49 +184,83 @@ def parse_decision(payload: object) -> WorkDecision:
     )
 
 
-def _valid_data(kind: str, data: object, text: str) -> bool:
-    if not isinstance(data, dict):
+def _valid_text(data: dict[str, Any], text: str) -> bool:
+    return not data and bool(text.strip())
+
+
+def _valid_media(data: dict[str, Any], _: str) -> bool:
+    if set(data) != {"attachments"} or not isinstance(data["attachments"], list) or not data["attachments"]:
         return False
-    if kind == "text":
-        return not data and bool(text.strip())
-    if kind == "media":
-        if set(data) != {"attachments"} or not isinstance(data["attachments"], list) or not data["attachments"]:
-            return False
-        for item in data["attachments"]:
-            if not isinstance(item, dict) or not {"id", "sha256", "media_type"} <= set(item) or set(item) - {"id", "sha256", "media_type", "file_name"}:
-                return False
-            if not _handle(item.get("id")) or not _string(item.get("media_type")):
-                return False
-            if not isinstance(item.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", item["sha256"]):
-                return False
-            if "file_name" in item and (
-                not _string(item["file_name"]) or "/" in item["file_name"] or "\\" in item["file_name"]
-            ):
-                return False
-        return True
-    if kind == "edit":
-        return set(data) == {"message_id"} and _string(data["message_id"]) and bool(text.strip())
-    if kind == "reaction":
-        return set(data) == {"message_id", "emoji"} and all(_string(data[key]) for key in data)
-    if kind == "poll":
-        if set(data) != {"options", "selectable_count"} or not bool(text.strip()):
-            return False
-        options, count = data["options"], data["selectable_count"]
-        return (
-            isinstance(options, list) and 2 <= len(options) <= 12
-            and all(_string(option) for option in options) and len({option.strip() for option in options}) == len(options)
-            and type(count) is int and 1 <= count <= len(options)
-        )
-    if kind == "location":
-        if set(data) - {"latitude", "longitude", "name", "address"} or not {"latitude", "longitude"} <= set(data):
-            return False
-        lat, lon = data["latitude"], data["longitude"]
-        return (
-            type(lat) in (int, float) and math.isfinite(lat) and -90 <= lat <= 90
-            and type(lon) in (int, float) and math.isfinite(lon) and -180 <= lon <= 180
-            and all(_string(data[key], nonempty=False) for key in ("name", "address") if key in data)
-        )
-    return False
+    return all(_valid_attachment(item) for item in data["attachments"])
+
+
+def _valid_attachment(item: object) -> bool:
+    required = {"id", "sha256", "media_type"}
+    allowed = required | {"file_name"}
+    if not isinstance(item, dict) or not required <= set(item) or set(item) - allowed:
+        return False
+    if not _handle(item.get("id")) or not _string(item.get("media_type")):
+        return False
+    digest = item.get("sha256")
+    if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        return False
+    name = item.get("file_name")
+    return "file_name" not in item or (
+        _string(name) and "/" not in name and "\\" not in name
+    )
+
+
+def _valid_edit(data: dict[str, Any], text: str) -> bool:
+    return set(data) == {"message_id"} and _string(data["message_id"]) and bool(text.strip())
+
+
+def _valid_reaction(data: dict[str, Any], _: str) -> bool:
+    return set(data) == {"message_id", "emoji"} and all(_string(value) for value in data.values())
+
+
+def _valid_poll(data: dict[str, Any], text: str) -> bool:
+    if set(data) != {"options", "selectable_count"} or not text.strip():
+        return False
+    options, count = data["options"], data["selectable_count"]
+    return (
+        isinstance(options, list) and 2 <= len(options) <= 12
+        and all(_string(option) for option in options)
+        and len({option.strip() for option in options}) == len(options)
+        and type(count) is int and 1 <= count <= len(options)
+    )
+
+
+def _valid_location(data: dict[str, Any], _: str) -> bool:
+    allowed = {"latitude", "longitude", "name", "address"}
+    if set(data) - allowed or not {"latitude", "longitude"} <= set(data):
+        return False
+    latitude, longitude = data["latitude"], data["longitude"]
+    return (
+        _valid_coordinate(latitude, -90, 90)
+        and _valid_coordinate(longitude, -180, 180)
+        and all(_string(data[key], nonempty=False) for key in ("name", "address") if key in data)
+    )
+
+
+def _valid_coordinate(value: object, lower: int, upper: int) -> bool:
+    if type(value) is int:
+        return lower <= value <= upper
+    return type(value) is float and math.isfinite(value) and lower <= value <= upper
+
+
+_CANDIDATE_DATA_VALIDATORS = {
+    "text": _valid_text,
+    "media": _valid_media,
+    "edit": _valid_edit,
+    "reaction": _valid_reaction,
+    "poll": _valid_poll,
+    "location": _valid_location,
+}
+
+
+def _valid_data(kind: str, data: object, text: str) -> bool:
+    validator = _CANDIDATE_DATA_VALIDATORS[kind]
+    return isinstance(data, dict) and validator(data, text)
 
 
 def parse_candidate(payload: object) -> Candidate:
