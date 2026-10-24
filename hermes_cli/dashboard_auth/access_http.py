@@ -5,7 +5,8 @@ user reached every route. With an access policy configured, a non-admin is limit
 
 * ``open``    - account and discovery routes any signed-in user needs;
 * ``profile`` - routes that act on one profile, only on a profile the user was granted;
-* ``admin``   - everything else, which is the default for a route nobody classified.
+* ``admin``   - everything else under ``/api``, which is the default for a route nobody classified. A GET or HEAD
+  of a page outside ``/api`` (the single-page app and its static files) is ``open``.
 
 A route is host-level (the filesystem, git, plugin install, update, the gateway process, other
 profiles' lifecycle) or unclassified => ``admin``. Without a policy nothing here runs, so single-user
@@ -71,6 +72,10 @@ def classify(method: str, path: str) -> str:
     """``open`` | ``profile`` | ``admin`` for one route; default-deny for anything unlisted."""
     path = path.rstrip("/") or "/"
     method = method.upper()
+    if not _under(path, ("/api",)):
+        # The app's own documents and static files carry no data (every route behind them is gated below); refusing
+        # them left an invited non-admin with a JSON error instead of the app.
+        return "open" if method in ("GET", "HEAD") else "admin"
     if path == "/api/profiles" or path.startswith("/api/profiles/"):
         return _profiles_class(method, path)
     if _under(path, _ADMIN_PREFIXES):
