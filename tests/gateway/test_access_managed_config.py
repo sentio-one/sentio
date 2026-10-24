@@ -113,14 +113,19 @@ def test_the_healthcheck_reports_a_dead_dashboard_port(deployment):
 
 
 def test_a_profile_cannot_loosen_the_docker_sandbox_from_its_own_config(deployment):
-    """Scope: the overlay applied to a config dict, as ``load_config`` does. It does NOT cover a routed profile's terminal policy,
-    which ``build_profile_terminal_scope`` builds from the raw files (tests/tools/test_terminal_scope_sandbox_gap.py)."""
+    """Scope: the overlay applied to a config dict, as ``load_config`` does. A routed profile's terminal policy is
+    enforced in ``build_profile_terminal_scope`` via ``tools.terminal_scope_sandbox`` (tests/tools/test_terminal_scope_sandbox_gap.py)."""
     from hermes_cli.managed_scope import apply_managed_overlay
 
     config = apply_managed_overlay({"terminal": {
         "backend": "docker", "docker_mount_cwd_to_workspace": True,
-        "docker_volumes": ["/:/host"], "docker_extra_args": ["--privileged"], "docker_image": "mine:latest"}})
+        "docker_volumes": ["/:/host"], "docker_extra_args": ["--privileged"],
+        "docker_forward_env": ["OPENROUTER_API_KEY"], "docker_env": {"LD_PRELOAD": "/tmp/x.so"},
+        "docker_image": "mine:latest", "container_cpu": 0, "container_memory": 0, "container_disk": 0}})
     terminal = config["terminal"]
     assert terminal["docker_mount_cwd_to_workspace"] is False
     assert terminal["docker_volumes"] == [] and terminal["docker_extra_args"] == []
-    assert terminal["backend"] == "docker" and terminal["docker_image"] == "mine:latest"  # unpinned keys stay theirs
+    assert terminal["docker_forward_env"] == [] and terminal["docker_env"] == {}
+    assert terminal["docker_image"] == "nikolaik/python-nodejs:python3.11-nodejs20"
+    assert terminal["container_cpu"] == 1 and terminal["container_memory"] == 5120 and terminal["container_disk"] == 51200
+    assert terminal["backend"] == "docker"  # backend stays unpinned in managed overlay so launch profile stays local

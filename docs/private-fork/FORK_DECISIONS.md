@@ -168,8 +168,8 @@ editable. If a new `access:` key is added, add it to this file.
   file) and Codex, **one subscription per company**, logged in by the company's admin with `hermes auth` inside the container
   (OAuth, stored with the profile on the `hermes-data` volume; not an env key).
 
-### D12. Sandbox: non-main profiles run tools in Docker-in-Docker (partly built)
-Resolves A6 in direction. Built:
+### D12. Sandbox: non-main profiles run tools in Docker-in-Docker (built and enforced in code; Dokploy throwaway deploy remains)
+Resolves A6 and O1 in code. Built:
 - `deploy/dokploy/docker-compose.yml` has a `dockerd` service (`docker:27.5.1-dind`, pinned, privileged, no domain, own `dockerd-data`
   volume). It listens on **no tcp port**, only on a unix socket (`/var/run/dind/docker.sock`, group = the gateway user's gid) in
   a `dockerd-sock` volume shared with `hermes`, which gets `DOCKER_HOST=unix://...` and waits for it to be healthy.
@@ -179,20 +179,29 @@ Resolves A6 in direction. Built:
   the old design and passes on the new one.
   **No host `docker.sock` anywhere**: it would be root on the Dokploy host and reach other companies' containers.
   `test_agent_sandboxes_run_on_the_companys_own_docker_daemon_never_the_hosts` fails if that changes.
-- `managed/config.yaml` pins `terminal.docker_volumes: []`, `docker_extra_args: []`, `docker_mount_cwd_to_workspace: false`.
-  *Correction (2026-10-23):* this was written as if the overlay covered every profile. It does not on the path that decides execution:
-  `tools/terminal_scope.build_profile_terminal_scope` reads a routed profile's `config.yaml` and `.env` raw and ignores the managed
-  overlay, so a hostile profile config still yields `docker_volumes ["/:/host"]`, `--privileged`, `docker_forward_env` of the gateway's
-  secrets and the local backend (shown by `tests/tools/test_terminal_scope_sandbox_gap.py`). The pins only apply where config is
-  loaded through `load_config`. Enforcement design: `SANDBOX_PLAN.md`.
-- Not pinned on purpose: `terminal.backend`. The main profile must keep the local backend because its agent provisions the
-  others (D13), and the managed overlay cannot differ per profile.
-Not built, so **not yet a boundary between people in one company**:
-- Nothing makes a non-main profile's agent use the docker backend, or stops a granted user from setting
-  `terminal.backend: local` (the REST config routes are `profile` class and allow it). See O1 for the seam.
-- Never run end to end: the sandbox image pull inside dind, per-profile containers (`docker_shared_container_key`), that file tools
-  and in-process tools (MCP stdio, plugins, `execute_code`) really run inside the sandbox, that a profile's `.env`/`auth.json`
-  is not mounted into it, and `dockerd` surviving a redeploy (volume `dockerd-data`).
+- `deploy/dokploy/dockerd-entrypoint.sh` installs `DOCKER-USER` and `INPUT` firewall rules inside `dockerd` that drop packets from
+  sandbox bridges (`! -i eth0`) to RFC 1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local (`169.254.0.0/16`),
+  loopback, CGNAT, the compose network, and local ports on `dockerd` itself, while keeping public internet access (`ESTABLISHED,RELATED`
+  + `RETURN`). Verified by `scripts/fork/verify-dind-isolation.sh` and `tests/gateway/test_dokploy_compose.py`.
+- `managed/config.yaml` pins `terminal.docker_image: nikolaik/python-nodejs:python3.11-nodejs20`, `docker_volumes: []`,
+  `docker_extra_args: []`, `docker_forward_env: []`, `docker_env: {}`, `docker_mount_cwd_to_workspace: false`,
+  `container_persistent: false`, `container_cpu: 1`, `container_memory: 5120`, `container_disk: 51200`.
+- `tools/terminal_scope_sandbox.py` is called by `tools/terminal_scope.build_profile_terminal_scope`, `set_terminal_scope`, and
+  `terminal_env`: for any non-launch profile under an `access:` policy, it applies the managed overlay and overwrites the scope to
+  `TERMINAL_ENV=docker` with empty volumes, empty extra args, empty forwarded env, ephemeral tmpfs (`/workspace` and `/root`),
+  pinned image, and bounded CPU/memory/disk regardless of what the profile's own `config.yaml` or `.env` requests
+  (`tests/tools/test_terminal_scope_sandbox_gap.py`). Task-level overrides (`_task_env_overrides`), host bind mounts
+  (`_readonly_skill_mount_args`, `credential_files`), and env passthrough (`env_passthrough`, `remote_common`) are also blocked for
+  sandboxed profiles.
+- Host-execution surfaces outside the terminal backend (`mcp_servers` stdio commands, `quick_commands` `type: exec`, shell hooks,
+  local host browser launch / `bot_desktop.placement: gateway`, and cron `script` / `monitor_script` jobs) fail closed and log for
+  sandboxed profiles (`tests/tools/test_sandbox_host_surfaces.py`).
+- End-to-end proof in `scripts/fork/verify-dind-isolation.sh` + `scripts/fork/verify_dind_profile_e2e.py` (run in `Fork CI`) drives a
+  real routed profile's `terminal_tool` against the live `dind` service with a hostile `config.yaml` and `.env`, asserting the command
+  runs inside an unprivileged container on `dockerd`, sees no gateway secrets or `/opt/data`, cannot reach the daemon API or compose
+  network, and has `CapDrop=[ALL]`, `no-new-privileges`, `Memory=5120m`, `NanoCpus=1e9`, and `PidsLimit=2048`.
+- Not pinned in `managed/config.yaml` on purpose: `terminal.backend`. The main profile must keep the local backend because its agent
+  provisions the others (D13), and `tools/terminal_scope_sandbox.py` forces `TERMINAL_ENV=docker` only for non-launch profiles.
 
 ### D13. The main profile's agent provisions the rest (decided)
 The pre-set-up launch profile is the admin profile. You talk to its agent and it creates other profiles, configured for the
@@ -204,8 +213,10 @@ Consequences to keep in mind:
   platforms, webhooks, public skills) off it.
 - Profile creation by RPC or REST stays admin-only; the agent path uses the CLI/files inside the container, so it is not
   covered by the access gate at all. That is intended, and is why the point above matters.
-- A profile the agent provisions must get a docker backend and a group grant (`hermes-profile-<name>` in the IdP, or an
-  invite). A convention or a skill for "create a profile" should do both; none exists yet (O3).
+- `hermes profile create <name>` (`hermes_cli/profiles_initialization.py`, `hermes_cli/profile_cmd.py`) stamps
+  `terminal.backend: docker` into the new profile's `config.yaml` when an `access:` policy is active and prints the
+  `hermes-profile-<name>` IdP group grant notice (`tests/hermes_cli/test_profile_sandbox_provisioning.py`), accompanied by the
+  bundled `skills/autonomous-ai-agents/profile-provisioning/SKILL.md` skill (O3).
 
 ## 2. Upstream files the fork modifies (merge conflict map)
 
@@ -236,10 +247,15 @@ Highest risk first. "Keep" is what must survive a conflict resolution.
 | `web/src/App.tsx` | `/access` route, nav item, `withoutAccessNav` | |
 | `pyproject.toml`, `uv.lock`, `apps/desktop/package.json` | version `0.1.0` | After a merge that touches the version or deps run `hermes pm lock` (or the PM-pinned `uv lock`); `Fork CI` runs `uv lock --check`. |
 | `README.md` | fork section on top | |
+| `tools/terminal_scope.py`, `tools/terminal_tool.py`, `tools/environments/docker.py`, `tools/environments/remote_common.py`, `tools/credential_files.py`, `tools/env_passthrough.py` | calls into `tools/terminal_scope_sandbox.py` to enforce the Docker sandbox, strip task overrides, and block host bind mounts / env passthrough for non-launch profiles under an `access:` policy | Keep the `terminal_scope_sandbox` hooks. |
+| `hermes_cli/managed_scope.py` | `_merge_managed_overlay` overwrites empty dict leaves (`docker_env: {}`) instead of deep-merging 0 keys | Keep `_merge_managed_overlay`. |
+| `tools/mcp_tool_config.py`, `tools/mcp_tool_transport.py`, `gateway/run_inbound_hooks.py`, `agent/shell_hooks.py`, `tools/bot_desktop/placement.py`, `tools/browser_session.py`, `tools/browser_launcher.py`, `tools/browser_lightpanda.py`, `cron/jobs_invariants.py`, `cron/scheduler_script.py` | fail closed on host-level execution surfaces (`mcp_servers` stdio, `quick_commands` `type: exec`, shell hooks, host browser, cron `script`/`monitor_script`) for sandboxed profiles | Keep `is_sandboxed_profile()` checks. |
+| `hermes_cli/profiles_initialization.py`, `hermes_cli/profile_cmd.py` | stamp `terminal.backend: docker` and print the `hermes-profile-<name>` IdP group grant notice when `access:` is active | Keep `_stamp_sandbox_backend_if_access_policy` and `_print_access_policy_grant_notice`. |
 
 Fork-only new files (no conflict possible, but they depend on upstream APIs): `gateway/access_policy.py`,
 `access_grants.py`, `session_access.py`; `hermes_cli/dashboard_auth/access.py`, `access_http.py`;
-`hermes_cli/web_routers/access_invites.py`; `web/src/pages/AccessPage.tsx`, `lib/api-access.ts`, `lib/access-nav.ts`,
+`hermes_cli/web_routers/access_invites.py`; `tools/terminal_scope_sandbox.py`; `skills/autonomous-ai-agents/profile-provisioning/SKILL.md`;
+`web/src/pages/AccessPage.tsx`, `lib/api-access.ts`, `lib/access-nav.ts`,
 `hooks/useAccessSummary.ts`; `apps/desktop/src/lib/connect-link.ts`, `store/connect-link.ts`,
 `app/contrib/connect-link-dialog.tsx`, `deep-link-dialogs.tsx`; `deploy/dokploy/*`; `scripts/fork/`;
 `.github/workflows/fork-ci.yml`, `release-light.yml`.
@@ -263,8 +279,10 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
      tests/gateway/test_legacy_fallback_access.py tests/gateway/test_dokploy_compose.py \
      tests/hermes_cli/test_dashboard_rest_access.py tests/hermes_cli/test_dashboard_ws_profile_gate.py \
      tests/hermes_cli/test_dashboard_access_scope.py tests/hermes_cli/test_access_invites_api.py \
-     tests/hermes_cli/test_auth_me_access.py tests/plugins/dashboard_auth/test_session_groups.py \
-     tests/scripts/test_check_github_protection.py
+     tests/hermes_cli/test_auth_me_access.py tests/hermes_cli/test_profile_sandbox_provisioning.py \
+     tests/plugins/dashboard_auth/test_session_groups.py \
+     tests/scripts/test_check_github_protection.py \
+     tests/tools/test_terminal_scope_sandbox_gap.py tests/tools/test_sandbox_host_surfaces.py
    scripts/run_tests.sh tests/gateway tests/hermes_cli
    python scripts/check
    cd apps/desktop && npm run typecheck && npx vitest run
@@ -285,21 +303,21 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
   Decided (L3): go private after cleanup and the upstream merge; until then do not add anything more sensitive to it. At that
   point also give Dokploy a deploy key, and check the plan still enforces rulesets on a private repository (branch protection is
   already applied, O11; the business README rewrite is done).
-- **O1. Make the sandbox real (deferred on purpose, must be done before go-live, L4).** Needed: non-main profiles get `terminal.backend: docker`, and a granted user cannot flip it
-  to `local`. Candidate seam: where the terminal backend is resolved (`tools/terminal_tool.py::_get_env_config`, scope-aware
-  `_tenv("TERMINAL_ENV")`): when an access policy is configured and the active profile is not the launch profile, force
-  `docker`. That edits a ratcheted upstream file, so it needs a small sibling module and a test on the real resolver. Then
-  run D12's verify list on a throwaway company.
-  **Plan written: `SANDBOX_PLAN.md`** (findings G1-G8, phases 0-5, decisions for the owner). Finding G1 supersedes the seam suggested
-  above: the policy is decided in `tools/terminal_scope.build_profile_terminal_scope`.
+- **O1. Make the sandbox real: IMPLEMENTED IN CODE AND VERIFIED IN DOCKER 2026-10-24** (`SANDBOX_PLAN.md` phases 0–5; throwaway-company Dokploy deploy in O5 remains before go-live).
+  `tools/terminal_scope_sandbox.py` enforces `TERMINAL_ENV=docker` and all managed pins (`docker_volumes: []`, `docker_extra_args: []`,
+  `docker_forward_env: []`, `docker_env: {}`, `docker_mount_cwd_to_workspace: false`, `container_persistent: false`, pinned image,
+  CPU/memory/disk limits) in `build_profile_terminal_scope` for every non-launch profile under an `access:` policy, closes host-execution
+  surfaces outside the backend (`tests/tools/test_sandbox_host_surfaces.py`), filters private-range egress in `dockerd-entrypoint.sh`,
+  and verifies end-to-end against live `dind` in `scripts/fork/verify-dind-isolation.sh`.
 - **O2. PTY child still uses the host-scoped internal credential.** Binding it to the PTY's profile server-side
   (`mint_ticket(extra=...)`) was planned (A3) and is not done.
-- **O3. A "create a profile" skill/convention for the main agent** that creates the profile with the docker backend, a
-  `hermes-profile-<name>` grant note for the IdP, and optionally an invite. Also: whether non-admins may edit their profile
-  config beyond the pinned keys.
+- **O3. A "create a profile" skill/convention for the main agent: DONE 2026-10-24.** `hermes profile create <name>` stamps
+  `terminal.backend: docker` and prints the `hermes-profile-<name>` IdP group grant note when `access:` is active
+  (`tests/hermes_cli/test_profile_sandbox_provisioning.py`), paired with `skills/autonomous-ai-agents/profile-provisioning/SKILL.md`.
 - **O4. Invite open questions:** link reuse policy (default single-use stands), who sends the email (admin copies the link
   today), JIT profile creation from a template (not built).
-- **O5. Not yet exercised anywhere:** the compose stack in real Docker/Dokploy (first deploy on a throwaway company), the
+- **O5. Not yet exercised on a live Dokploy host:** the compose stack deployed on Dokploy (first deploy on a throwaway company;
+  local Docker-in-Docker + sandbox isolation is exercised by `scripts/fork/verify-dind-isolation.sh` in `Fork CI`), the
   Light release workflow on a real tag, an invite redeemed end to end, WebSocket keepalive through a Cloudflare Tunnel.
 - **O6. Merge upstream.** 3,200 commits behind with 3 known conflicts (header). Do it on a branch, then section 3.
 - **O7. Strings** for the Access page and connect dialog are English only.
@@ -341,7 +359,7 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
 
 ## 5. Go-live gate (all must be true before a customer is on a gateway)
 
-- [ ] Sandbox enforced (O1): non-main profiles cannot run on the local backend; verified on a throwaway company with D12's list.
+- [ ] Sandbox enforced (O1): implemented and verified in Docker (`scripts/fork/verify-dind-isolation.sh` in `Fork CI`); verify on a throwaway company on Dokploy with D12's list before ticking.
 - [ ] PTY child no longer holds the host-scoped internal credential (O2).
 - [ ] First real deploy on Dokploy passed the checklist in `deploy/dokploy/README.md`; `dockerd` survives a redeploy.
 - [ ] An invite redeemed end to end against that gateway; WebSocket keepalive tested through the Cloudflare Tunnel.

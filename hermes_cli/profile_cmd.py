@@ -288,7 +288,27 @@ def _profile_create(args):
         print(f"\n  ⚠ This profile has no API keys yet. Run '{name} setup' first,")
         print("    or it will inherit keys from your shell environment.")
         print(f"  Edit {profile_dir_display}/SOUL.md to customize personality")
+    _print_access_policy_grant_notice(name)
     print()
+
+
+def _print_access_policy_grant_notice(name: str) -> None:
+    """When an ``access:`` policy is configured, print the Docker sandbox and IdP group grant note."""
+    from tools.terminal_scope_sandbox import access_policy_configured
+
+    if not access_policy_configured():
+        return
+    from gateway.access_policy import DEFAULT_GROUP_PREFIX, parse_access_policy
+    from hermes_cli.config import load_config_readonly
+    from hermes_cli.profiles import normalize_profile_name
+
+    canon = normalize_profile_name(name)
+    policy = parse_access_policy(load_config_readonly().get("access"))
+    prefix = policy.group_prefix or DEFAULT_GROUP_PREFIX
+    print("\nAccess & Sandbox (access policy active):")
+    print("  Sandbox:          terminal.backend = docker (enforced by gateway access policy)")
+    print(f"  IdP group grant:  {prefix}{canon}")
+    print("  Invite link:      create one from the Dashboard Access page (/access)")
 
 
 def _profile_delete(args):

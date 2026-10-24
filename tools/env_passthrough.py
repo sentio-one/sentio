@@ -108,6 +108,11 @@ def _load_config_passthrough() -> frozenset[str]:
         return cached
     result: set[str] = set()
     try:
+        from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+        if is_sandboxed_profile():
+            _config_passthrough[home_key] = frozenset()
+            return _config_passthrough[home_key]
         passthrough = cfg_get(read_raw_config(), "terminal", "env_passthrough")
         items = passthrough if isinstance(passthrough, list) else ()
         result.update(_accepted((i.strip() for i in items if isinstance(i, str)), (

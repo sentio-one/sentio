@@ -715,6 +715,15 @@ def _load_mcp_config() -> dict[str, dict]:
         # tighter limit would fall back to the package's looser one while the server keeps spending).
         rejected = frozenset(n for n in servers if n not in kept and _malformed_cost_table(n, servers[n]) is not None)
         _portable_mcp_servers(safe_servers, rejected)
+        from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+        if is_sandboxed_profile():
+            for name in [n for n, c in safe_servers.items() if "command" in c or not c.get("url")]:
+                safe_servers.pop(name, None)
+                logger.warning(
+                    "Skipping stdio MCP server '%s': host command execution is disabled for sandboxed profiles under access policy",
+                    name,
+                )
         return safe_servers
     except Exception as exc:
         logger.debug("Failed to load MCP config: %s", exc)

@@ -91,24 +91,29 @@ manage it in the IdP.
 
 ## Limits that matter
 
-- **Sandbox: how it is meant to work.** The main (launch) profile runs its tools inside the `hermes` container, because its
-  agent provisions the other profiles. Every other profile is created with `terminal.backend: docker`, so its commands run in
-  containers on the company's `dockerd`, which has no access to `/opt/data`. **This is the intended design, not what is
-  enforced today:** the pinned `docker_*` keys in `managed/config.yaml` do not reach a routed profile's terminal policy (found by
-  test, 2026-10-23), so a profile can still choose the local backend, add volumes or `--privileged`, or forward the gateway's
-  environment into its container. The enforcement plan is `docs/private-fork/SANDBOX_PLAN.md`.
-- **Sandbox: what is not enforced yet.** Nothing stops a granted user from setting their profile's `terminal.backend` back to
-  `local`, which runs commands as the container's `hermes` user with every profile's files in reach. Until that is closed
-  (`FORK_DECISIONS.md` O1) treat a grant as host-level trust inside the company; the container is the boundary **between
-  companies**.
+- **Sandbox: how it works.** The main (launch) profile runs its tools inside the `hermes` container, because its
+  agent provisions the other profiles (D13). Every other profile under an `access:` policy has `TERMINAL_ENV=docker` and the
+  managed sandbox pins (`docker_volumes: []`, `docker_extra_args: []`, `docker_forward_env: []`, `docker_env: {}`,
+  `docker_mount_cwd_to_workspace: false`, `container_persistent: false`, `docker_image: nikolaik/python-nodejs:python3.11-nodejs20`,
+  `container_cpu: 1`, `container_memory: 5120`, `container_disk: 51200`) enforced server-side in
+  `tools/terminal_scope.build_profile_terminal_scope` via `tools/terminal_scope_sandbox.py`. Even if a user or agent edits a
+  routed profile's `config.yaml` or `.env` to ask for `backend: local`, `/:/host`, `--privileged`, or `docker_forward_env`, the
+  gateway overwrites it back to the isolated Docker sandbox (`docs/private-fork/SANDBOX_PLAN.md`).
+- **Host execution surfaces outside the terminal backend are closed for sandboxed profiles.** For any non-launch profile under an
+  `access:` policy, stdio MCP servers (`mcp_servers`), `quick_commands` with `type: exec`, shell hooks (`hooks`), host-local
+  browser launch (`bot_desktop.placement: gateway`), and cron `script` / `monitor_script` jobs fail closed and log
+  (`tests/tools/test_sandbox_host_surfaces.py`).
 - **`dockerd` is privileged** (Docker-in-Docker needs it), so whoever can speak to its API owns the Dokploy host. It holds no
   company data and no secrets, has no domain, and listens on **no network port at all**: only a unix socket in a volume shared
   with `hermes`, restricted to the gateway user's gid. This matters because a sandboxed container runs on the daemon's own bridge
   and can reach any tcp port it serves (it did, in an earlier version of this file that used port 2375). Do not add a `ports`,
   `expose` or tcp `--host`, and do not mount the host's `docker.sock` into any service.
-  `scripts/fork/verify-dind-isolation.sh` proves it against real Docker and runs in CI.
-- **What a sandbox can still reach:** the internet, and any host service bound to all interfaces (SSH on port 22 was reachable
-  from a test sandbox). Egress control is not done yet (`SANDBOX_PLAN.md`).
+  `scripts/fork/verify-dind-isolation.sh` proves both the daemon isolation and an end-to-end routed profile `terminal_tool` call
+  against real Docker and runs in `Fork CI`.
+- **Sandbox egress filtering:** `deploy/dokploy/dockerd-entrypoint.sh` installs `DOCKER-USER` and `INPUT` rules inside `dockerd`
+  that drop traffic from sandbox bridges (`! -i eth0`) to RFC 1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local
+  (`169.254.0.0/16`), loopback, CGNAT, the compose network, and local ports on `dockerd` itself, while keeping public internet
+  access (`ESTABLISHED,RELATED` + `RETURN`).
 - Static per-user rules (`access.users` / `access.admins`) are deliberately empty in the pinned file. If a company's IdP
   cannot emit groups, fork `managed/config.yaml` for that company rather than loosening the shared one.
 - The compose file builds with `build:`. If server builds become a problem, build in GitHub Actions, push to GHCR and switch

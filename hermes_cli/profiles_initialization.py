@@ -40,7 +40,32 @@ def finish_profile_layout(profile_dir: Path, *, no_skills: bool, clone_all: bool
     if not clone_all:
         _migrate_profile_config_if_outdated(profile_dir)
 
+    # Under a configured access policy (SANDBOX_PLAN.md Phase 4, D13/O3), stamp
+    # terminal.backend: docker into the new profile's config.yaml so the file on disk
+    # matches the enforced Docker sandbox.
+    _stamp_sandbox_backend_if_access_policy(profile_dir)
+
     # Description last, so a partial-create failure doesn't strand a description file.
     if description and description.strip():
         with contextlib.suppress(Exception):  # non-fatal — `hermes profile describe` works later
             write_profile_meta(profile_dir, description=description.strip(), description_auto=False)
+
+
+def _stamp_sandbox_backend_if_access_policy(profile_dir: Path) -> None:
+    """When an ``access:`` policy is active, ensure ``terminal.backend: docker`` is written
+    into *profile_dir*'s ``config.yaml``."""
+    with contextlib.suppress(Exception):
+        from tools.terminal_scope_sandbox import access_policy_configured
+
+        if not access_policy_configured():
+            return
+        from hermes_cli.config import atomic_config_write, read_user_config_raw
+
+        cfg_path = profile_dir / "config.yaml"
+        cfg = read_user_config_raw(cfg_path) if cfg_path.is_file() else {}
+        if not isinstance(cfg, dict):
+            cfg = {}
+        terminal = dict(cfg.get("terminal")) if isinstance(cfg.get("terminal"), dict) else {}
+        terminal["backend"] = "docker"
+        cfg["terminal"] = terminal
+        atomic_config_write(cfg_path, cfg)

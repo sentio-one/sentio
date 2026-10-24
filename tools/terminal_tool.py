@@ -338,6 +338,9 @@ def register_task_env_overrides(task_id: str, overrides: dict[str, Any]):
     Keyed like ``_session_cwd`` — routed-profile qualified (:func:`_qualify_task_key`) — so two
     profiles registering the same task id never read each other's image/cwd (#123989).
     """
+    from tools.terminal_scope_sandbox import sanitize_task_overrides
+
+    overrides = sanitize_task_overrides(overrides)
     _task_env_overrides[_qualify_task_key(task_id)] = overrides
 
     new_cwd = overrides.get("cwd")
@@ -591,12 +594,15 @@ def resolve_task_overrides(task_id: Optional[str]) -> dict[str, Any]:
     session's override is silently dropped. Single source of that lookup so
     the terminal and file layers can't drift apart.
     """
+    from tools.terminal_scope_sandbox import sanitize_task_overrides
+
     raw = task_id or "default"
-    return (
+    found = (
         _task_env_overrides.get(_qualify_task_key(raw))
         or _task_env_overrides.get(_resolve_container_task_id(raw))
         or {}
     )
+    return sanitize_task_overrides(found)
 
 
 # Backends that take an image, keyed to the override/config key carrying it.

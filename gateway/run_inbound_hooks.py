@@ -180,6 +180,11 @@ class GatewayInboundHooksMixin:
         (the gateway process has every API key in os.environ), redacted output, its process tree
         killed after 30 s or when the awaiting task is cancelled (gateway shutdown).
         ``cwd`` is a local session's folder; None keeps the gateway's own (messaging)."""
+        from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+        if is_sandboxed_profile(getattr(self, "hermes_home", None)):
+            logger.warning("Quick command '%s' (type: exec) refused for sandboxed profile", command)
+            return f"`/{command}` refused: host command execution is disabled for sandboxed profiles."
         proc = None
         try:
             from tools.environments.local import build_subprocess_env

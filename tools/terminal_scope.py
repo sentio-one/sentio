@@ -46,6 +46,11 @@ class TerminalPolicyRefusal(dict[str, str]):
 
 def set_terminal_scope(mapping: Optional[dict[str, str]]) -> Token:
     """Install *mapping* as the current context's terminal policy."""
+    if mapping is not None and not isinstance(mapping, TerminalPolicyRefusal):
+        from hermes_constants import get_hermes_home
+        from tools.terminal_scope_sandbox import enforce_sandbox_terminal_scope
+
+        mapping = enforce_sandbox_terminal_scope(get_hermes_home(), dict(mapping))
     return _terminal_scope_var.set(mapping)
 
 
@@ -80,6 +85,11 @@ def terminal_env(name: str, default: str = "") -> str:
     """
     scope = _terminal_scope_var.get()
     if scope is None:
+        from hermes_constants import get_hermes_home
+        from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+        if is_sandboxed_profile():
+            return build_profile_terminal_scope(get_hermes_home()).get(name, default)
         return os.environ.get(name, default)
     enforce_no_refusal()
     value = scope.get(name)
@@ -175,6 +185,9 @@ def build_profile_terminal_scope(
             _apply_terminal_mapping(scope, raw_terminal)
             image_pinned = image_pinned or "docker_image" in raw_terminal
     scope["TERMINAL_DOCKER_IMAGE_PINNED"] = "1" if image_pinned else "0"
+    from tools.terminal_scope_sandbox import enforce_sandbox_terminal_scope
+
+    enforce_sandbox_terminal_scope(home, scope)
     _resolve_scope_cwd_placeholder(scope)
     return scope
 

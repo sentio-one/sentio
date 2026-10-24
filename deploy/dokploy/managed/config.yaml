@@ -14,12 +14,21 @@ access:
   admins: []
   users: []
 
-# Intended sandbox hardening for the docker terminal backend (the company's own `dockerd`, see docker-compose.yml): no
-# working-directory mount, no extra volumes, no raw `docker run` flags (--privileged, --pid=host, ...).
-# NOT YET EFFECTIVE for a routed profile's terminal: tools/terminal_scope.build_profile_terminal_scope reads each profile's
-# own config.yaml and .env raw and ignores this overlay (verified 2026-10-23; docs/private-fork/SANDBOX_PLAN.md, phase 1).
-# These keys only apply where the config is loaded through load_config. Do not rely on them as a security boundary.
+# Sandbox hardening for the docker terminal backend (the company's own `dockerd`, see docker-compose.yml): no
+# working-directory mount, no extra volumes, no raw `docker run` flags (--privileged, --pid=host, ...), no
+# forwarded host env vars, pinned image, ephemeral tmpfs (/workspace and /root inside the isolated dind), and
+# bounded CPU/memory/disk.
+# For routed profiles under this access policy, tools/terminal_scope_sandbox.py enforces `TERMINAL_ENV=docker`
+# and these pins in `build_profile_terminal_scope` even against a profile's own config.yaml and .env, while
+# leaving `backend` unpinned here so the launch profile stays host-level (FORK_DECISIONS.md D13).
 terminal:
+  docker_image: nikolaik/python-nodejs:python3.11-nodejs20
   docker_mount_cwd_to_workspace: false
   docker_volumes: []
   docker_extra_args: []
+  docker_forward_env: []
+  docker_env: {}
+  container_persistent: false
+  container_cpu: 1
+  container_memory: 5120
+  container_disk: 51200

@@ -52,8 +52,10 @@ jobs:
             tests/gateway/test_legacy_fallback_access.py tests/gateway/test_dokploy_compose.py \
             tests/hermes_cli/test_dashboard_rest_access.py tests/hermes_cli/test_dashboard_ws_profile_gate.py \
             tests/hermes_cli/test_dashboard_access_scope.py tests/hermes_cli/test_access_invites_api.py \
-            tests/hermes_cli/test_auth_me_access.py tests/plugins/dashboard_auth/test_session_groups.py \
-            tests/scripts/test_check_github_protection.py
+            tests/hermes_cli/test_auth_me_access.py tests/hermes_cli/test_profile_sandbox_provisioning.py \
+            tests/plugins/dashboard_auth/test_session_groups.py \
+            tests/scripts/test_check_github_protection.py \
+            tests/tools/test_terminal_scope_sandbox_gap.py tests/tools/test_sandbox_host_surfaces.py
         env:
           OPENROUTER_API_KEY: ""
           OPENAI_API_KEY: ""
@@ -92,8 +94,14 @@ jobs:
     steps:
       - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
 
-      # Starts the real privileged `dockerd` service and runs a sandbox container against it: the property is a network
-      # fact, so a YAML test cannot prove it (scripts/fork/verify-dind-isolation.sh).
+      - name: Set up locked Python for end-to-end sandbox harness
+        uses: ./.github/actions/setup-pm
+        with:
+          extras: '["all"]'
+          test-environment: 'true'
+
+      # Starts the real privileged `dockerd` service and drives a sandboxed profile's terminal tool against it: the
+      # network and container properties are runtime facts that a YAML test cannot prove (scripts/fork/verify-dind-isolation.sh).
       - name: Verify the sandbox isolation
         run: scripts/fork/verify-dind-isolation.sh
 

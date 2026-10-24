@@ -226,6 +226,10 @@ def _create_local_session(cache_key: str, allow_real_profile: bool = True) -> di
     can't load, the fresh browser carries ``real_profile_unavailable`` so the first result tells the model it
     is signed out. The hybrid sidecar passes ``allow_real_profile=False``: the user's cookie jar must not
     reach an arbitrary internal host the model chose."""
+    from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+    if is_sandboxed_profile():
+        allow_real_profile = False
     fallback_note = None
     if allow_real_profile:
         from tools.browser_session_real_profile import real_profile_cdp, real_profile_fallback_note, real_profile_key

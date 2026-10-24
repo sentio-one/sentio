@@ -36,11 +36,17 @@ def resolve_passthrough_env(explicit_forward: Iterable[str] = (),
     resolve_passthrough_value = None
     multiplex_active = False
     is_global_env = lambda _name: False
+    from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+    sandboxed = is_sandboxed_profile()
+    if sandboxed:
+        explicit_forward = ()
     try:
         from tools.env_passthrough import get_all_passthrough, resolve_passthrough_value
         from agent.secret_scope import _is_global_env as is_global_env, is_multiplex_active
         multiplex_active = is_multiplex_active()
-        passthrough_keys = set(get_all_passthrough())
+        if not sandboxed:
+            passthrough_keys = set(get_all_passthrough())
     except Exception:
         pass
     implicit_forward = {k for k in passthrough_keys if not _is_hermes_internal_secret(k)}

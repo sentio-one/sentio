@@ -73,12 +73,14 @@ services:
     image: docker:27.5.1-dind
     restart: unless-stopped
     privileged: true
+    entrypoint: ["/bin/sh", "/opt/dockerd-entrypoint.sh"]
     command: ["dockerd", "--host=unix:///var/run/dind/docker.sock", "--group=10000"]
     volumes:
       - dockerd-data:/var/lib/docker
       - dockerd-sock:/var/run/dind
+      - ./dockerd-entrypoint.sh:/opt/dockerd-entrypoint.sh:ro
     healthcheck:
-      test: ["CMD", "docker", "-H", "unix:///var/run/dind/docker.sock", "info"]
+      test: ["CMD-SHELL", "test -f /var/run/dind/firewall.ready && docker -H unix:///var/run/dind/docker.sock info >/dev/null"]
       interval: 15s
       timeout: 10s
       retries: 5
