@@ -136,7 +136,7 @@ async def enforce(request: Any, session: Any, policy: Any) -> Optional[Response]
     from hermes_cli.dashboard_auth.access import grant_for_identity
 
     grant = grant_for_identity(policy, provider=session.provider, issuer=session.issuer, sub=session.user_id,
-                               groups=session.groups)
+                               groups=session.groups, verified_email=session.verified_email)
     if grant.admin:
         return None
     request.state.access_allowed_profiles = grant.profiles

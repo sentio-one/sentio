@@ -14,7 +14,7 @@ use_compose=1
 if ! docker compose version >/dev/null 2>&1; then
   use_compose=0
 fi
-export PUBLIC_URL=https://verify.example OIDC_ISSUER=https://sso.example OIDC_CLIENT_ID=verify ADMIN_GROUP=verify
+export PUBLIC_URL=https://verify.example OIDC_ISSUER=https://sso.example OIDC_CLIENT_ID=verify ADMIN_GROUP=verify ADMIN_EMAILS=verify@example.test
 cli=docker:27.5.1-cli
 sock=/var/run/dind/docker.sock
 volume="${project}_dockerd-sock"

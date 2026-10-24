@@ -28,12 +28,32 @@ from adding themselves as an admin.
 |---|---|---|
 | `COMPANY_SLUG` | no | `acme`, only labels the image |
 | `PUBLIC_URL` | yes | `https://acme.gw.example.com`, the address users reach through the tunnel |
-| `OIDC_ISSUER` | yes | the company IdP's issuer URL |
+| `OIDC_ISSUER` | yes | the company IdP's issuer URL (`https://accounts.google.com` for Google, see below) |
 | `OIDC_CLIENT_ID` | yes | client id registered at that IdP |
 | `OIDC_CLIENT_SECRET` | no | leave empty for a public (PKCE) client |
-| `ADMIN_GROUP` | yes | IdP group whose members are admins, e.g. `hermes-admins` |
+| `ADMIN_EMAILS` | yes | comma-separated emails that are admins, e.g. `you@yourcompany.example`. Counts only when the IdP marked the email verified. Start with the operator's; add the customer's admin on handover |
+| `ADMIN_GROUP` | no | IdP group whose members are also admins, only for an IdP that emits a `groups` claim |
 | `COMMANDCODE_API_KEY` | as needed | this company's Command Code key (provider `commandcode`) |
 | `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | as needed | this company's other model keys |
+
+### Sign-in with Google (first-choice IdP, free)
+
+Decided 2026-10-24 (`docs/private-fork/ACCESS_CONTROL_PLAN.md` section 6). No per-user or per-login charge, and no billing account.
+1. Google Cloud Console → a project → APIs & Services → OAuth consent screen. User type **External**, scopes `openid`, `email`,
+   `profile` only. Then **publish it to production**: in Testing mode only listed test users (100 at most) can sign in and the
+   login expires after 7 days. Basic scopes normally need no Google app review; Google may ask you to confirm the app name,
+   logo and domain.
+2. Credentials → Create OAuth client ID → **Web application**. Authorized redirect URI: `<PUBLIC_URL>/auth/callback` (the route in
+   `hermes_cli/dashboard_auth/routes.py`). One client can serve every company, each gateway adding its own redirect URI, or make
+   one client per company to keep them apart.
+3. Set `OIDC_ISSUER=https://accounts.google.com`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` (Google's web client always has a
+   secret, so unlike a pure PKCE client it is required here). Not yet exercised against Google: the browser login and the desktop
+   app's native sign-in flow (tracked with O5 in `FORK_DECISIONS.md`).
+
+Google emits **no `groups` claim**, so admins are named in `ADMIN_EMAILS` (the operator first: sign in with that Google account and
+you are an admin) and per-profile access comes from invites, not `hermes-profile-<name>` groups. Set `email` on every invite.
+Changing `ADMIN_EMAILS` needs a redeploy of the company stack. Residual risk: the match is on the verified email, so an
+address that is later reassigned (a Workspace admin renaming an account) would carry the admin role with it.
 
 Codex is a subscription login, not an env key: one subscription per company. After the first deploy open a terminal in the
 `hermes` container (Dokploy → Terminal) and run `hermes auth` for Codex as the admin; the login is stored in that profile's
@@ -54,9 +74,10 @@ A missing required value aborts the deploy (`${VAR:?...}`), so a project cannot 
 5. **IdP (Keycloak/Authentik/Entra/Okta...):** register a client for this gateway.
    - Redirect URI: `<PUBLIC_URL>/auth/callback`. As far as I read the auth routes, the desktop's loopback sign-in goes
      through the gateway, so the IdP does not need the desktop's loopback addresses. Verify with a real sign-in.
-   - The ID token must carry a **`groups`** claim (Keycloak: a Group Membership mapper with full path off; Entra: group
-     claims, mind the 200-group overflow; Google Workspace has no groups claim). Users who should reach a profile are in
-     `hermes-profile-<profile>`; admins are in `ADMIN_GROUP`.
+   - Admins are the verified emails in `ADMIN_EMAILS`. To use groups instead (or as well), the ID token must carry a
+     **`groups`** claim (Keycloak: a Group Membership mapper with full path off; Entra: group claims, mind the 200-group
+     overflow; Google has none): users who should reach a profile are in `hermes-profile-<profile>` and admins are in
+     `ADMIN_GROUP`. Without groups, profile access comes from invites.
 6. **Deploy**, then check the list below.
 
 ## Checklist after the first deploy

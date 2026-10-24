@@ -90,7 +90,34 @@ For a non-launch profile under an access policy, each of these fails closed and 
 - External operator step tracked in `FORK_DECISIONS.md` O5 before a customer is on a gateway: a throwaway-company deploy on a live
   Dokploy server + Cloudflare Tunnel + OIDC IdP using the checklist in `deploy/dokploy/README.md`.
 
-## 4. Decisions for the owner
+### Phase 6: allowlist and profile templates (planned, not built)
+Replaces the fail-closed behaviour of phase 2 with the decisions in section 4. Each item is its own PR, test red then green.
+- **Allowlist:** a pinned, admin-owned list (in the managed config, not editable by a profile) of approved MCP servers (name,
+  command or URL, digest) and hook commands. Anything not on it still fails closed and logs.
+- **Run inside the sandbox:** stdio MCP servers, `exec` quick commands, hooks and the browser start in the profile's container
+  instead of on the gateway. Open question: how the browser is provided in a container (headless only, or a pinned browser image).
+- **Templates:** `templates:` in the managed config, keyed by name, each with limits, egress mode and allowlist. A profile names
+  one template; `hermes profile create <name> --template <t>` stamps it. Replaces the single pinned `container_*` numbers.
+- **Admin surface:** the main profile's agent and the Access page approve allowlist entries and assign templates.
+
+## 4. Decisions
+
+Decided by the owner 2026-10-24 (the original options and recommendations follow, for the record):
+
+1. **MCP, quick commands, hooks, browser: allowed, not forbidden.** The goal is company scoping that still lets a non-main profile
+   do real work. Phase 2 above fails these surfaces closed today and is **interim**. Direction, as phase 6: an **admin-approved
+   allowlist** (per profile or per template) decides which MCP servers and hook commands may load, and surfaces that run code
+   (stdio MCP, `exec` quick commands, hooks, the browser) run **inside that profile's sandbox**, never on the gateway host.
+2. **Egress: keep blocking private ranges** with open public internet (phase 3). Later, egress is a per-template setting
+   (open, or a domain allowlist). A credential proxy (iron-proxy) waits for the first customer who needs it.
+3. **One main profile manages the other users' agents for the MVP.** Admins who are not the main profile run sandboxed too.
+4. **Pinned image: deferred ("soon").**
+5. **Limits: per profile template**, powerful but bounded, not one global number. Templates are named by the work they do, for
+   example `standard`, `heavy` (coding, data) and `restricted`, each carrying CPU, memory, pids, disk, egress and tool allowlist.
+   The numbers are chosen after watching a real workload. An invite can carry `create_profile_from: <template>`
+   (`INVITES_DESIGN.md` section 4).
+
+Original options:
 
 1. **MCP, quick commands, hooks, browser for non-main profiles:** (a) forbid, (b) run inside the profile's sandbox, (c) forbid unless
    an admin approves per profile. Recommendation: **(a) for now**, (b) later per surface; it is the only option that needs no new

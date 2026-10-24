@@ -79,6 +79,7 @@ jobs:
           OIDC_ISSUER: https://sso.acme.example
           OIDC_CLIENT_ID: ci
           ADMIN_GROUP: hermes-admins
+          ADMIN_EMAILS: ci@acme.example
 
       - name: Required settings abort a deploy when unset
         run: |

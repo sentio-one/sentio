@@ -43,7 +43,7 @@ def test_the_web_gateway_is_enabled_and_bound_for_the_proxy(service):
 def test_per_company_settings_are_required_so_a_deploy_cannot_start_half_configured(service):
     env = service["environment"]
     for key in ("HERMES_DASHBOARD_PUBLIC_URL", "HERMES_DASHBOARD_OIDC_ISSUER", "HERMES_DASHBOARD_OIDC_CLIENT_ID",
-                "HERMES_ADMIN_GROUP"):
+                "HERMES_ADMIN_EMAILS"):
         assert re.search(r"\$\{[A-Z_]+:\?", env[key]), key  # `${VAR:?message}` aborts the deploy when unset
 
 

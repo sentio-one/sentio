@@ -31,14 +31,17 @@ services:
       # The address users reach (through the tunnel): OAuth redirects and hermes://connect invite links use it.
       HERMES_DASHBOARD_PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL, e.g. https://acme.gw.example.com}
 
-      # The company's own OIDC provider (must emit a `groups` claim in the ID token).
+      # The company's OIDC provider: Google (https://accounts.google.com) or any IdP. Group grants need a `groups` claim in the
+      # ID token; Google has none, so its admins come from ADMIN_EMAILS and its users from invites.
       HERMES_DASHBOARD_OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER}
       HERMES_DASHBOARD_OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?set OIDC_CLIENT_ID}
       HERMES_DASHBOARD_OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
 
-      # Pinned access policy: managed/config.yaml reads this. Members of this IdP group are admins.
+      # Pinned access policy: managed/config.yaml reads these. Admins are the comma-separated emails the IdP verified, plus the
+      # members of ADMIN_GROUP when the IdP emits groups.
       HERMES_MANAGED_DIR: /etc/hermes
-      HERMES_ADMIN_GROUP: ${ADMIN_GROUP:?set ADMIN_GROUP, e.g. hermes-admins}
+      HERMES_ADMIN_EMAILS: ${ADMIN_EMAILS:?set ADMIN_EMAILS, e.g. you@yourcompany.example (comma separated)}
+      HERMES_ADMIN_GROUP: ${ADMIN_GROUP:-}
 
       # Model provider keys for this company's agents (add the ones in use in Dokploy's Environment tab).
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
