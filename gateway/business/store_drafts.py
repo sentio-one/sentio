@@ -262,3 +262,67 @@ def list_tasks(store, scope):
         tasks.append(TaskRecord(id=row["task_id"], dedupe_key=row["dedupe_key"], reason=payload.get("reason", ""),
                                 refs=tuple(payload.get("refs", ()))))
     return tuple(tasks)
+
+
+def _plan(value):
+    from gateway.business.render import DeliveryPart, DeliveryPlan
+    parts = tuple(DeliveryPart(**p) for p in value["parts"])
+    return DeliveryPlan(
+        id=value["id"],
+        revision_id=value["revision_id"],
+        scope=_scope(value["scope"]),
+        context_version=value["context_version"],
+        policy_version=value["policy_version"],
+        parts=parts,
+        expires_at_ms=value["expires_at_ms"],
+        digest=value["digest"],
+        encrypted_plan_handle=value.get("encrypted_plan_handle"),
+    )
+
+
+def save_plan(store, plan):
+    conn = store._connect()
+    with transaction(conn, immediate=True) as db:
+        owned = db.execute(
+            "SELECT episode_id FROM business_revisions WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND revision_id=?",
+            (*_scope_values(plan.scope), plan.revision_id),
+        ).fetchone()
+        if not owned:
+            raise BusinessDenied()
+        db.execute(
+            "INSERT INTO business_plans(runtime_profile, transport_profile, account_id, contact_id, plan_id, revision_id, digest, payload, expires_at_ms) "
+            "VALUES(?,?,?,?,?,?,?,?,?)",
+            (
+                *_scope_values(plan.scope),
+                plan.id,
+                plan.revision_id,
+                plan.digest,
+                _json(plan),
+                plan.expires_at_ms,
+            ),
+        )
+
+
+def get_plan(store, scope, plan_id):
+    conn = store._connect()
+    with transaction(conn) as db:
+        row = db.execute(
+            "SELECT payload FROM business_plans WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND plan_id=?",
+            (*_scope_values(scope), plan_id),
+        ).fetchone()
+    if not row:
+        raise BusinessDenied()
+    return _plan(json.loads(row[0]))
+
+
+def get_plan_by_revision(store, scope, revision_id):
+    conn = store._connect()
+    with transaction(conn) as db:
+        row = db.execute(
+            "SELECT payload FROM business_plans WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND revision_id=?",
+            (*_scope_values(scope), revision_id),
+        ).fetchone()
+    if not row:
+        return None
+    return _plan(json.loads(row[0]))
+

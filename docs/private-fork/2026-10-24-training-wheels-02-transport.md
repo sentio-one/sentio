@@ -70,7 +70,7 @@ attachment bytes; volatile SDK encryption ids are excluded, semantic payload is 
 Tag ordinary digests `sha256:`; C3 adds `hmac-sha256:` for protected plans.
 Only `text | media | edit | reaction | poll | location` operations are accepted.
 
-- [ ] **Step 1: Write** `test_approval_hash_covers_every_delivery_field` and `test_render_captures_and_rechecks_attachment_bytes`; Node tests call the real formatter/chunker with fake message storage:
+- [x] **Step 1: Write** `test_approval_hash_covers_every_delivery_field` and `test_render_captures_and_rechecks_attachment_bytes`; Node tests call the real formatter/chunker with fake message storage:
 
 ```python
 assert plan.parts[0].payload["text"] == expected_whatsapp_rendering
@@ -82,10 +82,10 @@ with pytest.raises(BusinessProtocolError):
     render_changed_or_symlinked_capture()
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_render.py -v` and `node --test scripts/whatsapp-bridge/business_render.test.mjs`; expect absent rendering/capture contracts.
-- [ ] **Step 3: Implement** native capture using existing attachment capture/regular-file/hash primitives; bind handles to profile/account. Copy bytes into service-owned storage before approval, reject missing/foreign/symlinked media, and verify hash at use. Render exactly once before approval; store the immutable semantic plan. An expired reply target or unavailable quote fails rather than silently changing to an unquoted message. Reject credential-bearing plans until C3. No actual send exists on the render route.
-- [ ] **Step 4: Rerun** both commands; expect green for Unicode/chunk boundaries, captions, missing quote targets, changed media, and each operation kind.
-- [ ] **Step 5: Commit** named render/seam/test files with `feat(whatsapp): render immutable message plans for exact approval`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_render.py -v` and `node --test scripts/whatsapp-bridge/business_render.test.mjs`; expect absent rendering/capture contracts.
+- [x] **Step 3: Implement** native capture using existing attachment capture/regular-file/hash primitives; bind handles to profile/account. Copy bytes into service-owned storage before approval, reject missing/foreign/symlinked media, and verify hash at use. Render exactly once before approval; store the immutable semantic plan. An expired reply target or unavailable quote fails rather than silently changing to an unquoted message. Reject credential-bearing plans until C3. No actual send exists on the render route.
+- [x] **Step 4: Rerun** both commands; expect green for Unicode/chunk boundaries, captions, missing quote targets, changed media, and each operation kind.
+- [x] **Step 5: Commit** named render/seam/test files with `feat(whatsapp): render immutable message plans for exact approval`.
 
 ### Task B2: Exact approval and durable, stale-safe outbox
 

@@ -33,6 +33,7 @@ import qrcode from 'qrcode-terminal';
 import { matchesAllowedSender, matchesAllowedUser, matchesInboundWhatsAppGroup, parseAllowedUsers } from './allowlist.js';
 import { createOutboundIdTracker } from './outbound_ids.js';
 import { classifyOwnerMessageGate } from './owner_message_gate.js';
+import { renderBusinessPlan } from './business_render.js';
 import {
   addMentions,
   buildPollPayload,
@@ -1096,6 +1097,16 @@ app.post('/read', async (req, res) => {
   } catch (err) {
     console.warn('[bridge] failed to send read receipt:', err.message);
     return res.status(500).json({ error: 'Failed to send read receipt' });
+  }
+});
+
+// Render immutable message delivery plan for exact approval without sending
+app.post('/business/render', async (req, res) => {
+  try {
+    const plan = await renderBusinessPlan(req.body, { messageStore });
+    res.json(plan);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

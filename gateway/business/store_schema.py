@@ -59,6 +59,13 @@ CREATE TABLE IF NOT EXISTS business_audit (
  contact_id TEXT NOT NULL, source_id TEXT NOT NULL, kind TEXT NOT NULL, reason TEXT NOT NULL,
  payload TEXT NOT NULL, schema_version INTEGER NOT NULL DEFAULT 1,
  PRIMARY KEY(runtime_profile, transport_profile, account_id, contact_id, source_id));
+CREATE TABLE IF NOT EXISTS business_plans (
+ runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ contact_id TEXT NOT NULL, plan_id TEXT NOT NULL, revision_id TEXT NOT NULL,
+ digest TEXT NOT NULL, payload TEXT NOT NULL, expires_at_ms INTEGER NOT NULL,
+ schema_version INTEGER NOT NULL DEFAULT 1,
+ PRIMARY KEY(runtime_profile, transport_profile, account_id, contact_id, plan_id),
+ UNIQUE(runtime_profile, transport_profile, account_id, contact_id, revision_id));
 """
 
 

@@ -115,3 +115,16 @@ class BusinessStore:
     def revision_status(self, scope, revision_id):
         from gateway.business.store_drafts import revision_status
         return revision_status(self, scope, revision_id)
+
+    def save_plan(self, plan):
+        from gateway.business.store_drafts import save_plan
+        return save_plan(self, plan)
+
+    def get_plan(self, scope, plan_id):
+        from gateway.business.store_drafts import get_plan
+        return get_plan(self, scope, plan_id)
+
+    def get_plan_by_revision(self, scope, revision_id):
+        from gateway.business.store_drafts import get_plan_by_revision
+        return get_plan_by_revision(self, scope, revision_id)
+
