@@ -136,6 +136,8 @@ VALID_HOOKS: set[str] = {
     # auth/pairing and dispatch. Kwargs: event, gateway, session_store. Return {"action": "skip",
     # "reason"} -> drop; {"action": "rewrite", "text"} -> replace event.text; "allow"/None -> normal.
     "pre_gateway_dispatch", "post_gateway_admission",  # post_*: fail-open consume, gateway/run_inbound_consumer.py
+    # Required business policy contributions: invoked by gateway.business.policy only.
+    "business_context", "business_check",
     # agent_loop_stopped: an agent turn was interrupted mid-run (/stop, or the running-agent
     # fast-path of /new; see gateway/run.py::_interrupt_and_clear_session). Kwargs: session_key,
     # platform, reason, invalidation_reason. Return values are ignored.
@@ -961,6 +963,7 @@ class PluginContext:
                            key, ", ".join(sorted(valid)))
         mapping.setdefault(key, []).append(callback)
         handle = self._track(kind, key, lambda: self._manager._remove_callback(mapping, key, callback))
+        handle.callback = callback
         logger.debug("Plugin %s registered %s: %s", self.manifest.name, kind, key)
         return handle
 
