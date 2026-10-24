@@ -1060,6 +1060,13 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                 metadata["whatsapp_from_owner"] = True
                 if not body.startswith(_OWNER_REPLY_PREFIX):
                     body = f"{_OWNER_REPLY_PREFIX}{body}"
+            reaction_target = data.get("reactionTargetId") or (native_metadata.get("reactionTargetId") if isinstance(native_metadata, dict) else None)
+            if reaction_target:
+                metadata["reaction_target_id"] = reaction_target
+                metadata["reaction_emoji"] = data.get("reactionEmoji") or (native_metadata.get("reactionEmoji") if isinstance(native_metadata, dict) else "")
+            voice_trans = data.get("voiceTranscript") or (native_metadata.get("voiceTranscript") if isinstance(native_metadata, dict) else None)
+            if voice_trans:
+                metadata["voice_transcript"] = voice_trans
             return MessageEvent(
                 text=body, message_type=msg_type, source=source, raw_message=data, message_id=data.get("messageId"),
                 media_urls=cached_urls, media_types=media_types, media_text_inlined=media_text_inlined, metadata=metadata,

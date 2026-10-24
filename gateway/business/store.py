@@ -31,6 +31,18 @@ class BusinessStore:
         from gateway.business.store_episodes import record_verdict
         return record_verdict(self, scope, episode_id, kind=kind, reason=reason)
 
+    def get_verdict(self, scope, episode_id):
+        from gateway.business.store_episodes import get_verdict
+        return get_verdict(self, scope, episode_id)
+
+    def list_verdicts(self, scope):
+        from gateway.business.store_episodes import list_verdicts
+        return list_verdicts(self, scope)
+
+    def episode_for_source(self, scope, source_id):
+        from gateway.business.store_episodes import episode_for_source
+        return episode_for_source(self, scope, source_id)
+
     def list_events(self, scope):
         from gateway.business.store_episodes import list_events
         return list_events(self, scope)

@@ -140,18 +140,27 @@ def put_task(store, scope, *, dedupe_key, reason, refs):
 
 
 def get_task(store, scope, task_id):
+    from gateway.business.models import TaskRecord
     conn = store._connect()
     with transaction(conn) as db:
         row = db.execute("SELECT task_id,dedupe_key,payload FROM business_tasks WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND task_id=?",
                          (*_scope_values(scope), task_id)).fetchone()
     if not row:
         raise BusinessDenied()
-    return {"id": row["task_id"], "dedupe_key": row["dedupe_key"], **json.loads(row["payload"])}
+    payload = json.loads(row["payload"])
+    return TaskRecord(id=row["task_id"], dedupe_key=row["dedupe_key"], reason=payload.get("reason", ""),
+                      refs=tuple(payload.get("refs", ())))
 
 
 def list_tasks(store, scope):
+    from gateway.business.models import TaskRecord
     conn = store._connect()
     with transaction(conn) as db:
         rows = db.execute("SELECT task_id,dedupe_key,payload FROM business_tasks WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? ORDER BY task_id",
                           _scope_values(scope)).fetchall()
-    return tuple({"id": row["task_id"], "dedupe_key": row["dedupe_key"], **json.loads(row["payload"])} for row in rows)
+    tasks = []
+    for row in rows:
+        payload = json.loads(row["payload"])
+        tasks.append(TaskRecord(id=row["task_id"], dedupe_key=row["dedupe_key"], reason=payload.get("reason", ""),
+                                refs=tuple(payload.get("refs", ()))))
+    return tuple(tasks)

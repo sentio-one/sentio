@@ -151,6 +151,29 @@ class Receipt:
     reason: str | None
 
 
+@dataclass(frozen=True)
+class TaskRecord:
+    id: str
+    dedupe_key: str
+    reason: str
+    refs: tuple[str, ...]
+
+    def __getitem__(self, item: str) -> Any:
+        return getattr(self, item)
+
+
+@dataclass(frozen=True)
+class VerdictRecord:
+    episode_id: str
+    verdict: str
+    reason: str
+    state: str
+    receipt_id: str
+
+    def __getitem__(self, item: str) -> Any:
+        return getattr(self, item)
+
+
 def _envelope(payload: object, fields: set[str]) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise BusinessProtocolError("invalid_envelope")

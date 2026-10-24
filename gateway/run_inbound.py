@@ -212,12 +212,16 @@ class GatewayInboundMixin(GatewayInboundHooksMixin, GatewayInboundTranscriptionM
         # scale-to-zero: only real user-originated inbound stamps the last-inbound clock;
         # counting internal/system events would keep a genuinely idle gateway awake.
         self._scale_to_zero_note_real_inbound()
+        await self._hm_business_ingress(event)
+        _observed = event
         event = await self._hm_pre_gateway_dispatch_hook(event, source)
         if event is None:
+            await self._hm_business_ingress(_observed, verdict="escalate", reason="pre_gateway_dispatch skipped")
             return None
         source = event.source
 
         if not self._is_user_authorized_for_source(source):
+            await self._hm_business_ingress(_observed, verdict="refused", reason="sender not authorized")
             if source.user_id is None:
                 # No user identity (Telegram service messages, channel forwards, anonymous admin
                 # posts, sender_chat): can't be paired but may be authorized via a chat allowlist.
@@ -240,6 +244,7 @@ class GatewayInboundMixin(GatewayInboundHooksMixin, GatewayInboundTranscriptionM
             return None
         # The busy path charged this event on arrival; a drained follow-up must not pay twice.
         if not getattr(event, "_bot_loop_admitted", False) and not self._admit_bot_message_for_source(source):
+            await self._hm_business_ingress(_observed, verdict="refused", reason="bot message budget")
             return None
         return event, source, False
 

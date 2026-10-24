@@ -126,12 +126,50 @@ def record_verdict(store, scope, episode_id, *, kind, reason):
         if old:
             return Receipt(old["receipt_id"], kind, None, reason)
         receipt_id = str(uuid.uuid4())
-        state = "resolved" if kind == "no_reply" else "owed"
+        state = "resolved" if kind in ("no_reply", "refused") else "owed"
         db.execute("INSERT INTO business_verdicts(runtime_profile,transport_profile,account_id,contact_id,episode_id,verdict_key,receipt_id,kind,reason,state) VALUES(?,?,?,?,?,?,?,?,?,?)",
                    (*_scope_values(scope), episode_id, verdict_key, receipt_id, kind, reason, state))
         db.execute("UPDATE business_episodes SET state=? WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND episode_id=?",
                    (state, *_scope_values(scope), episode_id))
         return Receipt(receipt_id, kind, None, reason)
+
+
+def episode_for_source(store, scope, source_id):
+    """The episode a prior ``record_ingress`` created for *source_id*; BusinessDenied when none is owned."""
+    conn = store._connect()
+    with transaction(conn) as db:
+        row = db.execute("SELECT i.episode_id, e.context_version FROM business_ingress i JOIN business_episodes e "
+                         "ON e.runtime_profile=i.runtime_profile AND e.transport_profile=i.transport_profile "
+                         "AND e.account_id=i.account_id AND e.contact_id=i.contact_id AND e.episode_id=i.episode_id "
+                         "WHERE i.runtime_profile=? AND i.transport_profile=? AND i.account_id=? AND i.contact_id=? "
+                         "AND i.source_id=?", (*_scope_values(scope), source_id)).fetchone()
+    if not row:
+        raise BusinessDenied()
+    return EpisodeRef(row[0], row[1])
+
+
+def get_verdict(store, scope, episode_id):
+    from gateway.business.models import VerdictRecord
+    conn = store._connect()
+    with transaction(conn) as db:
+        row = db.execute("SELECT episode_id, receipt_id, kind, reason, state FROM business_verdicts "
+                         "WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND episode_id=?",
+                         (*_scope_values(scope), episode_id)).fetchone()
+    if not row:
+        raise BusinessDenied()
+    return VerdictRecord(episode_id=row["episode_id"], verdict=row["kind"], reason=row["reason"],
+                         state=row["state"], receipt_id=row["receipt_id"])
+
+
+def list_verdicts(store, scope):
+    from gateway.business.models import VerdictRecord
+    conn = store._connect()
+    with transaction(conn) as db:
+        rows = db.execute("SELECT episode_id, receipt_id, kind, reason, state FROM business_verdicts "
+                          "WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? "
+                          "ORDER BY receipt_id", _scope_values(scope)).fetchall()
+    return tuple(VerdictRecord(episode_id=row["episode_id"], verdict=row["kind"], reason=row["reason"],
+                               state=row["state"], receipt_id=row["receipt_id"]) for row in rows)
 
 
 def list_events(store, scope):
