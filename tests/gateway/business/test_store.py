@@ -131,10 +131,13 @@ def test_failed_commit_returns_no_revision_or_task_receipt(tmp_path, monkeypatch
     with pytest.raises(sqlite3.DatabaseError):
         store.put_task(scope, dedupe_key="task-1", reason="review", refs=(episode.id,))
     reopened = BusinessStore(tmp_path)
-    with pytest.raises(BusinessDenied):
-        reopened.get_revision(scope, "missing")
-    with pytest.raises(BusinessDenied):
-        reopened.get_task(scope, "task-1")
+    with sqlite3.connect(tmp_path / "state.db") as db:
+        revision_count = db.execute(
+            "SELECT COUNT(*) FROM business_revisions WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=?",
+            (scope.runtime_profile, scope.transport_profile, scope.account_id, scope.contact_id),
+        ).fetchone()[0]
+    assert revision_count == 0
+    assert reopened.list_tasks(scope) == ()
 
 
 def _snapshot(scope, episode):
