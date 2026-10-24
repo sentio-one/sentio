@@ -212,7 +212,7 @@ async `rollback_cutover(principal: Principal, manifest_id: str) -> CutoverManife
 CLI `cutover --plan` is default; `--apply` requires the explicit account/manifest and
 an authorized operator. Actual deployment/pilot application remains outside plan execution.
 
-- [ ] **Step 1: Write** `test_cutover_requires_quiescent_legacy_owner`, `test_crash_each_cutover_stage_resumes_paused`, `test_rollback_exports_unresolved_work_without_live_approvals`:
+- [x] **Step 1: Write** `test_cutover_requires_quiescent_legacy_owner`, `test_crash_each_cutover_stage_resumes_paused`, `test_rollback_exports_unresolved_work_without_live_approvals`:
 
 ```python
 assert active_legacy_writer_manifest.blockers
@@ -224,10 +224,10 @@ assert rollback_unknown_attempts_are_reconciled is True
 assert old_bridge_capability_activation_refused is True
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_migration.py -v`; run the isolated plugin wrapper `bash "$sales_plugin_worktree/tests/run_native.sh" --hermes-root "$PWD"`. Expect absent cutover/rollback contracts.
-- [ ] **Step 3: Implement** an auditable staged manifest: pause legacy writes/releases, back up, reconcile attempts, import suppression/state, verify stock native bridge/account/capabilities, select native plugin mode, transfer ownership while paused, and permit resume only after readiness. Match identified services/jobs through existing process identity/status helpers and pinned plugin inventory, never argv substring heuristics. No step spawns two schedulers. Native setup skips patch application and verifies capabilities; legacy mode remains explicitly separate until authorized transfer. Rollback pauses native, reconciles attempts, exports unresolved work with approval reset and requires human review before legacy can resume. Unsupported records block affected contacts, not silently vanish.
-- [ ] **Step 4: Rerun** both test commands with fake service/job controllers and real temporary stores; expect stage idempotency, restrictive rollback, and no live process/config mutation in tests.
-- [ ] **Step 5: Commit** named fork files with `feat(gateway): prepare reversible paused messaging cutover`; commit plugin setup/preflight changes separately with `feat: validate native messaging instead of patching its bridge`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_migration.py -v`; run the isolated plugin wrapper `bash "$sales_plugin_worktree/tests/run_native.sh" --hermes-root "$PWD"`. Expect absent cutover/rollback contracts.
+- [x] **Step 3: Implement** an auditable staged manifest: pause legacy writes/releases, back up, reconcile attempts, import suppression/state, verify stock native bridge/account/capabilities, select native plugin mode, transfer ownership while paused, and permit resume only after readiness. Match identified services/jobs through existing process identity/status helpers and pinned plugin inventory, never argv substring heuristics. No step spawns two schedulers. Native setup skips patch application and verifies capabilities; legacy mode remains explicitly separate until authorized transfer. Rollback pauses native, reconciles attempts, exports unresolved work with approval reset and requires human review before legacy can resume. Unsupported records block affected contacts, not silently vanish.
+- [x] **Step 4: Rerun** both test commands with fake service/job controllers and real temporary stores; expect stage idempotency, restrictive rollback, and no live process/config mutation in tests.
+- [x] **Step 5: Commit** named fork files with `feat(gateway): prepare reversible paused messaging cutover`; commit plugin setup/preflight changes separately with `feat: validate native messaging instead of patching its bridge`.
 
 ### Task C7: Workflow readiness, full offline acceptance, and pilot handoff
 
