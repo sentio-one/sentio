@@ -331,9 +331,11 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
   (`tests/hermes_cli/test_profile_sandbox_provisioning.py`), paired with `skills/autonomous-ai-agents/profile-provisioning/SKILL.md`.
 - **O4. Invite open questions:** link reuse policy (default single-use stands), who sends the email (admin copies the link
   today), JIT profile creation from a template (not built).
-- **O5. Not yet exercised on a live Dokploy host:** the compose stack deployed on Dokploy (first deploy on a throwaway company;
-  local Docker-in-Docker + sandbox isolation is exercised by `scripts/fork/verify-dind-isolation.sh` in `Fork CI`), the
-  Light release workflow on a real tag, an invite redeemed end to end, WebSocket keepalive through a Cloudflare Tunnel.
+- **O5. Partly exercised on a live Dokploy host (2026-10-24):** the compose stack deployed on Dokploy at `one-agent.sentiolangley.com`
+  behind a Cloudflare Tunnel, and a real Google sign-in as admin (both containers healthy). Still not exercised: the sandbox against a
+  real routed profile on that host (local Docker-in-Docker isolation runs in `scripts/fork/verify-dind-isolation.sh` in `Fork CI`),
+  the desktop app's native sign-in, the Light release workflow on a real tag, an invite redeemed end to end, WebSocket keepalive
+  through the tunnel, a redeploy keeping `dockerd-data`, a backup and restore.
 - **O6. Merge upstream.** 3,200 commits behind with 3 known conflicts (header). Do it on a branch, then section 3.
 - **O7. Strings** for the Access page and connect dialog are English only.
 - **O8.** `.commandcode/taste/taste.md` is an empty tracked file; likely stray.
@@ -380,7 +382,7 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
 ## 5. Go-live gate (all must be true before a customer is on a gateway)
 
 - [ ] Sandbox enforced (O1): implemented and verified in Docker (`scripts/fork/verify-dind-isolation.sh` in `Fork CI`); verify on a throwaway company on Dokploy with D12's list before ticking.
-- [ ] The first admin signs in through Google on a real deploy and is admin (built and unit-tested, O13; needs O5).
+- [x] The first admin signs in through Google on a real deploy and is admin (2026-10-24, `one-agent.sentiolangley.com` on Dokploy; the first attempt exposed the provider-name bug fixed in PR #15).
 - [ ] PTY child no longer holds the host-scoped internal credential (O2).
 - [ ] First real deploy on Dokploy passed the checklist in `deploy/dokploy/README.md`; `dockerd` survives a redeploy.
 - [ ] An invite redeemed end to end against that gateway; WebSocket keepalive tested through the Cloudflare Tunnel.

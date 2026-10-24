@@ -70,7 +70,10 @@ A missing required value aborts the deploy (`${VAR:?...}`), so a project cannot 
    if Cloudflare terminates TLS (the tunnel talks plain http to Traefik).
 4. **Cloudflare Tunnel:** a public hostname for that company pointing at Traefik's http entry point (typically
    `http://localhost:80`, wherever your tunnel can reach Traefik). A wildcard such as `*.gw.example.com` means a new
-   company needs no tunnel change.
+   company needs no tunnel change. The service URL must be plain **`http://localhost:80`**: an entry set to
+   `https://localhost:443` gives Cloudflare's 502 "Bad gateway" with the host marked Error, because Traefik serves this route
+   only over http (the Domains tab has HTTPS off). `PUBLIC_URL` must start with `https://` and have no trailing dot, or the
+   OAuth redirect is wrong (the gateway logs a warning and ignores it).
 5. **IdP (Keycloak/Authentik/Entra/Okta...):** register a client for this gateway.
    - Redirect URI: `<PUBLIC_URL>/auth/callback`. As far as I read the auth routes, the desktop's loopback sign-in goes
      through the gateway, so the IdP does not need the desktop's loopback addresses. Verify with a real sign-in.
