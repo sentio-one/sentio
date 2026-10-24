@@ -63,7 +63,7 @@ def authorize_operation(principal: Principal, scope: Scope, operation: str) -> N
         ops = getattr(principal, "operations", None) or getattr(principal, "capabilities", frozenset())
         if "admin" in ops or "operator" in ops or operation in ops:
             return
-        if operation in ("digest", "reaction", "shorthand", "alert", "propose_lessons", "confirm_lesson", "revoke_lesson") and ("review" in ops or "approve" in ops):
+        if operation in ("digest", "reaction", "shorthand", "alert", "propose_lessons", "confirm_lesson", "revoke_lesson", "credential_grant") and ("review" in ops or "approve" in ops or "credential_grant" in ops):
             return
         raise BusinessDenied("permission_denied")
 

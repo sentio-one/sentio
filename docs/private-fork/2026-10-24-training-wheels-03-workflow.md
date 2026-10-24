@@ -128,7 +128,7 @@ Vault methods are `seal_message_payload(binding: dict, payload: dict) -> str` an
 facilities in a separate purpose-bound payload namespace. Browser-origin grants
 remain unchanged and do not themselves authorize messaging release.
 
-- [ ] **Step 1: Write** `test_credential_only_reaches_exact_approved_recipient`, `test_rotation_missing_vault_and_error_paths_never_leak`, `test_approval_binds_final_split_with_secret_materialized`:
+- [x] **Step 1: Write** `test_credential_only_reaches_exact_approved_recipient`, `test_rotation_missing_vault_and_error_paths_never_leak`, `test_approval_binds_final_split_with_secret_materialized`:
 
 ```python
 assert customer_socket_payload["text"].endswith(secret_sentinel)
@@ -141,10 +141,10 @@ assert computed_materialized_digest == approved_digest  # use B1 digest_delivery
 assert rendered_parts == actually_dispatched_parts
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_credentials.py tests/agent/test_vault_business_payloads.py -v`; expect missing purpose-bound encryption/grants.
-- [ ] **Step 3: Implement** operator-only release from a profile-owned login vault item. Compute an opaque HMAC secret version; bind grant/approval to account/recipient/version/expiry. Materialize/render only inside restricted service scope before approval hashing, encrypt the exact plan, and persist just its handle, HMAC digest, masked preview and metadata in ordinary tables. Protected digests use `hmac-sha256:`; ordinary B1 digests use `sha256:`. Per-part dispatch verification uses the same tagged algorithm and B4 key, never the redacted preview. Resolve after approval and recheck current grant/secret version; rotation requires fresh review. Keep plaintext out of journals/errors, hooks, receipts, traces, transcripts and lessons; sanitize failures without printing payloads. Composer/reviewer see placeholders. Never restore passwords after redaction or disable general egress redaction.
-- [ ] **Step 4: Rerun** `scripts/run_tests.sh tests/gateway/business/test_credentials.py tests/agent/test_vault_business_payloads.py tests/agent/test_vault_store.py tests/agent/test_redact.py tests/tools/test_browser_vault.py -v`; expect green, including no broader browser-origin permission and no secret in logs after transport rejection.
-- [ ] **Step 5: Commit** named vault/credential/seam files with `feat(gateway): bind protected credential delivery to exact message approval`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_credentials.py tests/agent/test_vault_business_payloads.py -v`; expect missing purpose-bound encryption/grants.
+- [x] **Step 3: Implement** operator-only release from a profile-owned login vault item. Compute an opaque HMAC secret version; bind grant/approval to account/recipient/version/expiry. Materialize/render only inside restricted service scope before approval hashing, encrypt the exact plan, and persist just its handle, HMAC digest, masked preview and metadata in ordinary tables. Protected digests use `hmac-sha256:`; ordinary B1 digests use `sha256:`. Per-part dispatch verification uses the same tagged algorithm and B4 key, never the redacted preview. Resolve after approval and recheck current grant/secret version; rotation requires fresh review. Keep plaintext out of journals/errors, hooks, receipts, traces, transcripts and lessons; sanitize failures without printing payloads. Composer/reviewer see placeholders. Never restore passwords after redaction or disable general egress redaction.
+- [x] **Step 4: Rerun** `scripts/run_tests.sh tests/gateway/business/test_credentials.py tests/agent/test_vault_business_payloads.py tests/agent/test_vault_store.py tests/agent/test_redact.py tests/tools/test_browser_vault.py -v`; expect green, including no broader browser-origin permission and no secret in logs after transport rejection.
+- [x] **Step 5: Commit** named vault/credential/seam files with `feat(gateway): bind protected credential delivery to exact message approval`.
 
 ### Task C4: Native sales job client and durable CRM outcomes
 

@@ -410,6 +410,43 @@ class VaultStore:
                     return dict(rec.get("secret") or {})
         raise VaultError(f"no vault item with id {item_id!r}")
 
+    def update_item_secret(self, item_id: str, new_secret: dict[str, Any]) -> None:
+        """Update secret dictionary for an existing vault item."""
+        with self._locked():
+            items = self._read_all()
+            for rec in items:
+                if rec.get("id") == item_id:
+                    rec["secret"] = dict(new_secret)
+                    self._write_all(items)
+                    return
+        raise VaultError(f"no vault item with id {item_id!r}")
+
+    def seal_message_payload(self, binding: dict[str, Any], payload: dict[str, Any]) -> str:
+        """Encrypt and seal a message payload with scope binding (Task C3)."""
+        import uuid
+        self._ensure_dir()
+        payloads_dir = self._base / "payloads"
+        make_user_dir(payloads_dir, mode=0o700, parents=True, exist_ok=True)
+        handle = f"vpay-{uuid.uuid4().hex}"
+        data = json.dumps({"binding": binding, "payload": payload}).encode("utf-8")
+        blob = self._fernet().encrypt(data)
+        atomic_write_bytes(payloads_dir / f"{handle}.enc", blob, mode=0o600, fsync_dir=True)
+        return handle
+
+    def open_message_payload(self, handle: str) -> dict[str, Any]:
+        """Decrypt and open a sealed message payload by handle (Task C3)."""
+        from cryptography.fernet import InvalidToken
+        payload_file = self._base / "payloads" / f"{handle}.enc"
+        if not payload_file.exists():
+            raise VaultError(f"sealed payload {handle!r} not found")
+        blob = payload_file.read_bytes()
+        try:
+            raw = self._fernet().decrypt(blob)
+            return json.loads(raw.decode("utf-8"))
+        except (InvalidToken, json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise VaultError(f"sealed payload {handle!r} could not be decrypted or parsed") from exc
+
+
     @staticmethod
     def _meta(rec: dict[str, Any]) -> VaultItemMeta:
         identifier = rec.get("identifier")

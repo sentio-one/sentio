@@ -30,6 +30,16 @@ class DeliveryPart:
     payload: dict[str, Any]
     media_hash: str | None = None
 
+    @property
+    def data(self) -> dict[str, Any]:
+        return self.payload
+
+
+@dataclass(frozen=True)
+class PlanPreview:
+    text: str
+    contains_credential_indicator: bool = False
+
 
 @dataclass(frozen=True)
 class DeliveryPlan:
@@ -42,6 +52,18 @@ class DeliveryPlan:
     expires_at_ms: int
     digest: str
     encrypted_plan_handle: str | None = None
+
+    @property
+    def preview(self) -> PlanPreview:
+        contains_cred = False
+        texts = []
+        for p in self.parts:
+            t = p.payload.get("text", "")
+            if "[CREDENTIAL" in t or "CREDENTIAL" in p.payload:
+                contains_cred = True
+            texts.append(t)
+        return PlanPreview(text=" ".join(texts), contains_credential_indicator=contains_cred)
+
 
 
 def split_long_message(message: str, max_length: int = 4096) -> list[str]:
@@ -77,37 +99,11 @@ def _canonical_json(obj: Any) -> bytes:
 def digest_delivery_parts(
     parts: tuple[DeliveryPart, ...],
     *,
-    binding: dict[str, Any],
+    binding: dict[str, Any] | None = None,
+    algorithm: str = "sha256",
     hmac_key: bytes | None = None,
 ) -> str:
     """Compute deterministic SHA-256 (or HMAC-SHA256) digest over binding and delivery parts."""
-    scope_val = binding["scope"]
-    if hasattr(scope_val, "runtime_profile"):
-        scope_dict = {
-            "runtime_profile": scope_val.runtime_profile,
-            "transport_profile": scope_val.transport_profile,
-            "account_id": scope_val.account_id,
-            "contact_id": scope_val.contact_id,
-        }
-    else:
-        scope_dict = {
-            "runtime_profile": scope_val["runtime_profile"],
-            "transport_profile": scope_val["transport_profile"],
-            "account_id": scope_val["account_id"],
-            "contact_id": scope_val["contact_id"],
-        }
-
-    canonical_binding = {
-        "scope": scope_dict,
-        "revision_id": str(binding["revision_id"]),
-        "context_version": int(binding["context_version"]),
-        "policy_version": str(binding["policy_version"]),
-        "lesson_version": int(binding["lesson_version"]),
-        "expires_at_ms": int(binding["expires_at_ms"]),
-        "reply_target": binding.get("reply_target"),
-        "mentions": sorted(binding.get("mentions") or []),
-    }
-
     canonical_parts = [
         {
             "index": p.index,
@@ -118,14 +114,47 @@ def digest_delivery_parts(
         for p in parts
     ]
 
-    canonical_payload = {
-        "binding": canonical_binding,
-        "parts": canonical_parts,
-    }
+    if binding is not None:
+        scope_val = binding["scope"]
+        if hasattr(scope_val, "runtime_profile"):
+            scope_dict = {
+                "runtime_profile": scope_val.runtime_profile,
+                "transport_profile": scope_val.transport_profile,
+                "account_id": scope_val.account_id,
+                "contact_id": scope_val.contact_id,
+            }
+        else:
+            scope_dict = {
+                "runtime_profile": scope_val["runtime_profile"],
+                "transport_profile": scope_val["transport_profile"],
+                "account_id": scope_val["account_id"],
+                "contact_id": scope_val["contact_id"],
+            }
+
+        canonical_binding = {
+            "scope": scope_dict,
+            "revision_id": str(binding["revision_id"]),
+            "context_version": int(binding["context_version"]),
+            "policy_version": str(binding["policy_version"]),
+            "lesson_version": int(binding["lesson_version"]),
+            "expires_at_ms": int(binding["expires_at_ms"]),
+            "reply_target": binding.get("reply_target"),
+            "mentions": sorted(binding.get("mentions") or []),
+        }
+
+        canonical_payload = {
+            "binding": canonical_binding,
+            "parts": canonical_parts,
+        }
+    else:
+        canonical_payload = {
+            "parts": canonical_parts,
+        }
 
     payload_bytes = _canonical_json(canonical_payload)
-    if hmac_key is not None:
-        hexdigest = hmac.new(hmac_key, payload_bytes, hashlib.sha256).hexdigest()
+    if algorithm.startswith("hmac") or hmac_key is not None:
+        key = hmac_key or b"sentio_business_transport_key"
+        hexdigest = hmac.new(key, payload_bytes, hashlib.sha256).hexdigest()
         return f"hmac-sha256:{hexdigest}"
 
     hexdigest = hashlib.sha256(payload_bytes).hexdigest()
