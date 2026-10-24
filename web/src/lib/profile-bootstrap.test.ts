@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   dashboardServingProfile,
   initialProfileScope,
+  profileToAdopt,
   shouldAdoptActiveProfile,
 } from "./profile-bootstrap";
 
@@ -29,6 +30,22 @@ describe("initialProfileScope", () => {
     // `default`: the dashboard must not retarget chats to the other agent.
     expect(shouldAdoptActiveProfile(null, "", "demo", "default")).toBe(false);
     expect(shouldAdoptActiveProfile(null, "", "custom", "default")).toBe(false);
+  });
+});
+
+describe("profileToAdopt", () => {
+  it("moves a granted non-admin off a profile their roster does not list", () => {
+    expect(profileToAdopt(["sentio-sales"], "default")).toBe("sentio-sales");
+  });
+
+  it("keeps a profile the roster lists, and leaves an empty roster alone", () => {
+    expect(profileToAdopt(["default", "alpha"], "default")).toBeNull();
+    expect(profileToAdopt(["sentio-sales"], "sentio-sales")).toBeNull();
+    expect(profileToAdopt([], "default")).toBeNull();
+  });
+
+  it("never turns an unnamed scope into a guess", () => {
+    expect(profileToAdopt(["alpha", "beta"], "")).toBeNull();
   });
 });
 

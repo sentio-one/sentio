@@ -11,6 +11,7 @@ import { ProfileContext } from "@/contexts/profile-context";
 import {
   dashboardInitialProfile,
   initialProfileScope,
+  profileToAdopt,
   shouldAdoptActiveProfile,
 } from "@/lib/profile-bootstrap";
 
@@ -94,7 +95,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       .then(([profilesRes, info]) => {
         if (cancelled) return;
 
-        setProfiles(profilesRes.profiles.map((p) => p.name));
+        const names = profilesRes.profiles.map((p) => p.name);
+        setProfiles(names);
+
+        const reachable = profileToAdopt(names, profile);
+        if (reachable) {
+          setManagementProfile(reachable);
+          setProfileState(reachable);
+          return;
+        }
 
         const current = info.current || "default";
         const active = info.active || "default";

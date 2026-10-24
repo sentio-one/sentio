@@ -52,3 +52,13 @@ export function shouldAdoptActiveProfile(
     activeProfile !== currentProfile
   );
 }
+
+/**
+ * The profile to switch to when the scope the dashboard opened on is not one the caller's roster lists, or null to stay.
+ * The roster is filtered to what the caller may reach, so a granted non-admin opening on `default` lands on a profile of
+ * their own instead of a page of 403s. An empty roster, or a scope that names no profile (never guessed, see
+ * `dashboardServingProfile`), changes nothing.
+ */
+export function profileToAdopt(roster: string[], profile: string): string | null {
+  return profile && roster.length > 0 && !roster.includes(profile) ? roster[0] : null;
+}
