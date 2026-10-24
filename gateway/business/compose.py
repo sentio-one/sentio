@@ -151,6 +151,7 @@ async def compose_draft(
             snapshot, decision, main_runtime=main_runtime, previous=previous, reasons=reasons
         )
     except Exception as exc:
+        logger.warning("Compose draft failed: %s", exc, exc_info=True)
         receipt_id = str(uuid.uuid4())
         return Receipt(id=receipt_id, state="failed", revision_id=None, reason=str(exc)), None
 

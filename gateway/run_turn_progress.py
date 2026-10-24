@@ -166,6 +166,14 @@ class GatewayTurnProgressMixin:
             ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             preview_str = f' "{preview}"' if preview else ""
             ctx.log_queue.put(f"{ts}  {tool_name}:{preview_str}".rstrip())
+        # Under active WhatsApp business mode, customer tool progress and thinking are disabled.
+        try:
+            from gateway.business.turns import is_business_mode_active
+            if is_business_mode_active(self._runner, ctx.source):
+                return
+        except Exception as exc:
+            logger.debug("Failed checking business mode active: %s", exc, exc_info=True)
+
         if not ctx.progress_queue or not ctx._run_still_current():
             return
         if event_type == "tool.completed" and not ctx.long_tool_hint_fired[0]:

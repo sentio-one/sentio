@@ -88,7 +88,7 @@ class BusinessStore:
         from gateway.business.store_drafts import get_revision
         return get_revision(self, scope, revision_id)
 
-    def list_revisions(self, scope, episode_id):
+    def list_revisions(self, scope, episode_id=None):
         from gateway.business.store_drafts import list_revisions
         return list_revisions(self, scope, episode_id)
 

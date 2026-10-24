@@ -46,7 +46,7 @@ def _installed(home):
 def test_a_new_company_profile_is_seeded_with_the_baseline_only(company):
     _create("alice")
     installed = _installed(company / "profiles" / "alice")
-    assert ESSENTIAL_SKILLS <= installed and installed <= ESSENTIAL_SKILLS | DEFAULT_COMPANY_BASELINE
+    assert ESSENTIAL_SKILLS <= installed <= ESSENTIAL_SKILLS | DEFAULT_COMPANY_BASELINE
     assert "profile-provisioning" not in installed and "claude-code" not in installed
 
 
@@ -64,7 +64,7 @@ def test_trim_skills_cuts_an_overstocked_profile_down(company, monkeypatch, caps
     assert "claude-code" in _installed(home)
     profile_skills.profile_trim_skills(SimpleNamespace(profile_name="alice"))
     installed = _installed(home)
-    assert ESSENTIAL_SKILLS <= installed and installed <= ESSENTIAL_SKILLS | DEFAULT_COMPANY_BASELINE
+    assert ESSENTIAL_SKILLS <= installed <= ESSENTIAL_SKILLS | DEFAULT_COMPANY_BASELINE
     assert "removed" in capsys.readouterr().out
 
 

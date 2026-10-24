@@ -867,6 +867,8 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
         _log_standalone_profiles_at_boot(runner)
         from gateway.run_runtime import start_gateway_runtime_api
         await start_gateway_runtime_api(runner)
+        from gateway.business.lifecycle import start_business_service
+        await start_business_service(runner)
 
         def _lifecycle_record_startup() -> Optional[dict]:
             # Report if the previous life died uncleanly (SIGKILL / OOM / VM death), then claim the

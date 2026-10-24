@@ -70,6 +70,7 @@ async def review_candidate(
     except TimeoutError:
         return ReviewVerdict(recommendation="unavailable", reasons=("review timed out",), policy_refs=(), error_code="timeout")
     except Exception as exc:
+        logger.warning("Advisory review failed: %s", exc, exc_info=True)
         code = "timeout" if "timeout" in str(exc).lower() else "error"
         return ReviewVerdict(recommendation="unavailable", reasons=(str(exc),), policy_refs=(), error_code=code)
 
@@ -98,6 +99,7 @@ async def prepare_draft(
                 snapshot, decision, main_runtime=main_runtime, previous=last_candidate, reasons=reasons
             )
         except Exception as exc:
+            logger.warning("Composition failed: %s", exc, exc_info=True)
             receipt_id = str(uuid.uuid4())
             store.put_task(snapshot.scope, dedupe_key=f"episode:{snapshot.episode.id}", reason="composition_failed", refs=(snapshot.episode.id,))
             return Receipt(id=receipt_id, state="failed", revision_id=None, reason=str(exc))

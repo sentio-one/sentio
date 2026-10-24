@@ -67,7 +67,7 @@ async def _invoke(callback: Any, **kwargs: Any) -> Any:
             if inspect.isawaitable(value):
                 value = asyncio.run(value)
             finish(value=value)
-        except BaseException as exc:  # remote/plugin failures are blocking policy errors
+        except BaseException as exc:  # health: allow BLE001 -- remote/plugin failures are blocking policy errors
             finish(error=exc)
         finally:
             with _worker_lock:
@@ -118,7 +118,7 @@ async def collect_policy(scope: Scope, episode: EpisodeRef) -> PolicyBundle:
                     raise ValueError("invalid policy result")
                 target.extend(entries)
             versions.append(raw["version"])
-        except Exception:  # TimeoutError is an Exception; any failure blocks
+        except Exception:  # health: allow BLE001 -- plugin policy failure marks policy missing
             missing.append(plugin_id)
     return PolicyBundle(id=",".join(requirements), version="+".join(versions) or "unavailable",
                         facts=tuple(facts), actions=tuple(actions), rules=tuple(rules),
@@ -148,6 +148,6 @@ async def check_candidate(scope: Scope, candidate: Candidate, *, bundle: PolicyB
             if not isinstance(raw, dict) or not isinstance(raw.get("issues"), list):
                 raise ValueError("invalid policy result")
             issues.extend(raw["issues"])
-        except Exception:  # TimeoutError is an Exception; any failure blocks
+        except Exception:  # health: allow BLE001 -- plugin check failure marks policy unavailable
             issues.append({"code": "policy_unavailable", "policy": plugin_id})
     return CheckReport(not issues, tuple(issues), bundle.version)

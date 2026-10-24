@@ -113,13 +113,19 @@ def get_revision(store, scope, revision_id):
     return _revision(json.loads(row[0]))
 
 
-def list_revisions(store, scope, episode_id):
+def list_revisions(store, scope, episode_id=None):
     conn = store._connect()
     with transaction(conn) as db:
-        rows = db.execute(
-            "SELECT payload FROM business_revisions WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND episode_id=? ORDER BY number ASC",
-            (*_scope_values(scope), episode_id),
-        ).fetchall()
+        if episode_id is not None:
+            rows = db.execute(
+                "SELECT payload FROM business_revisions WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND episode_id=? ORDER BY number ASC",
+                (*_scope_values(scope), episode_id),
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT payload FROM business_revisions WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? ORDER BY number ASC",
+                _scope_values(scope),
+            ).fetchall()
     return tuple(_revision(json.loads(row[0])) for row in rows)
 
 
