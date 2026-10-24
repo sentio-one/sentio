@@ -103,6 +103,39 @@ Offline evaluation (`tests/gateway/business/test_drafting_eval.py`) verifies the
 
 ## Safety Invariants
 
-- **No Native Dispatch:** `socket_calls` must be 0 for shadow operations.
+- **No Native Dispatch in Shadow:** `socket_calls` must be 0 for shadow operations.
 - **Supervised Latch:** Supervised live sending is disabled until Plan 02 and Plan 03 cutover readiness is certified.
 - **Fail-Closed:** Missing policy, reviewer failure, or CAS version mismatch records an attention task and halts drafting.
+
+---
+
+## Supervised Mode Readiness & Latch Operations (Plan 02 - Task B7)
+
+### Verification Matrix Before Supervised Activation
+
+Prior to activating `supervised` mode on any account, `check_readiness(service, account)` evaluates seven critical boundaries:
+1. **Required Policy:** Concrete policy implementation (e.g. `sales_ops`) loaded and verified in plugin ledger.
+2. **Operator Identity:** At least one authorized human operator phone number or JID configured.
+3. **Pacing Governor:** Timezone, sending windows, hourly/daily caps, and hard daily maximum configured.
+4. **Durable Store:** SQLite `state.db` initialized with all business schemas, WAL or delete journal active, and writable.
+5. **Bridge Protocol & Account:** Verified WhatsApp bridge endpoint (`/business/dispatch`), matching account identity, and supported protocol version.
+6. **Recovery Ownership:** Single recovery owner active; physical journal reconciled with durable outbox.
+7. **Workflow Readiness Latch:** Requires Plan 03 (Task C7) completion; live activation fails closed if workflow capabilities are missing.
+
+### Persistent Account Latch
+
+- Account mode is stored in `business_account_modes` (`off`, `shadow`, `supervised`).
+- `set_business_mode(principal, account, mode="supervised")` requires authorization and 100% passing readiness checks.
+- If readiness fails, mode is **not** updated to supervised, avoiding half-activated or unmonitored sending loops.
+
+### Terminal Auth Revocation Handling
+
+- When Baileys disconnects due to logout or device removal (HTTP 401 / `logged_out`), `record_bridge_state` sets state to `needs_reauth`.
+- `respawn_count` is frozen to 0 to prevent infinite reconnect/respawn loops against revoked session credentials.
+
+### Fail-Closed WhatsApp Egress Authority
+
+Supervised turn separation prevents unapproved payloads from reaching external customer numbers:
+- Failed turns record operator tasks; customer socket calls remain 0.
+- Raw text footers, voice TTS syntheses, and typing/progress updates cannot reach customer destinations without an explicitly approved draft revision.
+- Ambiguous bridge timeouts are marked `unknown` and never automatically retried.

@@ -115,6 +115,15 @@ CREATE TABLE IF NOT EXISTS business_delivery_receipts (
  status_name TEXT NOT NULL, state TEXT NOT NULL,
  timestamp_ms INTEGER NOT NULL, schema_version INTEGER NOT NULL DEFAULT 1,
  PRIMARY KEY(transport_profile, account_id, message_id));
+CREATE TABLE IF NOT EXISTS business_account_modes (
+ runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ mode TEXT NOT NULL DEFAULT 'off', updated_at_ms INTEGER NOT NULL,
+ PRIMARY KEY(runtime_profile, transport_profile, account_id));
+CREATE TABLE IF NOT EXISTS business_bridge_states (
+ transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ state TEXT NOT NULL, code TEXT, respawn_count INTEGER NOT NULL DEFAULT 0,
+ updated_at_ms INTEGER NOT NULL,
+ PRIMARY KEY(transport_profile, account_id));
 """
 
 

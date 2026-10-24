@@ -259,7 +259,7 @@ Readiness checks policy, operator identity, complete governor, writable/journale
 verified bridge protocol/account, scoped model probes, and recovery ownership. No live
 supervised activation is allowed until C7's workflow readiness checks also pass.
 
-- [ ] **Step 1: Write** `test_latch_survives_missing_config_and_old_bridge`, `test_auth_revocation_stops_respawn`, `test_all_egress_paths_obey_native_authority`:
+- [x] **Step 1: Write** `test_latch_survives_missing_config_and_old_bridge`, `test_auth_revocation_stops_respawn`, `test_all_egress_paths_obey_native_authority`:
 
 ```python
 assert absent_policy_readiness["ready"] is False
@@ -271,13 +271,13 @@ assert configured_business_raw_footer_voice_progress_calls == []
 assert account_mode_after_failed_activation != "supervised"
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_readiness.py tests/gateway/business/test_egress_matrix.py -v`; expect missing latch/readiness/egress protections.
-- [ ] **Step 3: Implement** the persistent account latch and capability stamp, service-required health, and terminal `needs_reauth` propagation on real logout/device-removal events rather than generic status substring matching. Complete supervised turn separation: no ordinary final normalization, footer, TTS, progress, clarify/tool-approval prompt, or recovery message can reach an external contact through an unapproved path. Operator controls/clarifications use verified operator destinations. Require workflow readiness capability from C7 before activation; until then report the missing capability explicitly. Continue shadow/personal behavior as A7 specifies.
-- [ ] **Step 4: Run** the task files, `scripts/run_tests.sh tests/gateway/business/ tests/gateway/test_whatsapp_connect.py tests/gateway/test_whatsapp_multiplex.py tests/gateway/test_gateway_silence_tokens.py -v`, `node --test scripts/whatsapp-bridge/*.test.mjs`, and `python scripts/check`; require exit 0. Re-run only for changes/failures, not repeatedly after green.
-- [ ] **Step 5: Commit** named readiness/matrix/seam files with `feat(whatsapp): fail closed on incomplete supervised account readiness`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_readiness.py tests/gateway/business/test_egress_matrix.py -v`; expect missing latch/readiness/egress protections.
+- [x] **Step 3: Implement** the persistent account latch and capability stamp, service-required health, and terminal `needs_reauth` propagation on real logout/device-removal events rather than generic status substring matching. Complete supervised turn separation: no ordinary final normalization, footer, TTS, progress, clarify/tool-approval prompt, or recovery message can reach an external contact through an unapproved path. Operator controls/clarifications use verified operator destinations. Require workflow readiness capability from C7 before activation; until then report the missing capability explicitly. Continue shadow/personal behavior as A7 specifies.
+- [x] **Step 4: Run** the task files, `scripts/run_tests.sh tests/gateway/business/ tests/gateway/test_whatsapp_connect.py tests/gateway/test_whatsapp_multiplex.py tests/gateway/test_gateway_silence_tokens.py -v`, `node --test scripts/whatsapp-bridge/*.test.mjs`, and `python scripts/check`; require exit 0. Re-run only for changes/failures, not repeatedly after green.
+- [x] **Step 5: Commit** named readiness/matrix/seam files with `feat(whatsapp): fail closed on incomplete supervised account readiness`.
 
 ## Plan exit
 
-- [ ] Verify the acceptance matrix covers raw HTTP plus every actual gateway/tool/cron/standalone entry, including multi-profile restart and missing dispatch credentials in sandboxed scope.
-- [ ] Record offline evidence and remaining workflow capability blockers in the PR. No account is silently upgraded or enabled.
-- [ ] Proceed to Plan 03; the plugin's live patch remains intact until the explicitly authorized cutover.
+- [x] Verify the acceptance matrix covers raw HTTP plus every actual gateway/tool/cron/standalone entry, including multi-profile restart and missing dispatch credentials in sandboxed scope.
+- [x] Record offline evidence and remaining workflow capability blockers in the PR. No account is silently upgraded or enabled.
+- [x] Proceed to Plan 03; the plugin's live patch remains intact until the explicitly authorized cutover.
