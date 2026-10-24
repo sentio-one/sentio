@@ -362,10 +362,14 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
 - **O4. Invite open questions:** link reuse policy (default single-use stands), who sends the email (admin copies the link
   today), JIT profile creation from a template (not built).
 - **O5. Partly exercised on a live Dokploy host (2026-10-24):** the compose stack deployed on Dokploy at `one-agent.sentiolangley.com`
-  behind a Cloudflare Tunnel, and a real Google sign-in as admin (both containers healthy). Still not exercised: the sandbox against a
-  real routed profile on that host (local Docker-in-Docker isolation runs in `scripts/fork/verify-dind-isolation.sh` in `Fork CI`),
-  the desktop app's native sign-in, the Light release workflow on a real tag, an invite redeemed end to end, WebSocket keepalive
-  through the tunnel, a redeploy keeping `dockerd-data`, a backup and restore.
+  behind a Cloudflare Tunnel, a real Google sign-in as admin (both containers healthy), an invite redeemed by a second Google account
+  (through the browser, not the desktop deep link), and the sandbox against a real routed profile on that host: the profile's terminal
+  tool ran in an unprivileged container on the company's daemon (no `/opt/data`, no company keys, no Docker socket, private and
+  link-local ranges blocked, public internet reachable; `Privileged=false`, `CapDrop=[ALL]`, `no-new-privileges`, 5 GiB, 1 CPU,
+  2,048 pids, read-only root, no binds; see the Hindsight update "sandbox checks on the live sentio-sales profile PASSED").
+  Still not exercised: file tools, `execute_code`, MCP, quick commands and the browser against the live sandbox, the chat PTY's
+  own reach (O2), an LLM-driven session in the desktop app, the desktop app's native sign-in and the invite deep link, the Light
+  release workflow on a real tag, WebSocket keepalive through the tunnel, a redeploy keeping `dockerd-data`, a backup and restore.
 - **O6. Merge upstream.** 3,200 commits behind with 3 known conflicts (header). Do it on a branch, then section 3.
 - **O7. Strings** for the Access page and connect dialog are English only.
 - **O8.** `.commandcode/taste/taste.md` is an empty tracked file; likely stray.
@@ -413,7 +417,7 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
   carry the choice yet; today it is the CLI flag (and the main agent's question). Next to the allowlist/templates work (O12).
 ## 5. Go-live gate (all must be true before a customer is on a gateway)
 
-- [ ] Sandbox enforced (O1): implemented and verified in Docker (`scripts/fork/verify-dind-isolation.sh` in `Fork CI`); verify on a throwaway company on Dokploy with D12's list before ticking.
+- [ ] Sandbox enforced (O1): implemented, verified in Docker in `Fork CI`, and verified for tool execution on the live pilot gateway (2026-10-24, see O5). Tick when the remaining surfaces listed in O5 are covered and the PTY gap (O2) is closed or accepted in writing.
 - [x] The first admin signs in through Google on a real deploy and is admin (2026-10-24, `one-agent.sentiolangley.com` on Dokploy; the first attempt exposed the provider-name bug fixed in PR #15).
 - [ ] PTY child no longer holds the host-scoped internal credential (O2).
 - [ ] First real deploy on Dokploy passed the checklist in `deploy/dokploy/README.md`; `dockerd` survives a redeploy.
