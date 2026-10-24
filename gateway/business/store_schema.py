@@ -106,6 +106,9 @@ CREATE TABLE IF NOT EXISTS business_governor_attempts (
  schema_version INTEGER NOT NULL DEFAULT 1);
 CREATE INDEX IF NOT EXISTS idx_business_governor_attempts_ts
  ON business_governor_attempts(transport_profile, account_id, timestamp_ms);
+CREATE TABLE IF NOT EXISTS business_consumed_authorizations (
+ token_hash TEXT PRIMARY KEY, attempt_id TEXT NOT NULL,
+ consumed_at_ms INTEGER NOT NULL);
 """
 
 

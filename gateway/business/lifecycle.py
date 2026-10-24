@@ -68,6 +68,15 @@ async def start_business_service(runner: Any) -> BusinessService | None:
     )
     runner._business_service = service
     logger.info("Native WhatsApp business service started (mode=%s)", business_config.mode)
+
+    control_server = getattr(runner, "_control_server", None)
+    if control_server is not None:
+        try:
+            from gateway.business.control import register_business_control_handlers
+            register_business_control_handlers(control_server, service)
+        except Exception as exc:
+            logger.warning("Failed to register business control handlers: %s", exc, exc_info=True)
+
     return service
 
 

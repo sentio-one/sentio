@@ -165,7 +165,7 @@ assert dst_fold_counts == expected_single_local_day_counts
 `consume_authorization(token: str, *, payload_digest: str, now_ms: int) -> Attempt`.
 Node async `dispatchAuthorized(request, {authorize, journal, sendSocket, clock}) -> object`.
 
-- [ ] **Step 1: Write** native-control and Node tests: `test_missing_forged_foreign_expired_or_consumed_permit_refuses`, `test_pause_or_takeover_fence_refuses`, `test_oversized_and_malformed_control_request_is_inert`:
+- [x] **Step 1: Write** native-control and Node tests: `test_missing_forged_foreign_expired_or_consumed_permit_refuses`, `test_pause_or_takeover_fence_refuses`, `test_oversized_and_malformed_control_request_is_inert`:
 
 ```python
 assert missing_permit.error == "business_authorization_required"
@@ -176,10 +176,10 @@ assert invalid_request.business_row_count == before_count
 assert unverified_result["error"] == "permission_denied"
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_dispatch_protocol.py -v` and `node --test scripts/whatsapp-bridge/business_dispatch.test.mjs`; expect missing backstop behavior.
-- [ ] **Step 3: Implement** sorted canonical JSON/HMAC-SHA256 authorizations binding `business_dispatch=1`, account/profile/part/digest/attempt/generation and 30-second expiry. Generate separate 256-bit transport credentials in a service-owned 0600 file, never model/config output; scope plugin clients to submission operations only. Control principals derive from verified local/host provenance; caller fields cannot assert role/profile. The bridge verifies the token, fsyncs a consumed-attempt entry, and asks the native service to atomically recheck/consume against current state before socket submission. All endpoints and the final socket helper require it in latched mode, including media/edit/location/poll/reaction. API work that needs models is queued and returns a receipt, not a blocking control call. Native side-effect-free rendering remains available with authenticated access.
-- [ ] **Step 4: Rerun** both commands; ensure a service outage, journal write failure, or unverifiable expiry produces zero socket calls, and legacy raw callers get a typed refusal. Exercise Windows pipe behavior on Windows, never by faking `sys.platform`.
-- [ ] **Step 5: Commit** only named protocol/bridge/seam files with `feat(whatsapp): require native one-use authorization for supervised dispatch`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_dispatch_protocol.py -v` and `node --test scripts/whatsapp-bridge/business_dispatch.test.mjs`; expect missing backstop behavior.
+- [x] **Step 3: Implement** sorted canonical JSON/HMAC-SHA256 authorizations binding `business_dispatch=1`, account/profile/part/digest/attempt/generation and 30-second expiry. Generate separate 256-bit transport credentials in a service-owned 0600 file, never model/config output; scope plugin clients to submission operations only. Control principals derive from verified local/host provenance; caller fields cannot assert role/profile. The bridge verifies the token, fsyncs a consumed-attempt entry, and asks the native service to atomically recheck/consume against current state before socket submission. All endpoints and the final socket helper require it in latched mode, including media/edit/location/poll/reaction. API work that needs models is queued and returns a receipt, not a blocking control call. Native side-effect-free rendering remains available with authenticated access.
+- [x] **Step 4: Rerun** both commands; ensure a service outage, journal write failure, or unverifiable expiry produces zero socket calls, and legacy raw callers get a typed refusal. Exercise Windows pipe behavior on Windows, never by faking `sys.platform`.
+- [x] **Step 5: Commit** only named protocol/bridge/seam files with `feat(whatsapp): require native one-use authorization for supervised dispatch`.
 
 ### Task B5: Physical execution, registration checks, and typed send receipts
 
