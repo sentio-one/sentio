@@ -8,6 +8,9 @@
 access:
   admin_groups:
     - "${HERMES_ADMIN_GROUP}"
+  # Admins named by an email the IdP verified, comma separated (Google emits no groups claim; FORK_DECISIONS D14).
+  admin_emails:
+    - "${HERMES_ADMIN_EMAILS}"
   profile_group_prefix: "hermes-profile-"
   group_providers:
     - self_hosted

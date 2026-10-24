@@ -31,7 +31,7 @@ def policy_for_app(app: Any):
     return load_gateway_config().access
 
 
-def grant_for_identity(policy: Any, *, provider: str, issuer: str, sub: str, groups: Any = ()):
+def grant_for_identity(policy: Any, *, provider: str, issuer: str, sub: str, groups: Any = (), verified_email: str = ""):
     """The caller's grant: IdP groups and config plus any stored grant (a redeemed invite). An unreadable
     grant store fails closed (no stored access), never open."""
     extra: Any = ()
@@ -42,7 +42,8 @@ def grant_for_identity(policy: Any, *, provider: str, issuer: str, sub: str, gro
             extra = default_store().profiles_for(policy.subject_key(provider, issuer, sub))
         except Exception:  # health: allow BLE001 -- a broken store must not take the dashboard down or widen access
             logging.getLogger(__name__).exception("access grant store unreadable; ignoring stored grants")
-    return policy.grant_for(provider=provider, issuer=issuer, sub=sub, groups=groups, extra_profiles=extra)
+    return policy.grant_for(provider=provider, issuer=issuer, sub=sub, groups=groups, extra_profiles=extra,
+                            verified_email=verified_email)
 
 
 def access_summary(app: Any, session: Any) -> dict:
@@ -53,7 +54,7 @@ def access_summary(app: Any, session: Any) -> dict:
     if not policy.configured or session is None:
         return {"configured": policy.configured, "admin": True, "profiles": []}
     grant = grant_for_identity(policy, provider=session.provider, issuer=session.issuer, sub=session.user_id,
-                               groups=session.groups)
+                               groups=session.groups, verified_email=session.verified_email)
     return {"configured": True, "admin": grant.admin, "profiles": [] if grant.admin else sorted(grant.profiles)}
 
 
@@ -64,7 +65,7 @@ def scope_for_identity(identity: dict, policy: Any) -> tuple[dict, bool]:
     forwarded = {key: identity[key] for key in _FEDERATED_FIELDS if identity.get(key)}
     grant = grant_for_identity(policy, provider=str(identity.get('provider') or ''),
                                issuer=str(identity.get('issuer') or ''), sub=str(identity.get('user_id') or ''),
-                               groups=identity.get('groups') or ())
+                               groups=identity.get('groups') or (), verified_email=str(identity.get('verified_email') or ''))
     if grant.admin:
         return {**forwarded, 'profile_scope': 'host'}, True
     return {**forwarded, 'allowed_profiles': sorted(grant.profiles)}, False

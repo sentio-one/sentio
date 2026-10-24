@@ -223,7 +223,8 @@ def session_from_claims(
     return Session(
         user_id=user_id, email=email, display_name=display_name, org_id=org_id, provider=provider,
         expires_at=int(claims["exp"]), access_token=access_token, refresh_token=refresh_token,
-        issuer=str(claims.get("iss") or ""), groups=groups_from_claims(claims))
+        issuer=str(claims.get("iss") or ""), groups=groups_from_claims(claims),
+        verified_email=email.strip().lower() if claims.get("email_verified") is True else "")
 
 
 # ---- JWT verification ----

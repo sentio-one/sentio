@@ -20,6 +20,7 @@ class Session:
     refresh_token: str
     issuer: str = ""  # Verified issuer; empty for non-federated providers.
     groups: tuple[str, ...] = ()  # Verified IdP group claim; the input to per-profile access.
+    verified_email: str = ""  # Lowercased email, only when the IdP set email_verified true; empty otherwise.
 
 
 @dataclass(frozen=True)

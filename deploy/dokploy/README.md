@@ -31,7 +31,8 @@ from adding themselves as an admin.
 | `OIDC_ISSUER` | yes | the company IdP's issuer URL (`https://accounts.google.com` for Google, see below) |
 | `OIDC_CLIENT_ID` | yes | client id registered at that IdP |
 | `OIDC_CLIENT_SECRET` | no | leave empty for a public (PKCE) client |
-| `ADMIN_GROUP` | yes | IdP group whose members are admins, e.g. `hermes-admins` |
+| `ADMIN_EMAILS` | yes | comma-separated emails that are admins, e.g. `you@yourcompany.example`. Counts only when the IdP marked the email verified. Start with the operator's; add the customer's admin on handover |
+| `ADMIN_GROUP` | no | IdP group whose members are also admins, only for an IdP that emits a `groups` claim |
 | `COMMANDCODE_API_KEY` | as needed | this company's Command Code key (provider `commandcode`) |
 | `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | as needed | this company's other model keys |
 
@@ -49,9 +50,10 @@ Decided 2026-10-24 (`docs/private-fork/ACCESS_CONTROL_PLAN.md` section 6). No pe
    secret, so unlike a pure PKCE client it is required here). Not yet exercised against Google: the browser login and the desktop
    app's native sign-in flow (tracked with O5 in `FORK_DECISIONS.md`).
 
-Google emits **no `groups` claim**, so `ADMIN_GROUP` cannot name the first admin and per-profile access comes from invites, not
-`hermes-profile-<name>` groups. The admin bootstrap this needs is **not built yet** (ACCESS_CONTROL_PLAN section 6); do not deploy
-a real company on Google until it is.
+Google emits **no `groups` claim**, so admins are named in `ADMIN_EMAILS` (the operator first: sign in with that Google account and
+you are an admin) and per-profile access comes from invites, not `hermes-profile-<name>` groups. Set `email` on every invite.
+Changing `ADMIN_EMAILS` needs a redeploy of the company stack. Residual risk: the match is on the verified email, so an
+address that is later reassigned (a Workspace admin renaming an account) would carry the admin role with it.
 
 Codex is a subscription login, not an env key: one subscription per company. After the first deploy open a terminal in the
 `hermes` container (Dokploy → Terminal) and run `hermes auth` for Codex as the admin; the login is stored in that profile's

@@ -2,7 +2,8 @@
 
 Claim-driven with a config override. The IdP's ``groups`` claim is the source of truth
 (``<profile_group_prefix><profile>`` grants a profile, ``admin_groups`` grants all); ``users`` and
-``admins`` add static grants for IdPs that cannot emit groups. Everything is fail closed: an
+``admins`` add static grants for IdPs that cannot emit groups, and ``admin_emails`` names admins by an email the IdP verified
+(Google has no groups claim and its ``sub`` is unknown before a first sign-in). Everything is fail closed: an
 unconfigured policy, an unknown caller and every malformed row resolve to no profiles.
 
 Subjects are the dashboard's own ``(provider, issuer, sub)`` triple, never a bare ``sub`` or an
@@ -61,6 +62,7 @@ class AccessPolicy:
 
     configured: bool = False
     admin_groups: frozenset = frozenset()
+    admin_emails: frozenset = frozenset()  # lowercased, verified-email admins (trusted providers only)
     group_prefix: str = DEFAULT_GROUP_PREFIX
     group_providers: frozenset = DEFAULT_GROUP_PROVIDERS
     users: Mapping = field(default_factory=dict)  # subject -> frozenset of profiles
@@ -73,9 +75,9 @@ class AccessPolicy:
         return dashboard_subject(provider, issuer, sub)
 
     def grant_for(self, *, provider: str, issuer: str, sub: str, groups: Iterable[str] = (),
-                  extra_profiles: Iterable[str] = ()) -> Grant:
+                  extra_profiles: Iterable[str] = (), verified_email: str = "") -> Grant:
         """``extra_profiles`` are stored grants (``gateway/access_grants.py``, e.g. redeemed invites): validated
-        like every other source, and never an admin grant."""
+        like every other source, and never an admin grant. ``verified_email`` is empty unless the IdP verified it."""
         if not self.configured or not sub:
             return Grant()
         subject = self.subject_key(provider, issuer, sub)
@@ -83,7 +85,7 @@ class AccessPolicy:
         admin = subject in self.admins
         if provider in self.group_providers:
             groups = tuple(groups)
-            admin = admin or any(g in self.admin_groups for g in groups)
+            admin = admin or any(g in self.admin_groups for g in groups) or verified_email.lower() in self.admin_emails
             profiles |= self._group_profiles(groups)
         return Grant(admin=admin, profiles=frozenset(profiles))
 
@@ -101,6 +103,11 @@ def _strings(value: Any, what: str) -> frozenset:
         logger.warning("Ignoring access.%s: expected a list, got %s", what, type(value).__name__)
         return frozenset()
     return frozenset(v.strip() for v in value if isinstance(v, str) and v.strip())
+
+
+def _emails(value: Any) -> frozenset:
+    """Lowercased addresses from a list whose entries may themselves be comma separated (one env var names several)."""
+    return frozenset(a.strip().lower() for entry in _strings(value, "admin_emails") for a in entry.split(",") if a.strip())
 
 
 def _row_subject(row: Any, what: str) -> Optional[str]:
@@ -143,5 +150,6 @@ def parse_access_policy(raw: Any) -> AccessPolicy:
     admins = {s for s in (_row_subject(r, "admins") for r in rows) if s} if isinstance(rows, list) else set()
     return AccessPolicy(
         configured=True, admin_groups=_strings(raw.get("admin_groups"), "admin_groups"),
+        admin_emails=_emails(raw.get("admin_emails")),
         group_prefix=prefix, group_providers=providers, users=_parse_users(raw.get("users")),
         admins=frozenset(admins))

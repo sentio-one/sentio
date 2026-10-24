@@ -65,12 +65,12 @@ Cost: nothing. A Google OAuth client has no per-user or per-login charge and nee
 What changes because Google's ID token has **no `groups` claim**:
 - Per-profile grants come from invites (the store), never from `hermes-profile-<name>` groups. The group path stays for
   companies that bring an IdP that emits groups.
-- **The first admin cannot come from `ADMIN_GROUP`.** `access.admins` takes full `(provider, issuer, sub)` rows, and a
-  Google `sub` is a numeric id nobody knows before that person's first sign-in. Needs building (not built): an
-  admin-by-verified-email bootstrap (`email_verified` true, listed in the pinned managed config), or a `hermes access whoami`
-  that prints the subject row after the first sign-in. The first is simpler for the operator. Until one lands, Google cannot
-  be the IdP of a real company. `deploy/dokploy/docker-compose.yml` also still requires `ADMIN_GROUP`, so that must become
-  optional in the same change.
+- **Admins are named by verified email (built 2026-10-24, D14/O13).** A Google `sub` is a numeric id nobody knows before a first
+  sign-in, so `access.admins` rows are impractical for the first admin. `access.admin_emails` (pinned in the managed config from
+  `ADMIN_EMAILS`, comma separated, case-insensitive) makes a person admin when the ID token's `email_verified` is exactly `true`
+  and the provider is one in `group_providers`. `Session.verified_email` carries it, and it rides the WebSocket ticket like
+  `groups`, so REST, WebSocket and the `/api/auth/me` summary all agree. `ADMIN_GROUP` is optional; `ADMIN_EMAILS` is required.
+  The profile's own config cannot add an admin email (managed pin). Residual risk: a reassigned address keeps the role.
 - Because the email is what an admin types into an invite, set `email` on every invite so the verified ID-token email must
   match (`INVITES_DESIGN.md`).
 

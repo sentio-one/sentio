@@ -226,7 +226,12 @@ Owner decisions after the sandbox merged (details in `SANDBOX_PLAN.md` section 4
   not main run sandboxed. Image pin deferred. Limits come from profile templates named by the work they do.
 - **IdP: Google first (free), Microsoft Entra second, Pocket ID if neither.** Keycloak is no longer the recommendation. There is no
   public signup: access comes only from invites and configured admins. Google has no `groups` claim, so an admin bootstrap by
-  verified email is needed before a real company can use it (O13).
+  verified email was needed before a real company could use it (O13, built).
+- **The operator is the first admin of every company gateway** (owner's decision 2026-10-24): `ADMIN_EMAILS` is set per company in
+  Dokploy, starting with the operator's address, and the customer's admin is added on handover. This is a trust statement to
+  make to customers, not a footnote: the main profile is host-level inside the gateway (D13), and the operator already holds the
+  Dokploy host, so an operator admin can reach that company's data. Whether the operator's address stays on after handover is
+  a per-customer agreement; removing it is a redeploy.
 
 ## 2. Upstream files the fork modifies (merge conflict map)
 
@@ -369,12 +374,13 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
 
 - **O12. Sandbox phase 6: allowlist, profile templates, tools running inside the sandbox** (D14). Not started. Phase 2's fail-closed
   behaviour stays until it lands.
-- **O13. Admin bootstrap without a `groups` claim** (D14, needed for Google): admin by verified email in the pinned managed config,
-  or a `hermes access whoami`; make `ADMIN_GROUP` optional in `deploy/dokploy/docker-compose.yml`. Blocks go-live on Google.
+- **O13. Admin bootstrap without a `groups` claim: BUILT 2026-10-24** (`access.admin_emails`, `Session.verified_email`,
+  `ADMIN_EMAILS` required and `ADMIN_GROUP` optional in compose; `tests/gateway/test_access_admin_emails.py`). Not yet exercised
+  against real Google sign-in (with O5). Open: a way to hand over or remove the operator admin without a redeploy.
 ## 5. Go-live gate (all must be true before a customer is on a gateway)
 
 - [ ] Sandbox enforced (O1): implemented and verified in Docker (`scripts/fork/verify-dind-isolation.sh` in `Fork CI`); verify on a throwaway company on Dokploy with D12's list before ticking.
-- [ ] The first admin can sign in through the chosen IdP (Google: O13).
+- [ ] The first admin signs in through Google on a real deploy and is admin (built and unit-tested, O13; needs O5).
 - [ ] PTY child no longer holds the host-scoped internal credential (O2).
 - [ ] First real deploy on Dokploy passed the checklist in `deploy/dokploy/README.md`; `dockerd` survives a redeploy.
 - [ ] An invite redeemed end to end against that gateway; WebSocket keepalive tested through the Cloudflare Tunnel.
