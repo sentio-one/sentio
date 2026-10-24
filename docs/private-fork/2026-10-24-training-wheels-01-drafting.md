@@ -56,7 +56,7 @@ Modify only the existing seams named per task; keep facade edits to declarations
 from mode, never a separate flag. Invalid config raises `BusinessConfigError(code: str)`;
 invalid envelopes raise `BusinessProtocolError(code: str)`. No new type is implicitly truthy permission.
 
-- [ ] **Step 1: Write the failing tests.** Add `test_invalid_config_cannot_disable_a_latched_account`, `test_rewrite_and_aux_defaults`, and `test_invalid_outcome_is_not_customer_text` with these assertions:
+- [x] **Step 1: Write the failing tests.** Add `test_invalid_config_cannot_disable_a_latched_account`, `test_rewrite_and_aux_defaults`, and `test_invalid_outcome_is_not_customer_text` with these assertions:
 
 ```python
 assert load_business_config({}, supervised_latch=False).mode == "off"
@@ -70,10 +70,10 @@ for payload in ("no reply sent", [], {"kind": "send"}, {"kind": "compose"}):
         parse_decision(payload)
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_config.py -v`; expect missing-module/API failure before implementation.
-- [ ] **Step 3: Implement** those types/parsers/config reader, rejecting unknown envelope fields, missing references, invalid windows/config scalars, and JSON above 64 KiB. Add the three `_aux(60)` defaults; inherit provider/model through existing routing. Configuration never reads ambient profile secrets.
-- [ ] **Step 4: Run** the same command; expect all assertions green. Verify existing empty/personal config still loads without a business service.
-- [ ] **Step 5: Commit** the task's exact files: `git add gateway/business tests/gateway/business/conftest.py tests/gateway/business/test_config.py hermes_cli/config_defaults.py website/docs/developer-guide/gateway-internals.md`, then `git commit -m "feat(gateway): define supervised business messaging contracts"`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_config.py -v`; expect missing-module/API failure before implementation.
+- [x] **Step 3: Implement** those types/parsers/config reader, rejecting unknown envelope fields, missing references, invalid windows/config scalars, and JSON above 64 KiB. Add the three `_aux(60)` defaults; inherit provider/model through existing routing. Configuration never reads ambient profile secrets.
+- [x] **Step 4: Run** the same command; expect all assertions green. Verify existing empty/personal config still loads without a business service.
+- [x] **Step 5: Commit** the task's exact files: `git add gateway/business tests/gateway/business/conftest.py tests/gateway/business/test_config.py hermes_cli/config_defaults.py website/docs/developer-guide/gateway-internals.md`, then `git commit -m "feat(gateway): define supervised business messaging contracts"`.
 
 ### Task A2: Profile-scoped durable episodes, revisions, and tasks
 
@@ -92,7 +92,7 @@ for payload in ("no reply sent", [], {"kind": "send"}, {"kind": "compose"}):
 `put_task(scope: Scope, *, dedupe_key: str, reason: str, refs: tuple[str, ...]) -> str`.
 Conflict raises `BusinessConflict(code: str)`; foreign rows raise `BusinessDenied`.
 
-- [ ] **Step 1: Write** `test_ingress_idempotency_and_profile_isolation`, `test_revision_compare_and_swap`, and `test_suppression_survives_alias_binding_and_restart`:
+- [x] **Step 1: Write** `test_ingress_idempotency_and_profile_isolation`, `test_revision_compare_and_swap`, and `test_suppression_survives_alias_binding_and_restart`:
 
 ```python
 first = store.record_ingress(scope, event, source_id="inbound-1")
@@ -107,10 +107,10 @@ with pytest.raises(BusinessConflict):
 assert reopened.is_suppressed(scope) is True
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_store.py -v`; expect absent store behavior.
-- [ ] **Step 3: Implement** WAL transactions and versioned tables `business_accounts`, `business_contacts`, `business_ingress`, `business_episodes`, `business_contexts`, `business_revisions`, `business_tasks`, `business_events`. Unique source/profile/account and revision-parent keys enforce idempotency/CAS. Reject a changing payload under the same source id. Store no plaintext credential fields. Retain immutable records; expose only owned rows. Native contact records have stable UUIDs; attach aliases using the existing resolver. An alias collision between two native records holds both for reconciliation, rather than silently merging approvals or suppressions. Account ownership is explicit, never guessed from a phone/port.
-- [ ] **Step 4: Run** the same command; expect green, including a forced commit failure yielding no revision/task receipt. Reopen a real temporary SQLite file rather than mocking restart.
-- [ ] **Step 5: Commit** `gateway/business/` and `tests/gateway/business/test_store.py` with message `feat(gateway): persist business episodes and immutable draft revisions`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_store.py -v`; expect absent store behavior.
+- [x] **Step 3: Implement** WAL transactions and versioned tables `business_accounts`, `business_contacts`, `business_ingress`, `business_episodes`, `business_contexts`, `business_revisions`, `business_tasks`, `business_events`. Unique source/profile/account and revision-parent keys enforce idempotency/CAS. Reject a changing payload under the same source id. Store no plaintext credential fields. Retain immutable records; expose only owned rows. Native contact records have stable UUIDs; attach aliases using the existing resolver. An alias collision between two native records holds both for reconciliation, rather than silently merging approvals or suppressions. Account ownership is explicit, never guessed from a phone/port.
+- [x] **Step 4: Run** the same command; expect green, including a forced commit failure yielding no revision/task receipt. Reopen a real temporary SQLite file rather than mocking restart.
+- [x] **Step 5: Commit** `gateway/business/` and `tests/gateway/business/test_store.py` with message `feat(gateway): persist business episodes and immutable draft revisions`.
 
 ### Task A3: Required plugin policy with a concrete sales consumer
 
@@ -123,7 +123,7 @@ Registered hooks are exactly `business_context` and `business_check`; hook resul
 Plugin callbacks: `business_context(*, episode: dict, scope: dict) -> dict` and
 `business_check(*, candidate: dict, scope: dict, policy_version: str) -> dict`.
 
-- [ ] **Step 1: Write** real-discovery tests for in-process and isolated plugins: `test_missing_timeout_or_invalid_required_policy_blocks`, `test_callback_owner_cannot_be_spoofed`, and `test_native_sales_checks_match_existing_cases`:
+- [x] **Step 1: Write** real-discovery tests for in-process and isolated plugins: `test_missing_timeout_or_invalid_required_policy_blocks`, `test_callback_owner_cannot_be_spoofed`, and `test_native_sales_checks_match_existing_cases`:
 
 ```python
 assert missing_report.ok is False
@@ -133,10 +133,10 @@ assert native_report.issues == legacy_expected_issues
 assert loaded_plugin_has_callback("business_context")
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/plugins/test_business_policy_contract.py -v` and `python3 -m unittest discover -s "$sales_plugin_worktree/tests" -p test_native_policy.py`; expect absent native behavior. The new native test must seed a temporary profile before importing configuration. Do not invoke the old all-suite runner against its default live-profile fallback.
-- [ ] **Step 3: Implement** bounded required dispatch over the existing callback ownership ledger, scoped manager, and host transport, with 10-second deadline and fail-closed missing/error results. Preserve old callback signature filtering. Extract the plugin's pure rule interpreter, passing configuration per call; preserve content-lint parity and its existing limits rather than moving sales rules to core. Add dormant native callbacks to the real plugin registration; legacy sending remains enabled until C4/C7 cutover. Implement `run_native.sh --hermes-root PATH` as specified in the shared plan, with isolated home/config, native-test discovery and explicit temporary sources for every legacy suite.
-- [ ] **Step 4: Rerun** the fork command and `bash "$sales_plugin_worktree/tests/run_native.sh" --hermes-root "$PWD"`; expect the new discovery/host/parity tests and existing plugin suite green. A missing plugin must never become an empty successful report.
-- [ ] **Step 5: Commit** the fork task files with `feat(plugins): support required business policy contributions`; commit only the named plugin files in its isolated checkout with `feat: expose native sales policy without bridge mutation`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/plugins/test_business_policy_contract.py -v` and `python3 -m unittest discover -s "$sales_plugin_worktree/tests" -p test_native_policy.py`; expect absent native behavior. The new native test must seed a temporary profile before importing configuration. Do not invoke the old all-suite runner against its default live-profile fallback.
+- [x] **Step 3: Implement** bounded required dispatch over the existing callback ownership ledger, scoped manager, and host transport, with 10-second deadline and fail-closed missing/error results. Preserve old callback signature filtering. Extract the plugin's pure rule interpreter, passing configuration per call; preserve content-lint parity and its existing limits rather than moving sales rules to core. Add dormant native callbacks to the real plugin registration; legacy sending remains enabled until C4/C7 cutover. Implement `run_native.sh --hermes-root PATH` as specified in the shared plan, with isolated home/config, native-test discovery and explicit temporary sources for every legacy suite.
+- [x] **Step 4: Rerun** the fork command and `bash "$sales_plugin_worktree/tests/run_native.sh" --hermes-root "$PWD"`; expect the new discovery/host/parity tests and existing plugin suite green. A missing plugin must never become an empty successful report.
+- [x] **Step 5: Commit** the fork task files with `feat(plugins): support required business policy contributions`; commit only the named plugin files in its isolated checkout with `feat: expose native sales policy without bridge mutation`.
 
 ### Task A4: Admission ledger and complete customer context
 
@@ -147,7 +147,7 @@ assert loaded_plugin_has_callback("business_context")
 `build_context(store: BusinessStore, scope: Scope, episode: EpisodeRef, *, policy: PolicyBundle, lesson_version: int) -> ContextSnapshot`.
 Capture canonical `RoutingIdentity` before keys; use receiving adapter/account rather than the default bot. Native records exist before pre-dispatch hooks can skip. Record later access refusal as refused, never an authorized turn. Owner/control events are recorded once but not run as customer prompts.
 
-- [ ] **Step 1: Write** `test_consumed_message_remains_in_worklist`, `test_duplicate_ingress_and_owner_reply`, `test_voice_and_reaction_context`, `test_restored_secondary_never_uses_launch_account`:
+- [x] **Step 1: Write** `test_consumed_message_remains_in_worklist`, `test_duplicate_ingress_and_owner_reply`, `test_voice_and_reaction_context`, `test_restored_secondary_never_uses_launch_account`:
 
 ```python
 assert skipped_row.verdict == "escalate"
@@ -159,10 +159,10 @@ assert reaction_snapshot.events[-1].target_id == offer_id
 assert restored_snapshot.scope.transport_profile == "sales-secondary"
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_ingress_context.py -v`; expect absent business receipts/context.
-- [ ] **Step 3: Implement** durable pre-hook observation on direct/producer paths with one source id across replay. Capture raw typed input and the outcome separately. Use current burst batching and alias helpers; preserve transcript provenance, inbound targets, successful tool-action receipts and actual outgoing evidence. Do not infer voice text from a placeholder, or treat a held draft as already said. A new substantive input increments context, marks old candidates stale, and invalidates unused approval authorization through the account generation used in B2. Missing required facts/transcripts are explicit snapshot `missing` entries.
-- [ ] **Step 4: Rerun** the task file plus `scripts/run_tests.sh tests/gateway/test_whatsapp_identity.py tests/gateway/test_whatsapp_multiplex.py -v`; expect green and no change to unconfigured-profile hook ordering/fast paths.
-- [ ] **Step 5: Commit** the named ingress/context and seam files with `feat(gateway): record business admission decisions and conversation provenance`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_ingress_context.py -v`; expect absent business receipts/context.
+- [x] **Step 3: Implement** durable pre-hook observation on direct/producer paths with one source id across replay. Capture raw typed input and the outcome separately. Use current burst batching and alias helpers; preserve transcript provenance, inbound targets, successful tool-action receipts and actual outgoing evidence. Do not infer voice text from a placeholder, or treat a held draft as already said. A new substantive input increments context, marks old candidates stale, and invalidates unused approval authorization through the account generation used in B2. Missing required facts/transcripts are explicit snapshot `missing` entries.
+- [x] **Step 4: Rerun** the task file plus `scripts/run_tests.sh tests/gateway/test_whatsapp_identity.py tests/gateway/test_whatsapp_multiplex.py -v`; expect green and no change to unconfigured-profile hook ordering/fast paths.
+- [x] **Step 5: Commit** the named ingress/context and seam files with `feat(gateway): record business admission decisions and conversation provenance`.
 
 ### Task A5: Dedicated tool-free composition from verified context
 
@@ -172,7 +172,7 @@ assert restored_snapshot.scope.transport_profile == "sales-secondary"
 `compose_candidate(snapshot: ContextSnapshot, decision: WorkDecision, *, main_runtime: dict, previous: Candidate | None = None, reasons: tuple[str, ...] = ()) -> Candidate`.
 It uses `async_call_llm(task="business_compose", main_runtime=..., messages=..., tools=[], timeout=60, max_tokens=2048)` and extracts visible structured content only. Errors return through the service as failed receipts, never customer prose.
 
-- [ ] **Step 1: Write** `test_failed_result_never_calls_composer`, `test_composer_receives_offer_and_verified_action`, `test_invalid_output_and_missing_context_escalate`, `test_stale_composition_is_discarded`:
+- [x] **Step 1: Write** `test_failed_result_never_calls_composer`, `test_composer_receives_offer_and_verified_action`, `test_invalid_output_and_missing_context_escalate`, `test_stale_composition_is_discarded`:
 
 ```python
 assert decision_from_result({"failed": True, "final_response": billing_text}).kind == "failed"
@@ -185,10 +185,10 @@ assert invalid_result.state == "failed"
 assert socket_calls == []
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_compose.py -v`; expect absent composition contract.
-- [ ] **Step 3: Implement** decision parsing with runtime-failure precedence and a bounded composer request using the snapshot, supplied intent, applicable rules, and placeholders for credential slots. Validate fact/action references against that snapshot, including subject and successful action state. Store model/route/usage/error metadata without raw secrets. Perform context CAS again before saving. A schema-valid but semantically suspect claim still goes through checks/reviewer/human approval; do not claim schema validation proves prose true.
-- [ ] **Step 4: Rerun** the task file; also call the same fake auxiliary route under two profile scopes and assert the keys/context never cross. Test a JSON scalar, truncated output, and reasoning-only output as failures.
-- [ ] **Step 5: Commit** the named files with `feat(gateway): compose customer messages in a dedicated auxiliary stage`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_compose.py -v`; expect absent composition contract.
+- [x] **Step 3: Implement** decision parsing with runtime-failure precedence and a bounded composer request using the snapshot, supplied intent, applicable rules, and placeholders for credential slots. Validate fact/action references against that snapshot, including subject and successful action state. Store model/route/usage/error metadata without raw secrets. Perform context CAS again before saving. A schema-valid but semantically suspect claim still goes through checks/reviewer/human approval; do not claim schema validation proves prose true.
+- [x] **Step 4: Rerun** the task file; also call the same fake auxiliary route under two profile scopes and assert the keys/context never cross. Test a JSON scalar, truncated output, and reasoning-only output as failures.
+- [x] **Step 5: Commit** the named files with `feat(gateway): compose customer messages in a dedicated auxiliary stage`.
 
 ### Task A6: Bounded checks, review, and immutable corrections
 
@@ -198,7 +198,7 @@ assert socket_calls == []
 async `prepare_draft(store: BusinessStore, snapshot: ContextSnapshot, decision: WorkDecision, *, policy: PolicyBundle, main_runtime: dict) -> Receipt`.
 The latter owns initial compose, checks/review, and at most two rewrites; it uses A5 rather than another drafting implementation. `store.attach_review(scope, revision_id, *, verdict, expected_context_version) -> DraftRevision` rejects stale results.
 
-- [ ] **Step 1: Write** `test_two_rewrites_then_attention`, `test_reviewer_timeout_is_unavailable`, `test_policy_failure_and_late_review_do_not_authorize`:
+- [x] **Step 1: Write** `test_two_rewrites_then_attention`, `test_reviewer_timeout_is_unavailable`, `test_policy_failure_and_late_review_do_not_authorize`:
 
 ```python
 assert compose_call_count == 3  # initial plus two rewrites
@@ -211,10 +211,10 @@ assert human_revision.review is None  # late prior-version verdict did not attac
 assert approval_count == 0
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_review.py -v`; expect absent orchestration.
-- [ ] **Step 3: Implement** deterministic checks before advisory review, review via `business_review` with tool-free 60-second/2,048-token calls, and a state-bounded loop. Recheck every changed candidate. Preserve all originals/reasons/versions. Missing/timeout review creates attention but never an automatic approval. Queue tasks on exhausted correction budget; keep failed checks unapprovable. Distinguish context supersession from a rejected candidate.
-- [ ] **Step 4: Rerun** the task file; expect green, including no rewrite after a working-turn failure and no repeated state update after cancellation.
-- [ ] **Step 5: Commit** the named review/store/test files with `feat(gateway): check and review bounded draft revisions`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_review.py -v`; expect absent orchestration.
+- [x] **Step 3: Implement** deterministic checks before advisory review, review via `business_review` with tool-free 60-second/2,048-token calls, and a state-bounded loop. Recheck every changed candidate. Preserve all originals/reasons/versions. Missing/timeout review creates attention but never an automatic approval. Queue tasks on exhausted correction budget; keep failed checks unapprovable. Distinguish context supersession from a rejected candidate.
+- [x] **Step 4: Rerun** the task file; expect green, including no rewrite after a working-turn failure and no repeated state update after cancellation.
+- [x] **Step 5: Commit** the named review/store/test files with `feat(gateway): check and review bounded draft revisions`.
 
 ### Task A7: Shadow gateway wiring and audience-separation contracts
 
@@ -228,7 +228,7 @@ async `start_business_service(runner) -> BusinessService | None` and
 
 For shadow-only observation, async `shadow_decision(snapshot: ContextSnapshot, legacy_result: dict, *, main_runtime: dict) -> WorkDecision` makes at most one additional tool-free `business_compose` auxiliary call with a decision-only prompt. It never changes or executes the legacy worker's instructions/tools. Supervised mode gets its decision directly from the working agent's structured result.
 
-- [ ] **Step 1: Write** `test_shadow_never_dispatches`, `test_silence_failure_and_progress_are_not_drafts`, `test_personal_turn_still_uses_existing_delivery`, and replay evaluation assertions:
+- [x] **Step 1: Write** `test_shadow_never_dispatches`, `test_silence_failure_and_progress_are_not_drafts`, `test_personal_turn_still_uses_existing_delivery`, and replay evaluation assertions:
 
 ```python
 assert shadow_receipt.state in {"held", "attention", "failed", "no_reply", "escalate"}
@@ -240,13 +240,13 @@ assert customer_candidates_containing_progress == []
 assert personal_response == expected_legacy_response
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_shadow_gateway.py tests/gateway/business/test_drafting_eval.py -v`; expect missing lifecycle/integration behavior.
-- [ ] **Step 3: Implement** startup/shutdown and scoped background work, shadow observation without changing legacy dispatch, and a configured-business branch authoritative only when B7/C7 readiness allows supervised mode. For supervised working turns append the outcome schema, episode identity and current policy as new task input in `gateway/run_turn_prepare.py`, once per admitted turn; verify actual model requests preserve prior messages/system bytes. Shadow evaluation uses `shadow_decision` then the ordinary compose/review pipeline and never changes the legacy worker's live instructions. Runtime failure bypasses both shadow decision and composition. Incomplete supervised readiness holds. Persist silence/failure/escalation outside empty-response normalization; disable customer progress/voice/footer paths. Sanitize evidence: remove real contacts/logins, retain uncertainty on inferred corrections, and do not copy obsolete offers as policy. Evaluate outcome/facts/action rather than exact wording. Reproduce the precise HTTP-400 insufficient-credit envelope using existing `classify_api_error`; change the classifier only if it fails.
-- [ ] **Step 4: Run** the task files plus `scripts/run_tests.sh tests/gateway/test_gateway_silence_tokens.py tests/gateway/test_normalize_empty_agent_response.py -v`; expect business separation and legacy invariants green. Shadow evaluation reports quality/coverage/cost/latency, never certifies readiness for auto-send.
-- [ ] **Step 5: Commit** only this task's files with `feat(gateway): wire supervised drafting in send-free shadow mode`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_shadow_gateway.py tests/gateway/business/test_drafting_eval.py -v`; expect missing lifecycle/integration behavior.
+- [x] **Step 3: Implement** startup/shutdown and scoped background work, shadow observation without changing legacy dispatch, and a configured-business branch authoritative only when B7/C7 readiness allows supervised mode. For supervised working turns append the outcome schema, episode identity and current policy as new task input in `gateway/run_turn_prepare.py`, once per admitted turn; verify actual model requests preserve prior messages/system bytes. Shadow evaluation uses `shadow_decision` then the ordinary compose/review pipeline and never changes the legacy worker's live instructions. Runtime failure bypasses both shadow decision and composition. Incomplete supervised readiness holds. Persist silence/failure/escalation outside empty-response normalization; disable customer progress/voice/footer paths. Sanitize evidence: remove real contacts/logins, retain uncertainty on inferred corrections, and do not copy obsolete offers as policy. Evaluate outcome/facts/action rather than exact wording. Reproduce the precise HTTP-400 insufficient-credit envelope using existing `classify_api_error`; change the classifier only if it fails.
+- [x] **Step 4: Run** the task files plus `scripts/run_tests.sh tests/gateway/test_gateway_silence_tokens.py tests/gateway/test_normalize_empty_agent_response.py -v`; expect business separation and legacy invariants green. Shadow evaluation reports quality/coverage/cost/latency, never certifies readiness for auto-send.
+- [x] **Step 5: Commit** only this task's files with `feat(gateway): wire supervised drafting in send-free shadow mode`.
 
 ## Plan exit
 
-- [ ] Run `scripts/run_tests.sh tests/gateway/business/ tests/plugins/test_business_policy_contract.py -v` and `python scripts/check`; require exit 0.
-- [ ] Verify no live mode/queue was changed, no credentials/evidence exports were committed, and native shadow work cannot send. Publish the offline evidence in the PR description.
-- [ ] Begin Plan 02 only after these interfaces are stable. Do not enable a supervised live account from this plan.
+- [x] Run `scripts/run_tests.sh tests/gateway/business/ tests/plugins/test_business_policy_contract.py -v` and `python scripts/check`; require exit 0.
+- [x] Verify no live mode/queue was changed, no credentials/evidence exports were committed, and native shadow work cannot send. Publish the offline evidence in the PR description.
+- [x] Begin Plan 02 only after these interfaces are stable. Do not enable a supervised live account from this plan.
