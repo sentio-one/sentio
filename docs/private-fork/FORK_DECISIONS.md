@@ -28,7 +28,8 @@ to re-check when pulling upstream in. The detailed design lives in `ACCESS_CONTR
   biggest item on it. It is deliberately deferred, not forgotten.
 - **L5. A release is a merged version bump** (decided 2026-10-23). `scripts/fork/bump-version.sh X.Y.Z`, a PR, a merge; then
   `tag-release.yml` tags `vX.Y.Z` and `release-light.yml` builds and publishes. Every other merge to `main` builds an artifact and
-  releases nothing. Needs the owner's `RELEASE_TOKEN` secret (`RELEASING.md`). Merges are not all version bumps: only one commit in the
+  releases nothing as a version, but refreshes one rolling pre-release (`main-latest`, never marked Latest) so there is a stable place
+  to find and be notified of the newest build. Needs the owner's `RELEASE_TOKEN` secret (`RELEASING.md`). Merges are not all version bumps: only one commit in the
   fork era changed the version, so tagging every merge had nothing to name the tag after.
 
 ## 1. Decisions
