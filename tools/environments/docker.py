@@ -557,6 +557,10 @@ def _readonly_skill_mount_args() -> list[str]:
     container can authenticate/read but never modify host state. Missing or wrong-kind sources are
     skipped with a warning (Docker-in-Docker auto-creates a missing file source as a directory,
     which would exit 125)."""
+    from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+    if is_sandboxed_profile():
+        return []
     args: list[str] = []
     try:
         import tools.credential_files as cf
@@ -705,7 +709,7 @@ class DockerEnvironment(BaseEnvironment):
         _ensure_docker_available()
 
         resource_args = self._resource_args(image, cpu, memory, disk, network, shm_size, extra_args)
-        volume_args, writable_args = self._mount_args(volumes, host_cwd, auto_mount_cwd, task_id)
+        volume_args, writable_args = self._mount_args(volumes, host_cwd, auto_mount_cwd, task_id, disk)
         mount = getattr(self, "host_cwd_mount", None)
         if mount and cwd_follows_host_mount(cwd, mount):
             logger.info(
@@ -829,8 +833,11 @@ class DockerEnvironment(BaseEnvironment):
         if shm and shm != "0" and not _extra_args_set_shm_size(extra_args):
             args.extend(["--shm-size", shm])
         if disk > 0 and sys.platform != "darwin":
-            if self._storage_opt_supported():
-                args.extend(["--storage-opt", f"size={disk}m"])
+            from tools.terminal_scope_sandbox import sandbox_disk_resource_args
+            disk_args = sandbox_disk_resource_args(
+                disk=disk, storage_opt_supported=self._storage_opt_supported(), persistent=self._persistent)
+            if disk_args:
+                args.extend(disk_args)
             else:
                 logger.warning(
                     "Docker storage driver does not support per-container disk limits "
@@ -850,7 +857,7 @@ class DockerEnvironment(BaseEnvironment):
             # extra_network == "none": same intent stated twice; the extra arg carries it once.
         return args
 
-    def _mount_args(self, volumes, host_cwd, auto_mount_cwd, task_id) -> tuple[list[str], list[str]]:
+    def _mount_args(self, volumes, host_cwd, auto_mount_cwd, task_id, disk: int = 0) -> tuple[list[str], list[str]]:
         """``(volume_args, writable_args)`` for user volumes, host cwd and /workspace,/root.
 
         Persistent mode bind-mounts from TERMINAL_SANDBOX_DIR (default ~/.hermes/sandboxes/).
@@ -918,7 +925,9 @@ class DockerEnvironment(BaseEnvironment):
             for host_dir, container_path in self._sandbox_mounts:
                 writable_args += ["-v", f"{host_dir}:{container_path}"]
         else:
-            writable_args += ["--tmpfs", "/workspace:rw,exec,size=10g"] if mount_workspace else []
+            from tools.terminal_scope_sandbox import sandbox_workspace_tmpfs_size
+            ws_size = sandbox_workspace_tmpfs_size(disk)
+            writable_args += ["--tmpfs", f"/workspace:rw,exec,size={ws_size}"] if mount_workspace else []
             writable_args += ["--tmpfs", "/home:rw,exec,size=1g", "--tmpfs", "/root:rw,exec,size=1g"]
 
         if bind_target:

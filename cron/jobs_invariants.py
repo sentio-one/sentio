@@ -26,6 +26,18 @@ def _validate_job_mode_invariants(
 ) -> None:
     """Execution-mode invariants shared by create_job and update_job (no bypass via the update
     door)."""
+    if script or monitor_script:
+        from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+        if is_sandboxed_profile():
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Refusing cron script/monitor_script job for sandboxed profile under access policy"
+            )
+            raise ValueError(
+                "Cron script and monitor_script jobs are disabled for sandboxed profiles under access policy."
+            )
     if monitor_script and monitor_url:
         raise ValueError(
             "monitor_script and monitor_url are mutually exclusive — a job "

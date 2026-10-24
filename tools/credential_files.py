@@ -154,6 +154,10 @@ def _load_config_files() -> list[dict[str, str]]:
 
 def get_credential_file_mounts() -> list[dict[str, str]]:
     """Skill-registered + config credential files as ``host_path``/``container_path`` dicts (re-checked for existence)."""
+    from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+    if is_sandboxed_profile():
+        return []
     mounts = {cp: hp for cp, hp in _get_registered().items() if Path(hp).is_file()}
     for entry in _load_config_files():
         cp, hp = entry["container_path"], entry["host_path"]

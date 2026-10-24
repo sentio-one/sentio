@@ -1,6 +1,6 @@
 # Sandbox enforcement plan
 
-Status: **plan, not built.** Tracks `FORK_DECISIONS.md` O1 and the go-live gate (L4). Written 2026-10-23.
+Status: **implemented and verified in Docker (`scripts/fork/verify-dind-isolation.sh`).** Tracks `FORK_DECISIONS.md` O1 and the go-live gate (L4). Written 2026-10-23, implemented 2026-10-24.
 
 ## Goal
 
@@ -39,44 +39,56 @@ config as a request, never as policy.** With no `access:` policy configured, beh
 
 Each phase is its own PR, with a test shown red before the fix and green after.
 
-### Phase 0: pin the evidence (this PR)
-- `tests/tools/test_terminal_scope_sandbox_gap.py`: two **strict xfail** tests that state the contract (G1, G2, G3), and two passing guards
-  (the launch profile keeps its backend; with no access policy nothing is forced). Strict means they fail the day they start passing.
-- Still to add: an end-to-end test that a `docker_forward_env` entry reaches a container (G3), run against the dind in CI.
+### Phase 0: pin the evidence (done)
+- `tests/tools/test_terminal_scope_sandbox_gap.py`: contract tests for G1, G2, G3, G7, G8 plus passing guards
+  (the launch profile keeps its backend; with no access policy nothing is forced).
+- End-to-end test in `scripts/fork/verify_dind_profile_e2e.py` (invoked by `scripts/fork/verify-dind-isolation.sh` in `Fork CI`)
+  proving `docker_forward_env`, `docker_volumes`, and `--privileged` from a hostile profile are blocked against the live dind.
 
-### Phase 1: enforce at the seam (closes G1, G2, G3, G4, G7 for the terminal)
-- New sibling module `tools/terminal_scope_sandbox.py` (a hook of a few lines at the end of `build_profile_terminal_scope`; the
-  health ratchet forbids growing the facade).
-- When an `access:` policy is configured **and** the profile home is not the launch home, **overwrite** (not default) the scope:
+### Phase 1: enforce at the seam (done — closes G1, G2, G3, G4, G7, G8 for the terminal)
+- Sibling module `tools/terminal_scope_sandbox.py` hooked into `tools/terminal_scope.py` (`build_profile_terminal_scope`,
+  `set_terminal_scope`, `terminal_env`).
+- When an `access:` policy is configured **and** the profile home is not the launch home, **overwrites** (not defaults) the scope:
   `TERMINAL_ENV=docker`, `TERMINAL_DOCKER_VOLUMES=[]`, `TERMINAL_DOCKER_EXTRA_ARGS=[]`, `TERMINAL_DOCKER_FORWARD_ENV=[]`,
-  `TERMINAL_DOCKER_MOUNT_CWD_TO_WORKSPACE=false`, persistent container, and the pinned resource limits (G8).
-- Apply the managed overlay in the builder for every profile, so the pins in `managed/config.yaml` become true (upstream gap, fork patch).
-- "Launch home" is `get_routing_process_hermes_home()`, never a profile-supplied value. A scope that cannot be built stays a refusal.
-- Block the `_task_env_overrides` path for such profiles (G7) after reading who calls it.
-- Done when the two xfail tests pass (markers removed) and the guards still pass.
+  `TERMINAL_DOCKER_ENV={}`, `TERMINAL_DOCKER_MOUNT_CWD_TO_WORKSPACE=false`, `TERMINAL_CONTAINER_PERSISTENT=false`, pinned image,
+  and pinned resource limits (`container_cpu=1`, `container_memory=5120`, `container_disk=51200`).
+- Applies the managed overlay in `build_profile_terminal_scope` and updates `hermes_cli/managed_scope.py` so empty dict leaves
+  (`docker_env: {}`) overwrite user dicts.
+- Blocks `_task_env_overrides` (`register_task_env_overrides` / `resolve_task_overrides` in `tools/terminal_tool.py`), host bind
+  mounts (`tools/environments/docker.py::_readonly_skill_mount_args`, `tools/credential_files.py`), and env passthrough
+  (`tools/env_passthrough.py`, `tools/environments/remote_common.py`) for sandboxed profiles.
 
-### Phase 2: close the host-execution surfaces outside the backend (G5)
-For a non-launch profile under an access policy, each of these must stop running on the host. Decision per surface is in section 4.
-- `mcp_servers` stdio commands, `quick_commands` `type: exec`, shell hooks (`hooks_auto_accept`), local browser, cron `script` jobs.
-- Mechanism candidates: refuse in the loader (fail closed, logged), or run inside the profile's sandbox, or make the REST/RPC write of
-  that config key admin-only. The loader is the safe choice because file edits and the agent's own tools also reach it.
+### Phase 2: close the host-execution surfaces outside the backend (done — closes G5)
+For a non-launch profile under an access policy, each of these fails closed and logs (`tests/tools/test_sandbox_host_surfaces.py`):
+- `mcp_servers` stdio commands (`tools/mcp_tool_config.py`, `tools/mcp_tool_transport.py`; HTTP/SSE MCP remains allowed),
+- `quick_commands` `type: exec` (`gateway/run_inbound_hooks.py`),
+- shell hooks / `hooks_auto_accept` (`agent/shell_hooks.py`),
+- local host browser launch (`tools/bot_desktop/placement.py`, `tools/browser_session.py`, `tools/browser_launcher.py`,
+  `tools/browser_lightpanda.py`),
+- cron `script` and `monitor_script` jobs (`cron/jobs_invariants.py`, `cron/scheduler_script.py`).
 
-### Phase 3: egress (G6)
-- Inside the daemon, drop traffic from sandbox bridges to the compose network and RFC 1918 / link-local ranges and the host gateway,
-  keeping the internet (rules in `DOCKER-USER`, applied by the `dockerd` service at start; verified by `verify-dind-isolation.sh`).
-- Evaluate upstream's egress proxy (`egress:` in config, "iron-proxy"): the sandbox sees opaque tokens and real credentials are
-  swapped in at egress, and it guards `docker_forward_env`, `docker_env` and `docker_extra_args` while enabled. It would also
-  answer "never put real keys in a sandbox". Needs a decision (section 4) before building.
+### Phase 3: egress (done — closes G6)
+- Inside the daemon (`deploy/dokploy/dockerd-entrypoint.sh`, mounted by `deploy/dokploy/docker-compose.yml`), `DOCKER-USER` and
+  `INPUT` rules drop traffic from sandbox bridges (`! -i eth0`) to the compose network, RFC 1918 (`10.0.0.0/8`, `172.16.0.0/12`,
+  `192.168.0.0/16`), link-local (`169.254.0.0/16`), loopback, CGNAT, and the `dockerd` host while keeping public internet
+  (`ESTABLISHED,RELATED` + `RETURN`). Verified by `scripts/fork/verify-dind-isolation.sh` and `tests/gateway/test_dokploy_compose.py`.
 
-### Phase 4: provisioning (D13, O3)
-- A skill and a CLI path for the main agent to create a profile with the docker backend and a `hermes-profile-<name>` grant note.
-  Today nothing makes a new profile sandboxed except phase 1, which is why phase 1 comes first.
+### Phase 4: provisioning (done — D13, O3)
+- `hermes profile create <name>` (`hermes_cli/profiles_initialization.py`, `hermes_cli/profile_cmd.py`) stamps
+  `terminal.backend: docker` into the new profile's `config.yaml` when an `access:` policy is active and prints the
+  `hermes-profile-<name>` IdP group grant notice (`tests/hermes_cli/test_profile_sandbox_provisioning.py`).
+- Bundled skill `skills/autonomous-ai-agents/profile-provisioning/SKILL.md` guides the main agent through provisioning a
+  sandboxed profile and sharing the grant note.
 
-### Phase 5: prove it end to end
-- Extend `verify-dind-isolation.sh`: drive a real profile's terminal tool through the docker backend against the dind and assert the
-  sandbox sees none of the gateway's secrets, cannot see `/opt/data`, cannot reach host port 22 or the compose network, and is
-  bounded by its limits. Runs in `Fork CI`.
-- A throwaway-company deploy on Dokploy using the checklist in `deploy/dokploy/README.md`.
+### Phase 5: prove it end to end (done)
+- `scripts/fork/verify-dind-isolation.sh` and `scripts/fork/verify_dind_profile_e2e.py` drive a real routed profile's
+  `terminal_tool` through the docker backend against the live `dind` service and assert the sandbox sees none of the gateway's
+  secrets, cannot see `/opt/data` or `/var/run/dind/docker.sock`, cannot reach the daemon API, compose network, or link-local
+  metadata, and is bounded by `Privileged=false`, `CapDrop=[ALL]`, `no-new-privileges`, `Memory=5120m`, `NanoCpus=1e9`,
+  `PidsLimit=2048`, and disk bounds (`StorageOpt size=51200m` when supported, or `ReadonlyRootfs=true` + `/workspace` tmpfs
+  `size=51200m`). Runs in `Fork CI`.
+- External operator step tracked in `FORK_DECISIONS.md` O5 before a customer is on a gateway: a throwaway-company deploy on a live
+  Dokploy server + Cloudflare Tunnel + OIDC IdP using the checklist in `deploy/dokploy/README.md`.
 
 ## 4. Decisions for the owner
 

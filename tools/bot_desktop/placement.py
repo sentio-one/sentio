@@ -64,12 +64,21 @@ def _plugin_host_isolated() -> bool:
 def resolve() -> Placement:
     # Backend first (env only): a local terminal IS the gateway host whatever the setting says, and that is
     # the common case — it must not cost a config load (this runs on every browser / cua-driver spawn).
+    from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+    sandboxed = is_sandboxed_profile()
     backend = _terminal_backend()
     if backend == "local":
+        if sandboxed:
+            return Placement(REFUSED, backend, "Host desktop placement is disabled for sandboxed profiles under access policy")
         return Placement(GATEWAY, backend, "terminal.backend is local, so the terminal IS the gateway host")
     setting = _setting()
     if setting == GATEWAY:
-        return Placement(GATEWAY, backend)
+        if not sandboxed:
+            return Placement(GATEWAY, backend)
+        logger.warning(
+            "Refusing bot_desktop.placement='gateway' for sandboxed profile; enforcing terminal placement"
+        )
     if backend in _STREAM_BACKENDS:
         return Placement(TERMINAL, backend)
     if _plugin_streams(backend):

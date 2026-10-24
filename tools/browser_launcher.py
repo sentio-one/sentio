@@ -569,6 +569,11 @@ def launch_chromium(key: str, *, executable: Optional[str] = None, user_data_dir
     written there can neither race another process's copy nor land under a browser that just came up; a
     message it returns is the launch's error, as is."""
     from hermes_constants import hermes_home_key
+    from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+    if is_sandboxed_profile():
+        logger.warning("browser: refusing host Chromium launch for sandboxed profile under access policy")
+        return None, "Host browser execution is disabled for sandboxed profiles under access policy."
     # Loaded now, not first at teardown: stopping the browser from an atexit hook must not be this module's
     # first import (Python refuses new atexit registrations during shutdown, orphaning the browser). An
     # attacher needs it too: it is the one that stops a shared browser when it is the last holder.

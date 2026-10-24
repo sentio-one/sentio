@@ -278,6 +278,12 @@ def _hook_specs(cfg: Optional[dict[str, Any]]) -> tuple[Optional[list[ShellHookS
     if env_var_enabled("HERMES_SAFE_MODE"):  # hooks are user customizations too — fire zero user-configured code
         logger.info("HERMES_SAFE_MODE=1 — shell-hook registration skipped")
         return None, True
+    from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+    if is_sandboxed_profile():
+        if cfg.get("hooks"):
+            logger.warning("Shell hooks refused for sandboxed profile under access policy")
+        return [], True
     return _parse_hooks(cfg.get("hooks"))
 
 

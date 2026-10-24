@@ -201,6 +201,11 @@ def _write_record(server: LightpandaServer) -> None:
 def launch_lightpanda(session_name: str, *, block_private_networks: bool = False) -> tuple[Optional[LightpandaServer], Optional[str]]:
     """Start ``lightpanda serve`` on a free loopback port; ``(server, None)`` once ``/json/version`` answers,
     else ``(None, error)``. stderr goes to ``<state_dir>/<session>.log`` so a chatty child never blocks on a pipe."""
+    from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+    if is_sandboxed_profile():
+        logger.warning("lightpanda: refusing host launch for sandboxed profile under access policy")
+        return None, "Host browser execution (Lightpanda) is disabled for sandboxed profiles under access policy."
     binary = find_lightpanda_binary()
     if not binary:
         if os.name == "nt":

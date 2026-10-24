@@ -98,6 +98,21 @@ def test_the_privileged_daemon_has_no_network_surface_a_sandbox_could_reach(comp
     assert "unix://" in " ".join(daemon["healthcheck"]["test"])
 
 
+def test_the_daemon_blocks_sandbox_egress_to_private_and_link_local_networks(compose):
+    """Phase 3 (SANDBOX_PLAN.md G6): dockerd installs DOCKER-USER rules dropping RFC 1918 and link-local destinations
+    from sandbox bridges while allowing public internet, and gates healthcheck readiness on firewall installation."""
+    daemon = compose["services"]["dockerd"]
+    assert daemon["entrypoint"] == ["/bin/sh", "/opt/dockerd-entrypoint.sh"]
+    assert "./dockerd-entrypoint.sh:/opt/dockerd-entrypoint.sh:ro" in daemon["volumes"]
+    assert "/var/run/dind/firewall.ready" in " ".join(daemon["healthcheck"]["test"])
+    entrypoint = (DEPLOY / "dockerd-entrypoint.sh").read_text(encoding="utf-8")
+    assert "DOCKER-USER" in entrypoint
+    for cidr in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16"):
+        assert cidr in entrypoint, cidr
+    assert "kill -TERM 1" in entrypoint
+    assert "exec dockerd-entrypoint.sh" in entrypoint
+
+
 def test_the_model_provider_keys_the_company_uses_reach_the_container(service):
     for key in ("COMMANDCODE_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
         assert key in service["environment"]

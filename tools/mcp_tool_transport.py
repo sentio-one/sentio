@@ -364,6 +364,16 @@ class MCPServerTransportMixin:
 
     async def _run_stdio(self, config: dict):
         """Run the server using stdio transport."""
+        from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+        if is_sandboxed_profile():
+            logger.warning(
+                "MCP server '%s': refusing stdio spawn for sandboxed profile under access policy",
+                self.name,
+            )
+            raise PermissionError(
+                f"MCP server '{self.name}': stdio host command execution is disabled for sandboxed profiles under access policy"
+            )
         if config.get("identity_header") is not None:  # copy-pasted HTTP block: warn, don't mislead
             logger.warning("MCP server '%s': identity_header is only supported on "
                            "HTTP/SSE transports — ignored for stdio servers", self.name)

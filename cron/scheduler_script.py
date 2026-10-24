@@ -444,6 +444,11 @@ def _run_job_script(
     instead of the scripts-dir parent. See #69396. interpreter: the job's optional Python for
     ``.py`` scripts (#8714).
     """
+    from tools.terminal_scope_sandbox import is_sandboxed_profile
+
+    if is_sandboxed_profile(_sched._get_hermes_home()):
+        logger.warning("Refusing cron script %r for sandboxed profile %s", script_path, _sched._get_hermes_home())
+        return False, "Blocked: host script execution in cron jobs is disabled for sandboxed profiles under access policy."
     path, err = _resolve_script_path(script_path)
     if path is None:
         return False, err
