@@ -24,6 +24,8 @@ from adding themselves as an admin.
 
 ## Environment (Dokploy → project → Environment), per company
 
+Copy `.env.example` (this directory), paste it into Dokploy's Environment tab and fill in the values; the table explains each one.
+
 | Variable | Required | Example / meaning |
 |---|---|---|
 | `COMPANY_SLUG` | no | `acme`, only labels the image |
