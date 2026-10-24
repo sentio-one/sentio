@@ -14,9 +14,11 @@ on:
 permissions:
   contents: read
 
-# A newer push to a pull request supersedes its older run; every commit on main keeps its own result.
+# A newer push to a pull request supersedes its older run. A push to main gets a group of its own (the commit): a shared group
+# keeps one running and one pending run and cancels an older pending one even without cancel-in-progress, so merges landing
+# seconds apart used to leave a main commit with no result.
 concurrency:
-  group: fork-ci-${{ github.ref }}
+  group: fork-ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -40,7 +42,7 @@ jobs:
       - name: Fork script tests
         run: |
           scripts/run_tests.sh tests/scripts/test_release_version_scripts.py \
-            tests/scripts/test_disable_upstream_workflows.py
+            tests/scripts/test_disable_upstream_workflows.py tests/scripts/test_refresh_main_release.py
 
       - name: Run the fork's tests
         run: |
