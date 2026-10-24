@@ -224,15 +224,18 @@ def set_bundled_skills_opt_out(enabled: bool) -> dict:
     return {"ok": True, "changed": changed, "marker": str(marker), "message": _OPT_OUT_MESSAGES[(enabled, changed)]}
 
 
-def remove_pristine_bundled_skills(dry_run: bool = False) -> dict:
+def remove_pristine_bundled_skills(dry_run: bool = False, keep: Optional[frozenset] = None) -> dict:
     """Delete bundled skills that are manifest-tracked, still in the bundled source AND
     byte-identical to the origin hash; everything else lands in ``skipped``. Removed skills lose
-    their manifest entry so a later opt-in re-seed treats them as new.
+    their manifest entry so a later opt-in re-seed treats them as new. Names in ``keep`` are left alone
+    and not reported.
     Returns ``{ok, removed, skipped: [{name, reason}], dry_run, message}``."""
     ss, manifest, bundled_dir, bundled_by_name = _bundled_state()
     removed: list[str] = []
     skipped: list[dict] = []
     for name, origin_hash in sorted(manifest.items()):
+        if keep is not None and name in keep:
+            continue
         src = bundled_by_name.get(name)
         if src is None:
             skipped.append({"name": name, "reason": "no bundled source (removed upstream)"})

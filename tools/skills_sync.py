@@ -400,14 +400,16 @@ def sync_skills(quiet: bool = False) -> dict:
     essential_only = (_hermes_home() / NO_BUNDLED_SKILLS_MARKER).exists()
     if essential_only and not quiet:
         print("  (profile opted out of bundled skills via .no-bundled-skills — seeding essential skills only)")
+    from tools.skills_sync_company import company_skill_filter
+    only = ESSENTIAL_SKILLS if essential_only else company_skill_filter(_hermes_home())  # None: every bundled skill
     bundled_dir = _get_bundled_dir()
     if not bundled_dir.exists():
         return {"copied": [], "updated": [], "skipped": 0, "user_modified": [], "cleaned": [],
                 "suppressed": [], "total_bundled": 0, "optional_provenance_backfilled": []}
     _skills_dir().mkdir(parents=True, exist_ok=True)
     bundled_skills = _discover_bundled_skills(bundled_dir)
-    if essential_only:
-        bundled_skills = [(name, src) for name, src in bundled_skills if name in ESSENTIAL_SKILLS]
+    if only is not None:
+        bundled_skills = [(name, src) for name, src in bundled_skills if name in only]
     suppressed = _read_suppressed_names()
     external_index = _build_external_skill_index()
     st = _SyncState(manifest=_read_manifest(), quiet=quiet)
@@ -435,7 +437,7 @@ def sync_skills(quiet: bool = False) -> dict:
     # on disk (active or archived) keeps its entry: it is the only provenance record, and without it the
     # copy reads as agent-authored ("Learned", editable) (#95415). Skipped when opted out: bundled_skills
     # is only the essential set there, so cleaning would drop tracking for everything else.
-    removed = [] if essential_only else sorted(set(st.manifest) - {name for name, _ in bundled_skills})
+    removed = [] if only is not None else sorted(set(st.manifest) - {name for name, _ in bundled_skills})
     present = set()
     if removed:  # curator archive is flat: directory name == skill name
         archive = _skills_dir() / ".archive"
@@ -446,7 +448,7 @@ def sync_skills(quiet: bool = False) -> dict:
         del st.manifest[name]
     _seed_category_descriptions(
         bundled_dir,
-        {_compute_relative_dest(src, bundled_dir).parent for _, src in bundled_skills} if essential_only else None)
+        {_compute_relative_dest(src, bundled_dir).parent for _, src in bundled_skills} if only is not None else None)
     _write_manifest(st.manifest)
     return {
         "copied": st.copied, "updated": st.updated, "skipped": st.skipped, "user_modified": st.user_modified,

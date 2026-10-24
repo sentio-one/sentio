@@ -57,6 +57,10 @@ def build_profile_parser(subparsers, *, cmd_profile: Callable) -> None:
     profile_delete.add_argument("profile_name", help="Profile to delete")
     profile_delete.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompt")
 
+    profile_trim = profile_subparsers.add_parser(
+        "trim-skills", help="Cut a sandboxed company profile's bundled skills down to the company baseline")
+    profile_trim.add_argument("profile_name", help="Profile to trim")
+
     profile_describe = profile_subparsers.add_parser(
         "describe", help="Read or set a profile's description (used by the kanban orchestrator)")
     profile_describe.add_argument(
