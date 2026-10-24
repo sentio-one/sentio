@@ -47,6 +47,15 @@ def test_per_company_settings_are_required_so_a_deploy_cannot_start_half_configu
         assert re.search(r"\$\{[A-Z_]+:\?", env[key]), key  # `${VAR:?message}` aborts the deploy when unset
 
 
+def test_the_env_example_names_every_setting_the_compose_file_reads():
+    read = set(re.findall(r"\$\{([A-Z_0-9]+)", (DEPLOY / "docker-compose.yml").read_text(encoding="utf-8")))
+    example = (DEPLOY / ".env.example").read_text(encoding="utf-8")
+    declared = set(re.findall(r"^([A-Z_0-9]+)=", example, flags=re.M))
+    assert read == declared
+    assert all(not value for key, value in re.findall(r"^([A-Z_0-9]+)=(.*)$", example, flags=re.M)
+               if any(word in key for word in ("SECRET", "API_KEY", "TOKEN", "PASSWORD")))
+
+
 def test_the_secrets_come_from_the_environment_never_the_file(service):
     for key, value in service["environment"].items():
         if any(word in key for word in ("SECRET", "API_KEY", "TOKEN", "PASSWORD")):
