@@ -47,15 +47,39 @@ call does not read default; two tenants on one issuer host stay distinct.
 ## 5. Open decisions
 
 - Sandbox posture: container terminal backend per user, or accept "grant = host code execution".
-- IdP choice and claim shape (section 6).
+- IdP choice: decided 2026-10-24, Google first (section 6). The claim shape follows from it: no `groups` claim, so grants come from invites.
 - Whether non-admins may edit their profile's config (`terminal.backend`, plugins).
 
 ## 6. IdP
 
-Recommended: Keycloak. Fallback for a small team: Authentik. If the company already has Entra/Okta/Google,
-use it directly and only add a broker if it cannot emit a groups claim. Requirements to verify against
-`plugins/dashboard_auth/self_hosted`: authorization code + PKCE, public client, discovery + JWKS,
-`groups` array in the ID token (not only userinfo), stable `sub`.
+**Decided 2026-10-24: Google sign-in is the first IdP** (Microsoft Entra second). Superseded: the earlier recommendation of
+Keycloak, with Authentik as the fallback, which is more to run than an invite-only product with no public signup needs.
+
+Why this works: the gateway owns who may do what. An invite binds a verified `(provider, issuer, sub)` to a profile
+(`INVITES_DESIGN.md`), so the IdP only has to prove who someone is. "Invite only, no public signup" falls out of that: a
+Google account that holds no invite and no admin entry gets no grant.
+
+Cost: nothing. A Google OAuth client has no per-user or per-login charge and needs no billing account. Setup is in
+`deploy/dokploy/README.md`.
+
+What changes because Google's ID token has **no `groups` claim**:
+- Per-profile grants come from invites (the store), never from `hermes-profile-<name>` groups. The group path stays for
+  companies that bring an IdP that emits groups.
+- **The first admin cannot come from `ADMIN_GROUP`.** `access.admins` takes full `(provider, issuer, sub)` rows, and a
+  Google `sub` is a numeric id nobody knows before that person's first sign-in. Needs building (not built): an
+  admin-by-verified-email bootstrap (`email_verified` true, listed in the pinned managed config), or a `hermes access whoami`
+  that prints the subject row after the first sign-in. The first is simpler for the operator. Until one lands, Google cannot
+  be the IdP of a real company. `deploy/dokploy/docker-compose.yml` also still requires `ADMIN_GROUP`, so that must become
+  optional in the same change.
+- Because the email is what an admin types into an invite, set `email` on every invite so the verified ID-token email must
+  match (`INVITES_DESIGN.md`).
+
+Fallbacks: Microsoft Entra (also free, multi-tenant app registration, the same no-groups caveat unless the company configures
+a groups claim), then Pocket ID (one small self-hosted container, passkey-only) for a company with neither. Zitadel or WorkOS
+AuthKit only when a customer needs SSO groups or SCIM. Clerk is ruled out by the owner.
+
+Requirements any IdP must meet, verified against `plugins/dashboard_auth/self_hosted`: authorization code + PKCE, public
+client, discovery + JWKS, stable `sub`; a `groups` array in the ID token (not only userinfo) only if group grants are used.
 
 ## 7. Private fork workflow
 

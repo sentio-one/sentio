@@ -28,12 +28,30 @@ from adding themselves as an admin.
 |---|---|---|
 | `COMPANY_SLUG` | no | `acme`, only labels the image |
 | `PUBLIC_URL` | yes | `https://acme.gw.example.com`, the address users reach through the tunnel |
-| `OIDC_ISSUER` | yes | the company IdP's issuer URL |
+| `OIDC_ISSUER` | yes | the company IdP's issuer URL (`https://accounts.google.com` for Google, see below) |
 | `OIDC_CLIENT_ID` | yes | client id registered at that IdP |
 | `OIDC_CLIENT_SECRET` | no | leave empty for a public (PKCE) client |
 | `ADMIN_GROUP` | yes | IdP group whose members are admins, e.g. `hermes-admins` |
 | `COMMANDCODE_API_KEY` | as needed | this company's Command Code key (provider `commandcode`) |
 | `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | as needed | this company's other model keys |
+
+### Sign-in with Google (first-choice IdP, free)
+
+Decided 2026-10-24 (`docs/private-fork/ACCESS_CONTROL_PLAN.md` section 6). No per-user or per-login charge, and no billing account.
+1. Google Cloud Console → a project → APIs & Services → OAuth consent screen. User type **External**, scopes `openid`, `email`,
+   `profile` only. Then **publish it to production**: in Testing mode only listed test users (100 at most) can sign in and the
+   login expires after 7 days. Basic scopes normally need no Google app review; Google may ask you to confirm the app name,
+   logo and domain.
+2. Credentials → Create OAuth client ID → **Web application**. Authorized redirect URI: `<PUBLIC_URL>/auth/callback` (the route in
+   `hermes_cli/dashboard_auth/routes.py`). One client can serve every company, each gateway adding its own redirect URI, or make
+   one client per company to keep them apart.
+3. Set `OIDC_ISSUER=https://accounts.google.com`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` (Google's web client always has a
+   secret, so unlike a pure PKCE client it is required here). Not yet exercised against Google: the browser login and the desktop
+   app's native sign-in flow (tracked with O5 in `FORK_DECISIONS.md`).
+
+Google emits **no `groups` claim**, so `ADMIN_GROUP` cannot name the first admin and per-profile access comes from invites, not
+`hermes-profile-<name>` groups. The admin bootstrap this needs is **not built yet** (ACCESS_CONTROL_PLAN section 6); do not deploy
+a real company on Google until it is.
 
 Codex is a subscription login, not an env key: one subscription per company. After the first deploy open a terminal in the
 `hermes` container (Dokploy → Terminal) and run `hermes auth` for Codex as the admin; the login is stored in that profile's

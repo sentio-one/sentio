@@ -76,6 +76,9 @@ from a template (the JIT idea in the main plan). Off by default; separate from t
 
 ## Open decisions (need an owner)
 
+- **IdP: decided 2026-10-24, Google first** (`ACCESS_CONTROL_PLAN.md` section 6). With no `groups` claim, invites are the only
+  source of per-profile grants, so admins should always set the invite `email` (the verified ID-token email must then match).
+
 - **Tenancy:** one gateway per company (recommended: matches the current single-launch-profile policy
   design) or one shared multi-tenant gateway (would need a tenant dimension in every check).
 - **Link reuse:** keep "single use by default"; allow team links only by explicit admin choice. Agreed?
