@@ -20,8 +20,8 @@ to re-check when pulling upstream in. The detailed design lives in `ACCESS_CONTR
   they can choose to add, never the default path and never required. **How it is delivered is not decided**; see O9.
   D8 (Light = remote-only, never offers local) is the interim implementation of the remote half, not the final shape.
 - **L2. Everything after the first push goes through a pull request**, including every upstream merge. (Decided 2026-10-23;
-  the work in this document was committed straight to `main` once, before that rule.) Branch protection on `main` is not
-  enabled yet; enable it with the repo-private step (O0).
+  the work in this document was committed straight to `main` once, before that rule.) Branch protection on `main` has been
+  enforced since 2026-10-24 (O11).
 - **L3. The repo stays public until it is cleaned up and the upstream merge has landed, then goes private.** The README is
   rewritten then for what the Sentio One agent is for a business (it currently reads as a fork note on top of upstream's README).
 - **L4. The go-live gate (section 5) must be green before a real customer is on a gateway.** The unenforced sandbox (O1) is the
@@ -281,7 +281,8 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
 - **O0. The GitHub repository is public** (`sentio-one/sentio`, checked 2026-10-23), while the README and these docs call the
   fork private. It publishes the access-control audit, the known gaps (D9), the deployment layout and the invite design.
   Decided (L3): go private after cleanup and the upstream merge; until then do not add anything more sensitive to it. At that
-  point also: enable branch protection with required `Fork CI` (L2) and give Dokploy a deploy key. (The business README rewrite is done.)
+  point also give Dokploy a deploy key, and check the plan still enforces rulesets on a private repository (branch protection is
+  already applied, O11; the business README rewrite is done).
 - **O1. Make the sandbox real (deferred on purpose, must be done before go-live, L4).** Needed: non-main profiles get `terminal.backend: docker`, and a granted user cannot flip it
   to `local`. Candidate seam: where the terminal backend is resolved (`tools/terminal_tool.py::_get_env_config`, scope-aware
   `_tenv("TERMINAL_ENV")`): when an access policy is configured and the active profile is not the launch profile, force
@@ -327,12 +328,13 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
   `@{profile}`, `host_scoped`) and decide per feature. Candidate for the delegation case: pin `delegation.backend: default` in
   `managed/config.yaml`.
 
-- **O11. Repository protection is not in force yet** (found 2026-10-23). Both existing rulesets target a branch named `protect-main`,
-  which does not exist, so `main` was unprotected; tags and `upstream-merge` had no rules; squash and rebase merging were on. The
-  rules now exist as code (`.github/rulesets/`), with an apply script, a read-only checker (also run weekly) and a walkthrough:
-  `docs/private-fork/REPO_PROTECTION.md`. **Only the owner account `sentio-one` can apply them** (the `TheophilusChinomona` account
-  has write, not admin). Order: merge the sandbox-isolation CI job first, apply, run the checker, and only then consider going
-  private (rulesets on a private repository need a paid plan). One-time per clone: `gh repo set-default sentio-one/sentio`, because
+- **O11. Repository protection: APPLIED 2026-10-24** (found missing 2026-10-23). Both original rulesets targeted a branch named
+  `protect-main`, which does not exist, so `main` was unprotected; tags and `upstream-merge` had no rules; squash and rebase merging
+  were on. The owner applied `.github/rulesets/` with `scripts/fork/apply-github-protection.sh --apply --replace-legacy`; the checker
+  ends `github protection: ok`, GitHub reports the rules it enforces on `main` (deletion, non-fast-forward, pull request, required
+  checks) and on `upstream-merge`, and the weekly `Protection drift` workflow passes. Details and the review flow:
+  `docs/private-fork/REPO_PROTECTION.md`. **Only the owner account `sentio-one` can change it** (the `TheophilusChinomona` account has
+  write, not admin). Still ahead: before going private, confirm the plan enforces rulesets on a private repository. One-time per clone: `gh repo set-default sentio-one/sentio`, because
   with an `upstream` remote `gh` resolves to NousResearch/hermes-agent and a bare `gh pr create` would target upstream.
 
 ## 5. Go-live gate (all must be true before a customer is on a gateway)
@@ -345,7 +347,7 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
 - [ ] Repository private, branch protection on, README rewritten for the business audience (O0).
 - [ ] Desktop delivery decided and built (O9); installer signing decision made.
 - [ ] A backup and restore of `hermes-data` and `dockerd-data` tested.
-- [ ] Repository protection applied and `scripts/fork/check-github-protection.sh` green (O11).
+- [x] Repository protection applied and `scripts/fork/check-github-protection.sh` green (O11), 2026-10-24.
 
 ## 6. Upstream merge log
 

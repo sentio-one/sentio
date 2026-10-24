@@ -12,6 +12,18 @@ code in `.github/rulesets/*.json`; `scripts/fork/apply-github-protection.sh` app
 - **A squash merge of an upstream merge** drops upstream's commits from our ancestry and makes the next merge conflict on everything
   the fork touched (`FORK_DECISIONS.md` section 3).
 
+## Status: applied (2026-10-24)
+
+The owner applied it with `scripts/fork/apply-github-protection.sh --apply --replace-legacy`. Verified afterwards: the checker ends
+`github protection: ok`; `GET /repos/sentio-one/sentio/rules/branches/main` lists deletion, non-fast-forward, pull request and
+required status checks (and `upstream-merge` lists deletion and non-fast-forward); merge commits are the only allowed method; secret
+scanning, push protection and private vulnerability reporting are on; workflow tokens default to read-only. The two original rulesets
+were removed. `Protection drift` runs weekly and on demand.
+
+**Day to day:** every change to `main` is a pull request that needs one approval and the four `Fork CI` jobs. The pull requests are
+opened under `TheophilusChinomona`, so `sentio-one` approves them (an author cannot approve their own). As owner, `sentio-one` may
+also merge through the pull request without the approval (the ruleset's bypass is "pull request only", never a direct push).
+
 ## What was found (2026-10-23, read from the API)
 
 | Finding | Effect |
