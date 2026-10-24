@@ -139,7 +139,7 @@ required positive integer. All three classes require explicit windows/caps. Gaps
 jitter and thresholds are numeric nonnegative/positive as appropriate; missing
 required values hold. C5 translates the legacy field spellings without changing values.
 
-- [ ] **Step 1: Write** `test_batch_and_chunks_share_physical_capacity`, `test_restart_and_reconfiguration_do_not_burst`, `test_dst_overnight_and_clock_regression`:
+- [x] **Step 1: Write** `test_batch_and_chunks_share_physical_capacity`, `test_restart_and_reconfiguration_do_not_burst`, `test_dst_overnight_and_clock_regression`:
 
 ```python
 assert concurrent_reservations_allowed == 1
@@ -151,10 +151,10 @@ assert backward_clock.allowed is False
 assert dst_fold_counts == expected_single_local_day_counts
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_governor.py -v`; expect missing policy/reservation behavior.
-- [ ] **Step 3: Implement** `zoneinfo` window calculation with overnight windows explicitly split across days; DST gaps advance to the next valid instant and folds cannot reset counters twice. Use timestamped physical attempts for rolling hourly buckets and timezone-local daily buckets. Sample jitter once per persisted eligibility slot; don't resample every poll. One in-flight request per account plus a monotonic floor prevents parallel bursts. A backward UTC jump holds until a conservative elapsed-time/account watermark permits dispatch. Pause bumps the account generation; resumed/config-changed work is reevaluated. Refund only a proved unsubmitted reservation. Treat invalid windows/negative caps as configuration errors.
-- [ ] **Step 4: Rerun** the task file with clock-controlled concurrent approval/restart cases and no sleeps; expect all configured caps/gaps respected, including replies and operator-lane resource limits.
-- [ ] **Step 5: Commit** the task files with `feat(whatsapp): pace every physical send through an account governor`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_governor.py -v`; expect missing policy/reservation behavior.
+- [x] **Step 3: Implement** `zoneinfo` window calculation with overnight windows explicitly split across days; DST gaps advance to the next valid instant and folds cannot reset counters twice. Use timestamped physical attempts for rolling hourly buckets and timezone-local daily buckets. Sample jitter once per persisted eligibility slot; don't resample every poll. One in-flight request per account plus a monotonic floor prevents parallel bursts. A backward UTC jump holds until a conservative elapsed-time/account watermark permits dispatch. Pause bumps the account generation; resumed/config-changed work is reevaluated. Refund only a proved unsubmitted reservation. Treat invalid windows/negative caps as configuration errors.
+- [x] **Step 4: Rerun** the task file with clock-controlled concurrent approval/restart cases and no sleeps; expect all configured caps/gaps respected, including replies and operator-lane resource limits.
+- [x] **Step 5: Commit** the task files with `feat(whatsapp): pace every physical send through an account governor`.
 
 ### Task B4: Native control protocol and the bridge dispatch backstop
 

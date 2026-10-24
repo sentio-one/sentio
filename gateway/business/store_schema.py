@@ -89,6 +89,23 @@ CREATE TABLE IF NOT EXISTS business_attempts (
  error_code TEXT, claimed_at_ms INTEGER NOT NULL, schema_version INTEGER NOT NULL DEFAULT 1,
  PRIMARY KEY(attempt_id),
  UNIQUE(outbox_id, part_index, generation));
+CREATE TABLE IF NOT EXISTS business_governor_accounts (
+ transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ paused INTEGER NOT NULL DEFAULT 0, pause_reason TEXT,
+ high_watermark_ms INTEGER NOT NULL DEFAULT 0, schema_version INTEGER NOT NULL DEFAULT 1,
+ PRIMARY KEY(transport_profile, account_id));
+CREATE TABLE IF NOT EXISTS business_governor_reservations (
+ transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ attempt_id TEXT NOT NULL, message_class TEXT NOT NULL,
+ reserved_at_ms INTEGER NOT NULL, schema_version INTEGER NOT NULL DEFAULT 1,
+ PRIMARY KEY(transport_profile, account_id, attempt_id));
+CREATE TABLE IF NOT EXISTS business_governor_attempts (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, transport_profile TEXT NOT NULL,
+ account_id TEXT NOT NULL, message_class TEXT NOT NULL,
+ timestamp_ms INTEGER NOT NULL, success INTEGER NOT NULL DEFAULT 1,
+ schema_version INTEGER NOT NULL DEFAULT 1);
+CREATE INDEX IF NOT EXISTS idx_business_governor_attempts_ts
+ ON business_governor_attempts(transport_profile, account_id, timestamp_ms);
 """
 
 

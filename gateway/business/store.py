@@ -148,4 +148,25 @@ class BusinessStore:
         from gateway.business.store_outbox import invalidate_contact
         return invalidate_contact(self, scope, reason=reason, now_ms=now_ms)
 
+    def governor_eligibility(self, account, *, message_class, now_ms, config=None):
+        from gateway.business.store_governor import governor_eligibility
+        return governor_eligibility(self, account, message_class=message_class, now_ms=now_ms, config=config)
+
+    def governor_reserve_attempt(self, account, attempt_id, *, message_class, now_ms, config=None):
+        from gateway.business.store_governor import governor_reserve_attempt
+        return governor_reserve_attempt(self, account, attempt_id, message_class=message_class, now_ms=now_ms, config=config)
+
+    def governor_complete_attempt(self, account, attempt_id, *, submitted, finished_at_ms):
+        from gateway.business.store_governor import governor_complete_attempt
+        return governor_complete_attempt(self, account, attempt_id, submitted=submitted, finished_at_ms=finished_at_ms)
+
+    def governor_pause_account(self, principal, account, *, reason, now_ms):
+        from gateway.business.store_governor import governor_pause_account
+        return governor_pause_account(self, principal, account, reason=reason, now_ms=now_ms)
+
+    def governor_resume_account(self, principal, account, *, now_ms):
+        from gateway.business.store_governor import governor_resume_account
+        return governor_resume_account(self, principal, account, now_ms=now_ms)
+
+
 
