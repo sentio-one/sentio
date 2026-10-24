@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 import os
 import sys
+from types import SimpleNamespace
 from typing import NoReturn, Optional
 
 
@@ -198,6 +199,7 @@ def _profile_create(args):
     clone_from = getattr(args, "clone_from", None)
     clone_channels = getattr(args, "clone_channels", False)
     sync_imports = getattr(args, "sync_imports", False)
+    share_keys = getattr(args, "share_keys", False)
     clone_config = clone or clone_from is not None
     cloned = clone_config or clone_all
     source_label = clone_from or get_active_profile_name()
@@ -210,6 +212,9 @@ def _profile_create(args):
     except (ValueError, FileExistsError, FileNotFoundError) as e:
         _die(f"Error: {e}")
     print(f"\nProfile '{name}' created at {profile_dir}")
+    if share_keys:
+        from hermes_cli.profile_keys import profile_share_keys
+        profile_share_keys(SimpleNamespace(profile_name=name, off=False))
     if cloned:
         if clone_all:
             print(f"Full copy from {source_label} (excluding session history, cron jobs, backups, and snapshots).")
@@ -284,9 +289,11 @@ def _profile_create(args):
     if clone or clone_all:
         print(f"\n  Edit {profile_dir_display}/.env for different API keys")
         print(f"  Edit {profile_dir_display}/SOUL.md for different personality")
+    elif not share_keys:
+        print(f"\n  ⚠ This profile has no model keys yet. Use the company's:  hermes profile share-keys {name}")
+        print(f"    (or create with --share-keys), or give it its own:      {name} setup")
+        print(f"  Edit {profile_dir_display}/SOUL.md to customize personality")
     else:
-        print(f"\n  ⚠ This profile has no API keys yet. Run '{name} setup' first,")
-        print("    or it will inherit keys from your shell environment.")
         print(f"  Edit {profile_dir_display}/SOUL.md to customize personality")
     _print_access_policy_grant_notice(name)
     print()
@@ -417,6 +424,8 @@ def _profile_show(args):
     print(f"Gateway: {'running' if gw else 'stopped'}")
     print(f"Skills:  {_count_skills(profile_dir)}")
     print(f".env:    {'exists' if (profile_dir / '.env').exists() else 'not configured'}")
+    from hermes_cli.profile_keys import keys_line
+    print(keys_line(name))
     print(f"SOUL.md: {'exists' if (profile_dir / 'SOUL.md').exists() else 'not configured'}")
     if dist_name:
         print(f"Distribution: {dist_name}@{dist_version or '?'}")
@@ -633,6 +642,11 @@ def _profile_info(args):
     print()
 
 
+def _profile_share_keys(args):
+    from hermes_cli.profile_keys import profile_share_keys
+    profile_share_keys(args)
+
+
 # Order mirrors the original if/elif chain; None = bare ``hermes profile``.
 PROFILE_ACTIONS = {
     None: _profile_status,
@@ -643,6 +657,7 @@ PROFILE_ACTIONS = {
     'describe': _profile_describe,
     'trim-skills': _profile_trim_skills,
     'show': _profile_show,
+    'share-keys': _profile_share_keys,
     'alias': _profile_alias,
     'rename': _profile_rename,
     'purge-identity': _profile_purge_identity,

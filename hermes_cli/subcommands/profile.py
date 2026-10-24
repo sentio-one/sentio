@@ -38,6 +38,10 @@ def build_profile_parser(subparsers, *, cmd_profile: Callable) -> None:
              "the new profile stays registered against the same Claude Code / Codex trees "
              "(`hermes -p <name> import-agent --sync`). Never syncs config from the source profile.")
     profile_create.add_argument(
+        "--share-keys", action="store_true",
+        help="Let the new profile use the company's model keys (an admin choice kept in the launch home; "
+             "nothing is copied and the profile's own .env still wins). Without it the profile needs its own keys.")
+    profile_create.add_argument(
         "--no-alias", action="store_true", help="Skip wrapper script creation")
     profile_create.add_argument(
         "--no-skills", action="store_true",
@@ -76,6 +80,11 @@ def build_profile_parser(subparsers, *, cmd_profile: Callable) -> None:
     profile_describe.add_argument(
         "--all", dest="all_missing", action="store_true",
         help="With --auto, run on every profile missing a description")
+
+    profile_share = profile_subparsers.add_parser(
+        "share-keys", help="Let a profile use the company's model keys, or stop (admin choice)")
+    profile_share.add_argument("profile_name", help="Profile to change")
+    profile_share.add_argument("--off", action="store_true", help="Stop sharing; the profile then needs its own keys")
 
     profile_show = profile_subparsers.add_parser("show", help="Show profile details")
     profile_show.add_argument("profile_name", help="Profile to show")

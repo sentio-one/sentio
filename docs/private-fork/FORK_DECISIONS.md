@@ -233,6 +233,21 @@ Owner decisions after the sandbox merged (details in `SANDBOX_PLAN.md` section 4
   Dokploy host, so an operator admin can reach that company's data. Whether the operator's address stays on after handover is
   a per-customer agreement; removing it is a redeploy.
 
+### D15. A routed profile uses the company's model keys only if an admin chooses (decided and built 2026-10-24)
+Found on the first invited sign-in: a sandboxed profile's chat failed with "No usable credentials found for provider 'commandcode'".
+Profiles are islands, so a routed profile's secret scope is its own `.env` and nothing of the launch profile's, and the main
+agent cannot copy a company key because provider keys are not visible to its terminal. Copying keys into each profile was rejected
+(duplicate secrets, rotation drift). Instead:
+- An admin-side flag per profile, kept in the launch home (`profile_key_sharing.json`, written by `gateway/profile_key_sharing.py`),
+  never in the profile's own files. `agent.secret_scope.build_profile_secret_scope` adds the company's provider API keys (names the
+  config declares as category `provider`: `*_API_KEY` and `*_BASE_URL`, read from the launch process environment and launch `.env`)
+  to that profile's scope; the profile's own `.env` still wins. Bot tokens, tool secrets and OAuth logins are never shared.
+- `hermes profile create <name> --share-keys`, `hermes profile share-keys <name> [--off]`, and `hermes profile show` prints which
+  applies. The command records the choice only; it never reads or prints a key. The profile-provisioning skill makes the main agent
+  ask the admin "company keys or its own?" before creating a profile.
+- Trade-off to state to customers: shared keys mean shared spend (no per-person limit or attribution), and one rotation covers all.
+- Not built: the dashboard's Create profile dialog checkbox (O14).
+
 ### D16. A sandboxed company profile gets a business skill baseline, not every bundled skill (decided and built 2026-10-24)
 Found on the first invited profile: `sentio-sales` arrived with 54 bundled skills (claude-code, ascii-video, songwriting, p5js,
 architecture diagrams...) and, worst, `profile-provisioning`, the admin's how-to for creating profiles. Upstream seeds every
@@ -246,6 +261,7 @@ bundled skill into every profile, which suits a developer, not an employee of a 
 - `hermes profile trim-skills <name>` fixes profiles created earlier: it removes unmodified bundled skills outside the baseline and
   keeps anything the user edited or installed.
 - The default baseline is a starting guess for office work, not a decision about any customer's job: tune it per company.
+
 
 ## 2. Upstream files the fork modifies (merge conflict map)
 
@@ -393,6 +409,8 @@ Fork-only new files (no conflict possible, but they depend on upstream APIs): `g
 - **O13. Admin bootstrap without a `groups` claim: BUILT 2026-10-24** (`access.admin_emails`, `Session.verified_email`,
   `ADMIN_EMAILS` required and `ADMIN_GROUP` optional in compose; `tests/gateway/test_access_admin_emails.py`). Not yet exercised
   against real Google sign-in (with O5). Open: a way to hand over or remove the operator admin without a redeploy.
+- **O14. Dashboard "Create profile" with a "use the company's keys" choice** (D15): the REST create route and its dialog do not
+  carry the choice yet; today it is the CLI flag (and the main agent's question). Next to the allowlist/templates work (O12).
 ## 5. Go-live gate (all must be true before a customer is on a gateway)
 
 - [ ] Sandbox enforced (O1): implemented and verified in Docker (`scripts/fork/verify-dind-isolation.sh` in `Fork CI`); verify on a throwaway company on Dokploy with D12's list before ticking.
