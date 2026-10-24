@@ -40,7 +40,7 @@ PATHS = [
 class _GroupStub(StubAuthProvider):
     """Self-hosted-named stub whose session carries the ``groups`` of its token."""
 
-    name = "self_hosted"
+    name = "self-hosted"
 
     def verify_session(self, *, access_token):
         payload = _unsign(access_token)

@@ -180,7 +180,7 @@ Tests: `tests/gateway/test_access_policy.py` (25), `tests/plugins/dashboard_auth
 Deviations from section 3, with reasons:
 - **`users`/`admins` are lists of `{provider, issuer, sub}` rows**, not `host|sub` keys. The key is the
   full `(provider, issuer, sub)` triple (finding A7). `Session.user_id` is the `sub` claim, confirmed.
-- **New `group_providers` (default `self_hosted`).** Group grants count only for these providers, so
+- **New `group_providers` (default `self-hosted`).** Group grants count only for these providers, so
   another provider (e.g. `nous`) cannot mint a grant by emitting a matching group name.
 - **`org_id` folding of groups is kept** (existing test asserts it). Authorization reads
   `Session.groups` only. Only the `groups` claim is read; `roles` is not (different namespace).

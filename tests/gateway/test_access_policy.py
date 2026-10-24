@@ -14,12 +14,12 @@ ISSUER = "https://sso.corp.example"
 RAW = {
     "admin_groups": ["hermes-admins"],
     "profile_group_prefix": "hermes-profile-",
-    "users": [{"provider": "self_hosted", "issuer": ISSUER, "sub": "u-carol", "profiles": ["carol", "shared"]}],
-    "admins": [{"provider": "self_hosted", "issuer": ISSUER, "sub": "u-root"}],
+    "users": [{"provider": "self-hosted", "issuer": ISSUER, "sub": "u-carol", "profiles": ["carol", "shared"]}],
+    "admins": [{"provider": "self-hosted", "issuer": ISSUER, "sub": "u-root"}],
 }
 
 
-def _grant(policy, sub, groups=(), issuer=ISSUER, provider="self_hosted"):
+def _grant(policy, sub, groups=(), issuer=ISSUER, provider="self-hosted"):
     return policy.grant_for(provider=provider, issuer=issuer, sub=sub, groups=tuple(groups))
 
 
@@ -61,7 +61,7 @@ def test_same_sub_under_another_issuer_or_provider_is_a_different_subject():
 
 def test_two_tenants_behind_one_issuer_host_do_not_share_a_grant():
     entra = "https://login.example.net"
-    raw = {"admins": [{"provider": "self_hosted", "issuer": f"{entra}/tenant-a/v2.0", "sub": "same-sub"}]}
+    raw = {"admins": [{"provider": "self-hosted", "issuer": f"{entra}/tenant-a/v2.0", "sub": "same-sub"}]}
     policy = parse_access_policy(raw)
     assert _grant(policy, "same-sub", issuer=f"{entra}/tenant-a/v2.0").admin is True
     assert _grant(policy, "same-sub", issuer=f"{entra}/tenant-b/v2.0").admin is False
@@ -69,8 +69,8 @@ def test_two_tenants_behind_one_issuer_host_do_not_share_a_grant():
 
 def test_subject_key_is_the_one_the_session_authority_uses():
     policy = parse_access_policy(RAW)
-    identity = {"user_id": "u-root", "provider": "self_hosted", "issuer": ISSUER}
-    assert policy.subject_key("self_hosted", ISSUER, "u-root") == authenticated_subject(identity)
+    identity = {"user_id": "u-root", "provider": "self-hosted", "issuer": ISSUER}
+    assert policy.subject_key("self-hosted", ISSUER, "u-root") == authenticated_subject(identity)
 
 
 @pytest.mark.parametrize("bad", ["../etc", "a/b", "", "UPPER CASE", "x" * 200])
@@ -128,14 +128,14 @@ def test_group_grants_count_only_for_trusted_group_providers():
 
 def test_stored_invite_grants_merge_into_the_grant_and_never_make_an_admin():
     policy = parse_access_policy(RAW)
-    grant = policy.grant_for(provider="self_hosted", issuer=ISSUER, sub="u-eve", groups=("hermes-profile-alpha",),
+    grant = policy.grant_for(provider="self-hosted", issuer=ISSUER, sub="u-eve", groups=("hermes-profile-alpha",),
                              extra_profiles={"beta", "gamma"})
     assert grant.profiles == {"alpha", "beta", "gamma"} and grant.admin is False
 
 
 def test_stored_grants_are_validated_like_every_other_source():
     policy = parse_access_policy(RAW)
-    grant = policy.grant_for(provider="self_hosted", issuer=ISSUER, sub="u-eve", extra_profiles={"../x", "ok", "A B"})
+    grant = policy.grant_for(provider="self-hosted", issuer=ISSUER, sub="u-eve", extra_profiles={"../x", "ok", "A B"})
     assert grant.profiles == {"ok"}
 
 
@@ -146,4 +146,4 @@ def test_stored_grants_count_for_any_provider_because_the_subject_is_the_key():
 
 def test_stored_grants_do_nothing_without_a_configured_policy():
     policy = parse_access_policy(None)
-    assert policy.grant_for(provider="self_hosted", issuer=ISSUER, sub="u", extra_profiles={"beta"}).profiles == frozenset()
+    assert policy.grant_for(provider="self-hosted", issuer=ISSUER, sub="u", extra_profiles={"beta"}).profiles == frozenset()

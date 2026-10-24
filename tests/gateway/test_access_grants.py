@@ -10,10 +10,10 @@ import pytest
 
 from gateway.access_grants import GrantStore, InviteError
 
-ADMIN = 'auth:v1:["self_hosted","https://sso.corp.example","u-admin"]'
-ALICE = 'auth:v1:["self_hosted","https://sso.corp.example","u-alice"]'
-BOB = 'auth:v1:["self_hosted","https://sso.corp.example","u-bob"]'
-CAROL = 'auth:v1:["self_hosted","https://sso.corp.example","u-carol"]'
+ADMIN = 'auth:v1:["self-hosted","https://sso.corp.example","u-admin"]'
+ALICE = 'auth:v1:["self-hosted","https://sso.corp.example","u-alice"]'
+BOB = 'auth:v1:["self-hosted","https://sso.corp.example","u-bob"]'
+CAROL = 'auth:v1:["self-hosted","https://sso.corp.example","u-carol"]'
 
 
 class _Clock:
@@ -76,7 +76,7 @@ def test_a_team_link_admits_max_uses_distinct_people(store):
     for subject in (ALICE, BOB, CAROL):
         assert store.redeem(created.token, subject=subject) == "alpha"
     with pytest.raises(InviteError):
-        store.redeem(created.token, subject='auth:v1:["self_hosted","https://sso.corp.example","u-dave"]')
+        store.redeem(created.token, subject='auth:v1:["self-hosted","https://sso.corp.example","u-dave"]')
 
 
 def test_an_invite_expires(store, clock):

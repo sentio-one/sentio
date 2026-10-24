@@ -42,7 +42,7 @@ class SimpleDeployment:
         (self.home / "config.yaml").write_text(json.dumps(data), encoding="utf-8")  # JSON is valid YAML
 
 
-def _grant(policy, sub="u1", groups=(), provider="self_hosted"):
+def _grant(policy, sub="u1", groups=(), provider="self-hosted"):
     return policy.grant_for(provider=provider, issuer=ISSUER, sub=sub, groups=tuple(groups))
 
 
@@ -66,8 +66,8 @@ def test_the_profiles_own_config_cannot_add_admins_users_or_groups(deployment):
     """An agent or a granted user can edit the launch profile's config.yaml; the pinned policy must not move."""
     deployment.user_config({"access": {
         "admin_groups": ["evil-admins"], "profile_group_prefix": "",
-        "admins": [{"provider": "self_hosted", "issuer": ISSUER, "sub": "mallory"}],
-        "users": [{"provider": "self_hosted", "issuer": ISSUER, "sub": "mallory", "profiles": ["default"]}],
+        "admins": [{"provider": "self-hosted", "issuer": ISSUER, "sub": "mallory"}],
+        "users": [{"provider": "self-hosted", "issuer": ISSUER, "sub": "mallory", "profiles": ["default"]}],
         "group_providers": ["nous"]}})
     policy = load_gateway_config().access
     assert _grant(policy, sub="mallory").admin is False

@@ -29,7 +29,7 @@ def _ws(identity, *, policy=POLICY, auth_required=True, **query):
 
 
 def _alice(*groups):
-    return {"user_id": "u1", "provider": "self_hosted", "issuer": ISSUER, "groups": list(groups)}
+    return {"user_id": "u1", "provider": "self-hosted", "issuer": ISSUER, "groups": list(groups)}
 
 
 def test_a_granted_profile_is_permitted_and_others_are_not():
@@ -94,14 +94,14 @@ def test_console_and_pty_sockets_refuse_an_ungranted_profile_before_accepting(tm
     try:
         client = TestClient(web_server.app, base_url="https://fly-app.fly.dev")
         for route in ("console", "pty"):
-            ticket = mint_ticket(user_id="u1", provider="self_hosted", issuer=ISSUER,
+            ticket = mint_ticket(user_id="u1", provider="self-hosted", issuer=ISSUER,
                                  extra={"groups": ["hermes-profile-alpha"]})
             with pytest.raises(WebSocketDisconnect) as refused:
                 with client.websocket_connect(f"/api/{route}?ticket={ticket}&profile=beta", headers=HOST):
                     pass
             # The reason proves it was THIS gate, not the host/origin check that shares the close code.
             assert (refused.value.code, refused.value.reason) == (4403, "profile not granted"), route
-        granted = mint_ticket(user_id="u1", provider="self_hosted", issuer=ISSUER,
+        granted = mint_ticket(user_id="u1", provider="self-hosted", issuer=ISSUER,
                               extra={"groups": ["hermes-profile-alpha"]})
         with client.websocket_connect(f"/api/console?ticket={granted}&profile=alpha", headers=HOST) as ok:
             assert ok.receive_json()["type"] in {"ready", "error"}  # accepted, not refused at upgrade

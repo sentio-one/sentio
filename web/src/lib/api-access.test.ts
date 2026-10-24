@@ -78,10 +78,10 @@ describe("createErrorMessage", () => {
 
 describe("describeSubject", () => {
   it("splits the namespaced subject into the person, their issuer and provider", () => {
-    expect(describeSubject('auth:v1:["self_hosted","https://sso.acme.example/realms/x","u-alice"]')).toEqual({
+    expect(describeSubject('auth:v1:["self-hosted","https://sso.acme.example/realms/x","u-alice"]')).toEqual({
       sub: "u-alice",
       issuerHost: "sso.acme.example",
-      provider: "self_hosted",
+      provider: "self-hosted",
     });
   });
 

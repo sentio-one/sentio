@@ -15,7 +15,7 @@ POLICY = parse_access_policy({"admin_groups": ["hermes-admins"]})
 OPEN = parse_access_policy(None)
 
 
-def _identity(groups=(), provider="self_hosted", **extra):
+def _identity(groups=(), provider="self-hosted", **extra):
     base = {"user_id": "u1", "provider": provider, "issuer": ISSUER}
     if groups:
         base["groups"] = list(groups)
@@ -64,7 +64,7 @@ def test_groups_travel_through_a_ws_ticket_into_the_stamped_identity():
     from hermes_cli import web_server_chat as chat
     from tests.hermes_cli.test_dashboard_auth_ws_auth import _fake_ws
 
-    ticket = mint_ticket(user_id="u1", provider="self_hosted", issuer=ISSUER,
+    ticket = mint_ticket(user_id="u1", provider="self-hosted", issuer=ISSUER,
                          extra={"groups": ["hermes-profile-alice"]})
     ws = _fake_ws(query={"ticket": ticket}, path="/api/ws")
     from hermes_cli import web_server
@@ -74,7 +74,7 @@ def test_groups_travel_through_a_ws_ticket_into_the_stamped_identity():
     finally:
         web_server.app.state.auth_required = False
     assert ws._hermes_auth_identity == {
-        "user_id": "u1", "provider": "self_hosted", "issuer": ISSUER, "groups": ["hermes-profile-alice"]}
+        "user_id": "u1", "provider": "self-hosted", "issuer": ISSUER, "groups": ["hermes-profile-alice"]}
 
 
 @pytest.mark.parametrize("groups", [[], None])

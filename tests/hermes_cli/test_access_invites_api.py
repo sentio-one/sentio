@@ -29,7 +29,7 @@ ADMIN, ALICE, BOB = ["hermes-admins"], [], []
 
 
 class _Stub(StubAuthProvider):
-    name = "self_hosted"
+    name = "self-hosted"
 
     def verify_session(self, *, access_token):
         payload = _unsign(access_token)
@@ -126,7 +126,7 @@ def test_the_websocket_scope_picks_up_the_redeemed_grant(world):
 
     token = _token(_create(world))
     _call(world, ALICE, "POST", "/api/access/invites/redeem", sub="u-alice", json={"token": token})
-    identity = {"user_id": "u-alice", "provider": "self_hosted", "issuer": ISSUER}
+    identity = {"user_id": "u-alice", "provider": "self-hosted", "issuer": ISSUER}
     scoped, operator = scope_for_identity(identity, POLICY)
     assert scoped["allowed_profiles"] == ["alpha"] and operator is False
     other, _ = scope_for_identity({**identity, "user_id": "u-bob"}, POLICY)

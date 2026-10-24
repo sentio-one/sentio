@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from gateway.access_policy import parse_access_policy
+from gateway.access_policy import DEFAULT_GROUP_PROVIDERS, parse_access_policy
 from gateway.config import load_gateway_config
 from hermes_cli.dashboard_auth.access import grant_for_identity, scope_for_identity
 from plugins.dashboard_auth._shared import session_from_claims
@@ -19,7 +19,7 @@ POLICY = parse_access_policy({"admin_emails": ["Owner@Sentio.example", "second@s
 MANAGED_FILE = Path(__file__).resolve().parents[2] / "deploy" / "dokploy" / "managed" / "config.yaml"
 
 
-def _grant(email, provider="self_hosted", policy=POLICY):
+def _grant(email, provider="self-hosted", policy=POLICY):
     return policy.grant_for(provider=provider, issuer=ISSUER, sub="1234", verified_email=email)
 
 
@@ -48,7 +48,7 @@ def test_an_unconfigured_policy_grants_nothing_to_a_listed_email():
 
 def test_the_session_carries_the_email_only_when_the_idp_verified_it():
     def session(**claims):
-        return session_from_claims("self_hosted", {"sub": "u", "exp": 10, **claims}, access_token="t", refresh_token="r",
+        return session_from_claims("self-hosted", {"sub": "u", "exp": 10, **claims}, access_token="t", refresh_token="r",
                                    email=claims.get("email", ""))
 
     assert session(email="Owner@Sentio.example", email_verified=True).verified_email == "owner@sentio.example"
@@ -58,9 +58,9 @@ def test_the_session_carries_the_email_only_when_the_idp_verified_it():
 
 
 def test_the_grant_follows_the_verified_email_on_every_path_a_request_can_take():
-    kwargs = dict(provider="self_hosted", issuer=ISSUER, sub="1234")
+    kwargs = dict(provider="self-hosted", issuer=ISSUER, sub="1234")
     assert grant_for_identity(POLICY, verified_email="owner@sentio.example", **kwargs).admin is True
-    identity = {"user_id": "1234", "provider": "self_hosted", "issuer": ISSUER, "verified_email": "owner@sentio.example"}
+    identity = {"user_id": "1234", "provider": "self-hosted", "issuer": ISSUER, "verified_email": "owner@sentio.example"}
     scoped, operator = scope_for_identity(identity, POLICY)
     assert operator is True and scoped["profile_scope"] == "host"
     assert scope_for_identity({**identity, "verified_email": ""}, POLICY)[1] is False
@@ -81,6 +81,15 @@ def deployment(tmp_path, monkeypatch):
     managed_scope.invalidate_managed_cache()
     yield home
     managed_scope.invalidate_managed_cache()
+
+
+def test_the_trusted_provider_is_the_name_the_real_login_plugin_reports(deployment):
+    """A login's session carries the plugin's own ``name``; a trusted-provider list spelled differently never matches it, so no
+    admin (by group or by email) could ever sign in. Found on the first real deploy."""
+    from plugins.dashboard_auth.self_hosted import SelfHostedOIDCProvider
+
+    assert DEFAULT_GROUP_PROVIDERS == {SelfHostedOIDCProvider.name}
+    assert load_gateway_config().access.group_providers == {SelfHostedOIDCProvider.name}
 
 
 def test_the_deployment_names_its_admins_by_email_with_no_admin_group(deployment):

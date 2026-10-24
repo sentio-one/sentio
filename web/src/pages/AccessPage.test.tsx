@@ -25,7 +25,7 @@ import AccessPage from "./AccessPage";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const SUB_ALICE = 'auth:v1:["self_hosted","https://sso.acme.example","u-alice"]';
+const SUB_ALICE = 'auth:v1:["self-hosted","https://sso.acme.example","u-alice"]';
 const NOW = Math.floor(Date.now() / 1000);
 
 const invite = (over: Record<string, unknown> = {}) => ({
