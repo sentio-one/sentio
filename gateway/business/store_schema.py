@@ -129,6 +129,22 @@ CREATE TABLE IF NOT EXISTS business_digests (
  transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
  contact_id TEXT NOT NULL, revision_ids TEXT NOT NULL,
  created_at_ms INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS business_lessons (
+ lesson_id TEXT PRIMARY KEY, runtime_profile TEXT NOT NULL,
+ transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ policy_id TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1,
+ text TEXT NOT NULL, evidence_revision_ids TEXT NOT NULL,
+ state TEXT NOT NULL, revoke_reason TEXT,
+ created_at_ms INTEGER NOT NULL, updated_at_ms INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS business_reviews (
+ review_id TEXT PRIMARY KEY, runtime_profile TEXT NOT NULL,
+ transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ contact_id TEXT NOT NULL, revision_id TEXT NOT NULL,
+ policy_version TEXT NOT NULL, model_version TEXT NOT NULL,
+ message_class TEXT NOT NULL, outcome TEXT NOT NULL,
+ agreed INTEGER NOT NULL DEFAULT 1, false_approval INTEGER NOT NULL DEFAULT 0,
+ unavailable INTEGER NOT NULL DEFAULT 0, unpaired INTEGER NOT NULL DEFAULT 0,
+ reviewed_at_ms INTEGER NOT NULL);
 """
 
 

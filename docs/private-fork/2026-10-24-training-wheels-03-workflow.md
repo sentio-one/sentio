@@ -97,7 +97,7 @@ async `propose_lessons(principal: Principal, scope: Scope, *, policy_id: str) ->
 Metrics keys are `reviewed`, `unavailable`, `coverage`, `agreement`, `false_approvals`,
 `unpaired`; no automatically actionable `ready_for_auto_send` field is returned.
 
-- [ ] **Step 1: Write** `test_only_confirmed_lessons_apply`, `test_metrics_join_same_revision_and_version`, `test_historical_policy_conflict_and_association_are_not_training_truth`:
+- [x] **Step 1: Write** `test_only_confirmed_lessons_apply`, `test_metrics_join_same_revision_and_version`, `test_historical_policy_conflict_and_association_are_not_training_truth`:
 
 ```python
 assert proposed_lesson not in active_lessons
@@ -110,10 +110,10 @@ assert inferred_later_send not in eligible_training_pairs
 assert account_mode == "supervised"
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_learning.py -v`; expect absent lesson/metrics behavior.
-- [ ] **Step 3: Implement** `business_lessons`/proposal/evidence records and revision-aligned metric queries. Use `business_lessons` auxiliary routing with 60-second/2,048-token limits and evidence references; no more than five proposed rules per request. An edit/reject without rationale or policy compatibility remains weak/conflicted evidence. Only confirmed active rules enter a newly built context snapshot; preserve prior snapshots/system prompts. Partition reviewer metrics by the revision actually reviewed and the current policy/model version; show unavailable reason/coverage rather than comparing unrelated aggregate counts. Version changes do not inherit readiness. Lesson confirmation/revocation is profile-authorized and invalidates dependent unsent approval plans through their lesson/policy binding.
-- [ ] **Step 4: Rerun** the task file; include two profiles, stale human review, revoked lesson and a previously approved historical price exception. Expect no cross-profile lesson leakage or policy overwrite.
-- [ ] **Step 5: Commit** named learning/context/schema/CLI files with `feat(gateway): learn only from confirmed versioned message reviews`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_learning.py -v`; expect absent lesson/metrics behavior.
+- [x] **Step 3: Implement** `business_lessons`/proposal/evidence records and revision-aligned metric queries. Use `business_lessons` auxiliary routing with 60-second/2,048-token limits and evidence references; no more than five proposed rules per request. An edit/reject without rationale or policy compatibility remains weak/conflicted evidence. Only confirmed active rules enter a newly built context snapshot; preserve prior snapshots/system prompts. Partition reviewer metrics by the revision actually reviewed and the current policy/model version; show unavailable reason/coverage rather than comparing unrelated aggregate counts. Version changes do not inherit readiness. Lesson confirmation/revocation is profile-authorized and invalidates dependent unsent approval plans through their lesson/policy binding.
+- [x] **Step 4: Rerun** the task file; include two profiles, stale human review, revoked lesson and a previously approved historical price exception. Expect no cross-profile lesson leakage or policy overwrite.
+- [x] **Step 5: Commit** named learning/context/schema/CLI files with `feat(gateway): learn only from confirmed versioned message reviews`.
 
 ### Task C3: Explicit protected credential delivery
 

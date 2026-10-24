@@ -176,5 +176,19 @@ class BusinessStore:
         from gateway.business.store_outbox import get_attempt_context
         return get_attempt_context(self, attempt_id)
 
+    def record_review_event(self, scope, **kwargs):
+        from gateway.business.store_learning import record_review_event
+        return record_review_event(self, scope, **kwargs)
+
+    def list_confirmed_lessons(self, scope, policy_id):
+        from gateway.business.store_learning import list_confirmed_lessons
+        return list_confirmed_lessons(self, scope, policy_id)
+
+    def confirmed_lesson_texts(self, scope, policy_id):
+        from gateway.business.store_learning import list_confirmed_lessons
+        rows = list_confirmed_lessons(self, scope, policy_id)
+        return tuple(r["text"] for r in rows)
+
+
 
 
