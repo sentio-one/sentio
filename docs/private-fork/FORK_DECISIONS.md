@@ -233,6 +233,20 @@ Owner decisions after the sandbox merged (details in `SANDBOX_PLAN.md` section 4
   Dokploy host, so an operator admin can reach that company's data. Whether the operator's address stays on after handover is
   a per-customer agreement; removing it is a redeploy.
 
+### D16. A sandboxed company profile gets a business skill baseline, not every bundled skill (decided and built 2026-10-24)
+Found on the first invited profile: `sentio-sales` arrived with 54 bundled skills (claude-code, ascii-video, songwriting, p5js,
+architecture diagrams...) and, worst, `profile-provisioning`, the admin's how-to for creating profiles. Upstream seeds every
+bundled skill into every profile, which suits a developer, not an employee of a customer.
+- `tools/skills_sync_company.py` decides, and `tools/skills_sync.sync_skills` obeys it: for a non-launch profile under an `access:`
+  policy it seeds the essentials (`hermes-agent`) plus `DEFAULT_COMPANY_BASELINE` (docx, pdf, xlsx, powerpoint,
+  document-to-action-items, meeting-action-items, weekly-review-planning, grounded-citations, competitor-news-monitor). The launch
+  profile keeps the full set. `profile-provisioning` is never seeded into a sandboxed profile, whatever the baseline says.
+- The baseline is configurable per deployment with `skills.company_baseline` in the managed config; profile templates (O12)
+  will name it per kind of work. Later `hermes update` syncs respect it, so the rest do not come back.
+- `hermes profile trim-skills <name>` fixes profiles created earlier: it removes unmodified bundled skills outside the baseline and
+  keeps anything the user edited or installed.
+- The default baseline is a starting guess for office work, not a decision about any customer's job: tune it per company.
+
 ## 2. Upstream files the fork modifies (merge conflict map)
 
 Highest risk first. "Keep" is what must survive a conflict resolution.

@@ -390,6 +390,11 @@ def _profile_describe(args):
     sys.exit(0 if (ok_count > 0 if all_flag else ok_count == 1) else 1)
 
 
+def _profile_trim_skills(args):
+    from hermes_cli.profile_skills import profile_trim_skills
+    profile_trim_skills(args)
+
+
 def _profile_show(args):
     name = args.profile_name
     from hermes_cli.profiles import (
@@ -636,6 +641,7 @@ PROFILE_ACTIONS = {
     'create': _profile_create,
     'delete': _profile_delete,
     'describe': _profile_describe,
+    'trim-skills': _profile_trim_skills,
     'show': _profile_show,
     'alias': _profile_alias,
     'rename': _profile_rename,
