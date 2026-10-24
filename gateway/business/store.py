@@ -128,3 +128,24 @@ class BusinessStore:
         from gateway.business.store_drafts import get_plan_by_revision
         return get_plan_by_revision(self, scope, revision_id)
 
+    def submit_revision(self, scope, revision_id, *, request_id, now_ms):
+        from gateway.business.store_outbox import submit_revision
+        return submit_revision(self, scope, revision_id, request_id=request_id, now_ms=now_ms)
+
+    def approve_revision(self, principal, scope, *, revision_id, plan_digest, now_ms, override_reason=None):
+        from gateway.business.store_outbox import approve_revision
+        return approve_revision(self, principal, scope, revision_id=revision_id, plan_digest=plan_digest, now_ms=now_ms, override_reason=override_reason)
+
+    def reject_revision(self, principal, scope, *, revision_id, reason, now_ms):
+        from gateway.business.store_outbox import reject_revision
+        return reject_revision(self, principal, scope, revision_id=revision_id, reason=reason, now_ms=now_ms)
+
+    def claim_part(self, account, *, now_ms):
+        from gateway.business.store_outbox import claim_part
+        return claim_part(self, account, now_ms=now_ms)
+
+    def invalidate_contact(self, scope, *, reason, now_ms):
+        from gateway.business.store_outbox import invalidate_contact
+        return invalidate_contact(self, scope, reason=reason, now_ms=now_ms)
+
+

@@ -25,6 +25,14 @@ def business_config():
     return {}
 
 
+@pytest.fixture
+def business_account():
+    """Return a default WhatsApp account key."""
+    from gateway.business.models import AccountKey
+    return AccountKey(transport_profile="whatsapp", account_id="account-1")
+
+
+
 class BusinessGatewayHarness:
     """Harness exposing receive(event), finish(result), restart(), and inspection points."""
 

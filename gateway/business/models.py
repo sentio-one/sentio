@@ -39,6 +39,13 @@ class Scope:
 
 
 @dataclass(frozen=True)
+class AccountKey:
+    transport_profile: str
+    account_id: str
+
+
+
+@dataclass(frozen=True)
 class Principal:
     subject: str
     runtime_profile: str

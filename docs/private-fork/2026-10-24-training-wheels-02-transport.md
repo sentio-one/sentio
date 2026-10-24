@@ -99,7 +99,7 @@ with pytest.raises(BusinessProtocolError):
 Approval is idempotent for the same actor/revision/digest. A new approval after expiry
 has a new audit identity. Claimed dispatch rechecks the current context/policy/ownership.
 
-- [ ] **Step 1: Write** `test_held_receipt_is_not_send_success`, `test_approval_is_exact_and_idempotent`, and `test_late_results_and_suppression_cannot_resurrect_approval`:
+- [x] **Step 1: Write** `test_held_receipt_is_not_send_success`, `test_approval_is_exact_and_idempotent`, and `test_late_results_and_suppression_cannot_resurrect_approval`:
 
 ```python
 assert submitted.state == "held"
@@ -113,10 +113,10 @@ with pytest.raises(BusinessConflict):
     approve_old_digest()
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_approvals_outbox.py -v`; expect absent outbox/approval behavior.
-- [ ] **Step 3: Implement** versioned `business_plans`, `business_approvals`, `business_outbox`, `business_attempts` tables with unique submission key and one active account claim. Required checks must pass; an advisory reject/unavailable review needs explicit nonempty human override reason. Store failure blocks submission/approval. Default approval/queue expiry comes from A1; expiry creates a visible attention event, never an answered episode. A changed revision, account, context, policy, lesson version, attachment, or suppression invalidates approval and unused authorizations. Rejected/expired/superseded drafts do not settle an owed episode.
-- [ ] **Step 4: Rerun** the task file; use concurrent real SQLite transactions to prove only one claim succeeds. Verify an invalidated late review/compose result remains superseded after reopen.
-- [ ] **Step 5: Commit** the task files with `feat(gateway): authorize exact draft revisions in a durable outbox`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_approvals_outbox.py -v`; expect absent outbox/approval behavior.
+- [x] **Step 3: Implement** versioned `business_plans`, `business_approvals`, `business_outbox`, `business_attempts` tables with unique submission key and one active account claim. Required checks must pass; an advisory reject/unavailable review needs explicit nonempty human override reason. Store failure blocks submission/approval. Default approval/queue expiry comes from A1; expiry creates a visible attention event, never an answered episode. A changed revision, account, context, policy, lesson version, attachment, or suppression invalidates approval and unused authorizations. Rejected/expired/superseded drafts do not settle an owed episode.
+- [x] **Step 4: Rerun** the task file; use concurrent real SQLite transactions to prove only one claim succeeds. Verify an invalidated late review/compose result remains superseded after reopen.
+- [x] **Step 5: Commit** the task files with `feat(gateway): authorize exact draft revisions in a durable outbox`.
 
 ### Task B3: Transactional account pacing and sending windows
 

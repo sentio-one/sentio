@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from typing import Any, Callable
 
@@ -10,7 +11,9 @@ from gateway.business.config import BusinessConfig, load_business_config
 from gateway.business.context import build_context
 from gateway.business.decision import decision_from_result
 from gateway.business.models import (
+    AccountKey,
     EpisodeRef,
+    Principal,
     Receipt,
     Scope,
     WorkDecision,
@@ -119,3 +122,46 @@ class BusinessService:
             main_runtime=main_runtime,
         )
         return receipt
+
+    async def submit_revision(self, scope: Scope, revision_id: str, *, request_id: str, now_ms: int | None = None) -> Receipt:
+        from gateway.business.outbox import submit_revision
+        timestamp = now_ms if now_ms is not None else int(time.time() * 1000)
+        return await submit_revision(self.store, scope, revision_id, request_id=request_id, now_ms=timestamp)
+
+    async def approve_revision(
+        self,
+        principal: Principal,
+        scope: Scope,
+        *,
+        revision_id: str,
+        plan_digest: str,
+        now_ms: int | None = None,
+        override_reason: str | None = None,
+    ):
+        from gateway.business.approvals import approve_revision
+        timestamp = now_ms if now_ms is not None else int(time.time() * 1000)
+        return await approve_revision(self.store, principal, scope, revision_id=revision_id, plan_digest=plan_digest, now_ms=timestamp, override_reason=override_reason)
+
+    async def reject_revision(
+        self,
+        principal: Principal,
+        scope: Scope,
+        *,
+        revision_id: str,
+        reason: str,
+        now_ms: int | None = None,
+    ) -> Receipt:
+        from gateway.business.outbox import reject_revision
+        timestamp = now_ms if now_ms is not None else int(time.time() * 1000)
+        return await reject_revision(self.store, principal, scope, revision_id=revision_id, reason=reason, now_ms=timestamp)
+
+    async def claim_part(self, account: AccountKey, *, now_ms: int | None = None):
+        from gateway.business.outbox import claim_part
+        timestamp = now_ms if now_ms is not None else int(time.time() * 1000)
+        return await claim_part(self.store, account, now_ms=timestamp)
+
+    async def invalidate_contact(self, scope: Scope, *, reason: str, now_ms: int | None = None) -> int:
+        from gateway.business.outbox import invalidate_contact
+        timestamp = now_ms if now_ms is not None else int(time.time() * 1000)
+        return await invalidate_contact(self.store, scope, reason=reason, now_ms=timestamp)
+

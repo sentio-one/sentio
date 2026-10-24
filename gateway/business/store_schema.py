@@ -66,6 +66,29 @@ CREATE TABLE IF NOT EXISTS business_plans (
  schema_version INTEGER NOT NULL DEFAULT 1,
  PRIMARY KEY(runtime_profile, transport_profile, account_id, contact_id, plan_id),
  UNIQUE(runtime_profile, transport_profile, account_id, contact_id, revision_id));
+CREATE TABLE IF NOT EXISTS business_approvals (
+ runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ contact_id TEXT NOT NULL, approval_id TEXT NOT NULL, plan_id TEXT NOT NULL,
+ revision_id TEXT NOT NULL, actor TEXT NOT NULL, plan_digest TEXT NOT NULL,
+ approved_at_ms INTEGER NOT NULL, expires_at_ms INTEGER NOT NULL, override_reason TEXT,
+ payload TEXT NOT NULL, schema_version INTEGER NOT NULL DEFAULT 1,
+ PRIMARY KEY(runtime_profile, transport_profile, account_id, contact_id, approval_id),
+ UNIQUE(runtime_profile, transport_profile, account_id, contact_id, revision_id, actor, plan_digest));
+CREATE TABLE IF NOT EXISTS business_outbox (
+ runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ contact_id TEXT NOT NULL, outbox_id TEXT NOT NULL, revision_id TEXT NOT NULL,
+ plan_id TEXT NOT NULL, approval_id TEXT, request_id TEXT NOT NULL,
+ state TEXT NOT NULL DEFAULT 'held', created_at_ms INTEGER NOT NULL,
+ expires_at_ms INTEGER NOT NULL, reason TEXT, schema_version INTEGER NOT NULL DEFAULT 1,
+ PRIMARY KEY(runtime_profile, transport_profile, account_id, contact_id, outbox_id),
+ UNIQUE(runtime_profile, transport_profile, account_id, contact_id, request_id));
+CREATE TABLE IF NOT EXISTS business_attempts (
+ attempt_id TEXT NOT NULL, outbox_id TEXT NOT NULL, transport_profile TEXT NOT NULL,
+ account_id TEXT NOT NULL, part_index INTEGER NOT NULL, generation INTEGER NOT NULL DEFAULT 1,
+ state TEXT NOT NULL DEFAULT 'claimed', platform_ids TEXT NOT NULL DEFAULT '[]',
+ error_code TEXT, claimed_at_ms INTEGER NOT NULL, schema_version INTEGER NOT NULL DEFAULT 1,
+ PRIMARY KEY(attempt_id),
+ UNIQUE(outbox_id, part_index, generation));
 """
 
 
