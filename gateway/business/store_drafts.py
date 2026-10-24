@@ -211,6 +211,12 @@ def attach_review(store, scope, revision_id, *, verdict, expected_context_versio
         return new_rev
 
 
+class RevisionState(str):
+    @property
+    def state(self) -> str:
+        return str(self)
+
+
 def revision_status(store, scope, revision_id):
     conn = store._connect()
     with transaction(conn) as db:
@@ -218,7 +224,7 @@ def revision_status(store, scope, revision_id):
                          (*_scope_values(scope), revision_id)).fetchone()
     if not row:
         raise BusinessDenied()
-    return row[0]
+    return RevisionState(row[0])
 
 
 def put_task(store, scope, *, dedupe_key, reason, refs):

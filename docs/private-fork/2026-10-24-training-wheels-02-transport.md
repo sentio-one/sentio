@@ -230,7 +230,7 @@ async `reconcile_account(service: BusinessService, account: AccountKey, *, journ
 Node `normalizeDeliveryUpdates(updates, {account, statusEnum}) -> object[]`; import
 the exact receipt status enum from the installed/pinned Baileys package during implementation.
 
-- [ ] **Step 1: Write** `test_ack_before_send_result_and_duplicate_acks`, `test_partial_delivery_aggregate`, `test_crash_at_each_dispatch_boundary`, `test_legacy_sweep_cannot_resend_business_item`:
+- [x] **Step 1: Write** `test_ack_before_send_result_and_duplicate_acks`, `test_partial_delivery_aggregate`, `test_crash_at_each_dispatch_boundary`, `test_legacy_sweep_cannot_resend_business_item`:
 
 ```python
 assert accepted.state == "accepted"
@@ -243,10 +243,10 @@ assert customer_recovered_prefixes == []
 assert legacy_sweep_business_socket_calls == []
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_delivery_recovery.py -v` and `node --test scripts/whatsapp-bridge/business_receipts.test.mjs`; expect missing status/recovery contracts.
-- [ ] **Step 3: Implement** idempotent receipt storage with account/message-id joins, retaining early orphan receipts and not regressing delivered on stale updates. Forward ordinary acks without breaking existing poll updates. Reconcile fsynced bridge attempt entries with outbox attempts: consumed/in-flight without terminal evidence is unknown; proved unsubmitted may retry under B3. Late authoritative receipts resolve unknowns; absent receipt never proves failure. Preserve per-part outcomes and create deduplicated permanent/abandoned/unknown human tasks. Business ids bypass legacy best-effort recovery and its visible prefixes; do not rewrite legacy states or behavior globally.
-- [ ] **Step 4: Rerun** both commands and the existing delivery-ledger tests selected by `scripts/run_tests.sh tests/gateway/test_delivery_ledger.py tests/gateway/test_delivery_ledger_process_home.py tests/gateway/test_delivery_ledger_producer.py -v`; expect green. Inject process death before/after journal fsync, consume commit, socket call, socket response, and outbox completion using events/subprocesses, not timing sleeps.
-- [ ] **Step 5: Commit** the named receipt/recovery files with `feat(whatsapp): reconcile delivery evidence without blind business retries`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_delivery_recovery.py -v` and `node --test scripts/whatsapp-bridge/business_receipts.test.mjs`; expect missing status/recovery contracts.
+- [x] **Step 3: Implement** idempotent receipt storage with account/message-id joins, retaining early orphan receipts and not regressing delivered on stale updates. Forward ordinary acks without breaking existing poll updates. Reconcile fsynced bridge attempt entries with outbox attempts: consumed/in-flight without terminal evidence is unknown; proved unsubmitted may retry under B3. Late authoritative receipts resolve unknowns; absent receipt never proves failure. Preserve per-part outcomes and create deduplicated permanent/abandoned/unknown human tasks. Business ids bypass legacy best-effort recovery and its visible prefixes; do not rewrite legacy states or behavior globally.
+- [x] **Step 4: Rerun** both commands and the existing delivery-ledger tests selected by `scripts/run_tests.sh tests/gateway/test_delivery_ledger.py tests/gateway/test_delivery_ledger_process_home.py tests/gateway/test_delivery_ledger_producer.py -v`; expect green. Inject process death before/after journal fsync, consume commit, socket call, socket response, and outbox completion using events/subprocesses, not timing sleeps.
+- [x] **Step 5: Commit** the named receipt/recovery files with `feat(whatsapp): reconcile delivery evidence without blind business retries`.
 
 ### Task B7: Persistent supervision, readiness, and complete path verification
 

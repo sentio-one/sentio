@@ -109,6 +109,12 @@ CREATE INDEX IF NOT EXISTS idx_business_governor_attempts_ts
 CREATE TABLE IF NOT EXISTS business_consumed_authorizations (
  token_hash TEXT PRIMARY KEY, attempt_id TEXT NOT NULL,
  consumed_at_ms INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS business_delivery_receipts (
+ transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ message_id TEXT NOT NULL, status INTEGER NOT NULL,
+ status_name TEXT NOT NULL, state TEXT NOT NULL,
+ timestamp_ms INTEGER NOT NULL, schema_version INTEGER NOT NULL DEFAULT 1,
+ PRIMARY KEY(transport_profile, account_id, message_id));
 """
 
 

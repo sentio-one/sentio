@@ -227,6 +227,12 @@ def contact_identifiers(store, scope):
     return tuple(row[0] for row in rows)
 
 
+class EpisodeState(str):
+    @property
+    def state(self) -> str:
+        return str(self)
+
+
 def episode_status(store, scope, episode_id):
     conn = store._connect()
     with transaction(conn) as db:
@@ -234,7 +240,7 @@ def episode_status(store, scope, episode_id):
                          (*_scope_values(scope), episode_id)).fetchone()
     if not row:
         raise BusinessDenied()
-    return row[0]
+    return EpisodeState(row[0])
 
 
 def audit_events(store, scope):

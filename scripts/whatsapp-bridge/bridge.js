@@ -19,7 +19,7 @@
  *   node bridge.js --port 3000 --session ~/.hermes/whatsapp/session
  */
 
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, getAggregateVotesInPollMessage, decryptPollVote, getKeyAuthor, jidNormalizedUser } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, getAggregateVotesInPollMessage, decryptPollVote, getKeyAuthor, jidNormalizedUser, WAMessageStatus } from '@whiskeysockets/baileys';
 import express from 'express';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
@@ -33,6 +33,7 @@ import qrcode from 'qrcode-terminal';
 import { matchesAllowedSender, matchesAllowedUser, matchesInboundWhatsAppGroup, parseAllowedUsers } from './allowlist.js';
 import { createOutboundIdTracker } from './outbound_ids.js';
 import { classifyOwnerMessageGate } from './owner_message_gate.js';
+import { normalizeDeliveryUpdates } from './business_receipts.js';
 import { renderBusinessPlan } from './business_render.js';
 import {
   addMentions,
@@ -471,6 +472,29 @@ async function startSocket() {
   });
 
   sock.ev.on('messages.update', async (updates) => {
+    try {
+      const receipts = normalizeDeliveryUpdates(updates, {
+        account: {
+          transport_profile: 'whatsapp',
+          account_id: (sock.user?.id || 'default').split(':')[0].split('@')[0],
+        },
+        statusEnum: WAMessageStatus,
+      });
+      for (const rec of receipts) {
+        messageQueue.push({
+          messageId: rec.messageId,
+          chatId: rec.remoteJid,
+          senderId: rec.remoteJid,
+          hasMedia: false,
+          mediaType: 'delivery_receipt',
+          deliveryReceipt: rec,
+          timestamp: Math.floor(Date.now() / 1000),
+        });
+      }
+    } catch (err) {
+      console.warn('[bridge] failed to normalize delivery updates:', err.message);
+    }
+
     for (const { key, update } of updates || []) {
       if (!update?.pollUpdates) continue;
       const pollCreationId = key?.id || update.pollUpdates?.[0]?.pollCreationMessageKey?.id;
