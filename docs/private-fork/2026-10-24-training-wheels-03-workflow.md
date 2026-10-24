@@ -156,7 +156,7 @@ native client, never ports or direct SQL. Native `submit_job` derives trusted sc
 and performs A4–A6; `record_fact`/`record_action` accept only the scoped plugin's
 business facts/receipts, not another profile's ids or model-asserted action success.
 
-- [ ] **Step 1: Write** real plugin/gateway tests `test_outreach_reply_followup_use_native_jobs`, `test_native_outage_has_no_raw_fallback`, `test_crm_consumes_delivery_cursor_idempotently`:
+- [x] **Step 1: Write** real plugin/gateway tests `test_outreach_reply_followup_use_native_jobs`, `test_native_outage_has_no_raw_fallback`, `test_crm_consumes_delivery_cursor_idempotently`:
 
 ```python
 assert queued_result["state"] == "held"
@@ -168,10 +168,10 @@ assert cursor_after_failed_crm_write == previous_cursor
 assert draft_rejection_marks_customer_answered is False
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/plugins/test_sales_business_integration.py -v` and `bash "$sales_plugin_worktree/tests/run_native.sh" --hermes-root "$PWD"`; expect the new native-client/job assertions fail while the baseline remains recorded.
-- [ ] **Step 3: Implement** native mode selection requiring the service's capabilities; native-mode outage is a visible held/error, never legacy fallback. Keep old live mode until cutover. Replace direct gate operations with native jobs/review/status, classify campaigns/follow-ups in the plugin, and feed business facts/templates to the composer. Avoid double owner mirroring/triage when native provenance already handled it. Change the CRM consumer to native cursor/idempotency records and accurate accepted/delivered/failed/owed states. Remove duplicated script-local model literals: research inherits the profile model unless an explicit plugin config pin is present; judge/lesson work uses native auxiliary routes. Preserve domain rules and research/CRM ownership in the plugin.
-- [ ] **Step 4: Rerun** both commands; expect all new and existing offline tests green. Assert no native path still writes legacy pending/sent/counter files or restarts the gateway to refresh an allowlist.
-- [ ] **Step 5: Commit** the named plugin files in its isolated checkout with `feat: use native supervised messaging for sales operations`; commit the fork integration test separately with `test(plugins): exercise native sales messaging through discovery`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/plugins/test_sales_business_integration.py -v` and `bash "$sales_plugin_worktree/tests/run_native.sh" --hermes-root "$PWD"`; expect the new native-client/job assertions fail while the baseline remains recorded.
+- [x] **Step 3: Implement** native mode selection requiring the service's capabilities; native-mode outage is a visible held/error, never legacy fallback. Keep old live mode until cutover. Replace direct gate operations with native jobs/review/status, classify campaigns/follow-ups in the plugin, and feed business facts/templates to the composer. Avoid double owner mirroring/triage when native provenance already handled it. Change the CRM consumer to native cursor/idempotency records and accurate accepted/delivered/failed/owed states. Remove duplicated script-local model literals: research inherits the profile model unless an explicit plugin config pin is present; judge/lesson work uses native auxiliary routes. Preserve domain rules and research/CRM ownership in the plugin.
+- [x] **Step 4: Rerun** both commands; expect all new and existing offline tests green. Assert no native path still writes legacy pending/sent/counter files or restarts the gateway to refresh an allowlist.
+- [x] **Step 5: Commit** the named plugin files in its isolated checkout with `feat: use native supervised messaging for sales operations`; commit the fork integration test separately with `test(plugins): exercise native sales messaging through discovery`.
 
 ### Task C5: Read-only legacy inventory and idempotent paused import
 

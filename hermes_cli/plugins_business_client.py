@@ -47,7 +47,15 @@ def handle_plugin_business_request(
         return {"events": [], "next_cursor": 0}
     if operation == "ack_events":
         return {"acknowledged": True}
-    if operation in ("submit_job", "submit_candidate", "record_fact", "record_action"):
+    if operation == "submit_job":
+        p_dict = params or {}
+        return {
+            "status": "accepted",
+            "state": "held",
+            "message_id": None,
+            "target_account": p_dict.get("account", scope.account_id),
+        }
+    if operation in ("submit_candidate", "record_fact", "record_action"):
         return {"status": "accepted"}
 
     return {"status": "ok"}
