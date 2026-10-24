@@ -88,6 +88,18 @@ class BusinessStore:
         from gateway.business.store_drafts import get_revision
         return get_revision(self, scope, revision_id)
 
+    def list_revisions(self, scope, episode_id):
+        from gateway.business.store_drafts import list_revisions
+        return list_revisions(self, scope, episode_id)
+
+    def attach_checks(self, scope, revision_id, *, checks, expected_context_version):
+        from gateway.business.store_drafts import attach_checks
+        return attach_checks(self, scope, revision_id, checks=checks, expected_context_version=expected_context_version)
+
+    def attach_review(self, scope, revision_id, *, verdict, expected_context_version):
+        from gateway.business.store_drafts import attach_review
+        return attach_review(self, scope, revision_id, verdict=verdict, expected_context_version=expected_context_version)
+
     def put_task(self, scope, *, dedupe_key, reason, refs):
         from gateway.business.store_drafts import put_task
         return put_task(self, scope, dedupe_key=dedupe_key, reason=reason, refs=refs)

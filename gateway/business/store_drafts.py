@@ -113,6 +113,98 @@ def get_revision(store, scope, revision_id):
     return _revision(json.loads(row[0]))
 
 
+def list_revisions(store, scope, episode_id):
+    conn = store._connect()
+    with transaction(conn) as db:
+        rows = db.execute(
+            "SELECT payload FROM business_revisions WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND episode_id=? ORDER BY number ASC",
+            (*_scope_values(scope), episode_id),
+        ).fetchall()
+    return tuple(_revision(json.loads(row[0])) for row in rows)
+
+
+def attach_checks(store, scope, revision_id, *, checks, expected_context_version):
+    conn = store._connect()
+    with transaction(conn, immediate=True) as db:
+        owned = db.execute(
+            "SELECT episode_id, number, parent_revision_id, payload FROM business_revisions "
+            "WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND revision_id=?",
+            (*_scope_values(scope), revision_id),
+        ).fetchone()
+        if not owned:
+            raise BusinessDenied()
+        episode_id = owned["episode_id"]
+        current = db.execute(
+            "SELECT context_version, held FROM business_contacts WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=?",
+            _scope_values(scope),
+        ).fetchone()
+        stored = db.execute(
+            "SELECT context_version, state FROM business_episodes WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND episode_id=?",
+            (*_scope_values(scope), episode_id),
+        ).fetchone()
+        if current[1] or stored[0] != expected_context_version or current[0] != expected_context_version:
+            raise BusinessConflict("stale_episode")
+
+        old_rev = _revision(json.loads(owned["payload"]))
+        new_rev = DraftRevision(
+            id=old_rev.id,
+            scope=old_rev.scope,
+            episode=old_rev.episode,
+            number=old_rev.number,
+            candidate=old_rev.candidate,
+            policy_version=old_rev.policy_version,
+            lesson_version=old_rev.lesson_version,
+            checks=checks,
+            review=old_rev.review,
+        )
+        db.execute(
+            "UPDATE business_revisions SET payload=? WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND revision_id=?",
+            (_json(new_rev), *_scope_values(scope), revision_id),
+        )
+        return new_rev
+
+
+def attach_review(store, scope, revision_id, *, verdict, expected_context_version):
+    conn = store._connect()
+    with transaction(conn, immediate=True) as db:
+        owned = db.execute(
+            "SELECT episode_id, number, parent_revision_id, payload FROM business_revisions "
+            "WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND revision_id=?",
+            (*_scope_values(scope), revision_id),
+        ).fetchone()
+        if not owned:
+            raise BusinessDenied()
+        episode_id = owned["episode_id"]
+        current = db.execute(
+            "SELECT context_version, held FROM business_contacts WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=?",
+            _scope_values(scope),
+        ).fetchone()
+        stored = db.execute(
+            "SELECT context_version, state FROM business_episodes WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND episode_id=?",
+            (*_scope_values(scope), episode_id),
+        ).fetchone()
+        if current[1] or stored[0] != expected_context_version or current[0] != expected_context_version:
+            raise BusinessConflict("stale_episode")
+
+        old_rev = _revision(json.loads(owned["payload"]))
+        new_rev = DraftRevision(
+            id=old_rev.id,
+            scope=old_rev.scope,
+            episode=old_rev.episode,
+            number=old_rev.number,
+            candidate=old_rev.candidate,
+            policy_version=old_rev.policy_version,
+            lesson_version=old_rev.lesson_version,
+            checks=old_rev.checks,
+            review=verdict,
+        )
+        db.execute(
+            "UPDATE business_revisions SET payload=? WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND revision_id=?",
+            (_json(new_rev), *_scope_values(scope), revision_id),
+        )
+        return new_rev
+
+
 def revision_status(store, scope, revision_id):
     conn = store._connect()
     with transaction(conn) as db:
