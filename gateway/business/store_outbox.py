@@ -281,8 +281,51 @@ def claim_part(
                     (attempt_id, outbox_id, account.transport_profile, account.account_id, idx, 1, "claimed", "[]", now_ms),
                 )
                 return Attempt(id=attempt_id, outbox_id=outbox_id, part_index=idx, generation=1, state="claimed", platform_ids=(), error_code=None)
+            if att["state"] not in ("sent", "delivered", "accepted"):
+                return None
 
         return None
+
+
+def update_attempt_state(
+    store,
+    attempt_id: str,
+    *,
+    state: str,
+    error_code: str | None = None,
+    platform_ids: tuple[str, ...] | None = None,
+) -> None:
+    """Update the status, platform identifiers, and error of a delivery attempt."""
+    conn = store._connect()
+    with transaction(conn, immediate=True) as db:
+        if platform_ids is not None:
+            pids = json.dumps(list(platform_ids))
+            db.execute(
+                "UPDATE business_attempts SET state=?, error_code=?, platform_ids=? WHERE attempt_id=?",
+                (state, error_code, pids, attempt_id),
+            )
+        else:
+            db.execute(
+                "UPDATE business_attempts SET state=?, error_code=? WHERE attempt_id=?",
+                (state, error_code, attempt_id),
+            )
+
+
+def get_attempt_context(store, attempt_id: str) -> dict | None:
+    """Retrieve attempt details joined with its parent outbox row."""
+    conn = store._connect()
+    with transaction(conn) as db:
+        row = db.execute(
+            "SELECT a.attempt_id, a.outbox_id, a.part_index, a.generation, a.state, a.platform_ids, a.error_code, "
+            "       o.runtime_profile, o.transport_profile, o.account_id, o.contact_id, o.revision_id, o.plan_id "
+            "FROM business_attempts a "
+            "JOIN business_outbox o ON a.outbox_id = o.outbox_id "
+            "WHERE a.attempt_id = ?",
+            (attempt_id,),
+        ).fetchone()
+        if not row:
+            return None
+        return dict(row)
 
 
 def invalidate_contact(

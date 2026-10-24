@@ -28,7 +28,6 @@ from agent.proxy_bypass import first_proxy_env_value, should_bypass_proxy as _sh
 
 logger = logging.getLogger(__name__)
 
-
 def _consume_detached_handler_exception(task: asyncio.Task) -> None:
     """Done-callback for a detached fatal-error handler task (carrier cancelled in
     ``_notify_fatal_error``): retrieve its exception so asyncio never logs "never retrieved"."""
@@ -37,7 +36,6 @@ def _consume_detached_handler_exception(task: asyncio.Task) -> None:
     exc = task.exception()
     if exc is not None:
         logger.error("Detached fatal-error handler task failed: %s", exc, exc_info=exc)
-
 
 # Audio exts for native audio delivery; Telegram's narrower sets stay separate (.m2a is audio to
 # Hermes but not to sendAudio).
@@ -1655,7 +1653,7 @@ class SendResult:
     # SEND_ERROR_KINDS member (failures only) via :func:`classify_send_error`, so consumers
     # branch without substring-matching ``error``.
     error_kind: Optional[str] = None
-
+    business_receipt: Optional[dict] = None
 
 # Longest server ``retry_after`` ``_send_with_retry`` will sleep inline. Longer penalties return the
 # typed failure so the delivery ledger owns the wait (#91969: a 97-minute FloodWait slept verbatim
@@ -3719,6 +3717,8 @@ class BasePlatformAdapter(ABC):
     def _send_retry_is_final(self, result: SendResult) -> bool:
         """True when a failed send must be returned as-is: neither a retry nor the plain-text
         fallback can fix it (a structured auth/target refusal). Default: never."""
+        if getattr(result, "business_receipt", None) is not None:
+            return True
         return False
 
     @staticmethod

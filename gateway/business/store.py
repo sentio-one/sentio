@@ -168,5 +168,13 @@ class BusinessStore:
         from gateway.business.store_governor import governor_resume_account
         return governor_resume_account(self, principal, account, now_ms=now_ms)
 
+    def update_attempt_state(self, attempt_id, *, state, error_code=None, platform_ids=None):
+        from gateway.business.store_outbox import update_attempt_state
+        return update_attempt_state(self, attempt_id, state=state, error_code=error_code, platform_ids=platform_ids)
+
+    def get_attempt_context(self, attempt_id):
+        from gateway.business.store_outbox import get_attempt_context
+        return get_attempt_context(self, attempt_id)
+
 
 

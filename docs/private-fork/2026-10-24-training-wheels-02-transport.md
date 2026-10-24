@@ -199,7 +199,7 @@ Add optional `business_receipt: dict | None = None` to `SendResult`. A held resu
 `success=False`, `retryable=False`, `message_id=None`, and a typed business receipt.
 All owned callers branch on that receipt before generic error/retry logic. Nonbusiness results are unchanged.
 
-- [ ] **Step 1: Write** a parameterized real-path test for final, tool, cron, standalone, media, edit, reaction, poll and location; add `test_registration_error_holds`, `test_chunk_timeout_is_unknown`:
+- [x] **Step 1: Write** a parameterized real-path test for final, tool, cron, standalone, media, edit, reaction, poll and location; add `test_registration_error_holds`, `test_chunk_timeout_is_unknown`:
 
 ```python
 assert queued.business_receipt["state"] == "held"
@@ -215,10 +215,10 @@ assert timeout_after_socket.state == "unknown"
 assert subsequent_parts_dispatched == []
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_transport.py -v`; expect queued/outbox/send paths to fail the new assertions.
-- [ ] **Step 3: Implement** claimed per-part dispatch through B3/B4. Known valid recent inbound satisfies preflight; otherwise use `onWhatsApp` for a resolvable phone target. Empty negative fails, lookup error holds, unresolved LID never becomes a guessed number. Resolve existing bridge ownership and require reported session/account proof. Execute the approved payload with no formatting fallback. Stop on partial/unknown outcomes and preserve earlier part ids. Route alternate callers into submission; own-contact working-tool sends stage intent until the terminal draft rather than compete with final response delivery. Cron submission keys use execution identity so retries are idempotent without suppressing future runs. Ensure text/media base retry loops recognize held/staged as queued, not success or retryable failure.
-- [ ] **Step 4: Rerun** the task file plus `scripts/run_tests.sh tests/gateway/test_whatsapp_native_delivery.py tests/tools/test_whatsapp_send_message_media.py -v`; expect green, including no port-3000/default-bot fallback for a secondary.
-- [ ] **Step 5: Commit** the named transport/caller/test files with `feat(gateway): route all WhatsApp egress through supervised submission`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_transport.py -v`; expect queued/outbox/send paths to fail the new assertions.
+- [x] **Step 3: Implement** claimed per-part dispatch through B3/B4. Known valid recent inbound satisfies preflight; otherwise use `onWhatsApp` for a resolvable phone target. Empty negative fails, lookup error holds, unresolved LID never becomes a guessed number. Resolve existing bridge ownership and require reported session/account proof. Execute the approved payload with no formatting fallback. Stop on partial/unknown outcomes and preserve earlier part ids. Route alternate callers into submission; own-contact working-tool sends stage intent until the terminal draft rather than compete with final response delivery. Cron submission keys use execution identity so retries are idempotent without suppressing future runs. Ensure text/media base retry loops recognize held/staged as queued, not success or retryable failure.
+- [x] **Step 4: Rerun** the task file plus `scripts/run_tests.sh tests/gateway/test_whatsapp_native_delivery.py tests/tools/test_whatsapp_send_message_media.py -v`; expect green, including no port-3000/default-bot fallback for a secondary.
+- [x] **Step 5: Commit** the named transport/caller/test files with `feat(gateway): route all WhatsApp egress through supervised submission`.
 
 ### Task B6: Delivery evidence and a single crash-recovery owner
 
