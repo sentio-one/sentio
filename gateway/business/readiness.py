@@ -54,11 +54,19 @@ async def check_readiness(service: BusinessService, account: AccountKey) -> dict
         blocking.append("bridge_needs_reauth")
 
     # Supervised activation strictly requires C7 workflow readiness capability
-    # This prevents live sending until operator commands, learning, and credentials cutover
-    blocking.append("workflow_readiness_missing")
+    from gateway.business.workflow_readiness import check_workflow_readiness
+
+    wf = await check_workflow_readiness(service, account)
+    if not wf.get("ready"):
+        for b in wf.get("blockers", []):
+            if b not in blocking:
+                blocking.append(b)
+        if not wf.get("blockers"):
+            blocking.append("workflow_readiness_incomplete")
 
     return {
         "ready": len(blocking) == 0,
+        "workflow_protocol": wf.get("workflow_protocol", 1) if len(blocking) == 0 else None,
         "blocking": blocking,
         "warnings": warnings,
     }

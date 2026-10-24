@@ -83,6 +83,28 @@ def propose_lessons(
     return tuple(lessons)
 
 
+def propose_lesson(
+    principal: Principal,
+    scope: Scope,
+    *,
+    rule: str = "",
+    topic: str = "",
+    category: str = "",
+    policy_id: str = "default",
+    store: BusinessStore | None = None,
+) -> Lesson:
+    """Convenience helper to propose a single lesson."""
+    text = rule or topic or category or "General rule"
+    lessons = propose_lessons(
+        principal,
+        scope,
+        policy_id=policy_id,
+        texts=(text,),
+        store=store,
+    )
+    return lessons[0]
+
+
 def confirm_lesson(
     principal: Principal,
     scope: Scope,

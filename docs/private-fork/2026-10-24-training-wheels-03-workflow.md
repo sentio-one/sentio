@@ -235,7 +235,7 @@ assert old_bridge_capability_activation_refused is True
 
 **Interfaces:** Async `check_workflow_readiness(service: BusinessService, account: AccountKey) -> dict` contributes `workflow_protocol=1` only when operator controls, required policy, credential capability when needed, native plugin mode, import manifest, and exclusive ownership all validate. `pilot_report(scope: Scope) -> dict` reports supervised test evidence without promoting mode or emitting sends. No global requirement that a specific provider/local endpoint must exist is introduced.
 
-- [ ] **Step 1: Write** `test_workflow_blocks_partial_activation`, `test_real_plugin_approval_delivery_and_learning_roundtrip`, `test_native_update_needs_no_patch`:
+- [x] **Step 1: Write** `test_workflow_blocks_partial_activation`, `test_real_plugin_approval_delivery_and_learning_roundtrip`, `test_native_update_needs_no_patch`:
 
 ```python
 assert missing_credentials_workflow["ready"] is False
@@ -247,10 +247,10 @@ assert upgraded_stock_bridge.patch_invocations == 0
 assert physical_send_times_obey_config is True
 ```
 
-- [ ] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_workflow_readiness.py tests/gateway/business/test_full_acceptance.py -v`; expect absent complete workflow capability.
-- [ ] **Step 3: Implement** readiness integration and the actual-plugin/fake-transport acceptance scenario: inbound/triage, compose/rewrite, operator edit, fresh approval, delayed paced dispatch, early/late receipts, CRM cursor consumption, lesson proposal/confirmation, new-context cancellation, credential release, and restart/rollback. Document setup keys, commands, outcome meanings, paused cutover, and the separate authorized pilot checklist. Keep raw evidence out of commits; summarize sanitized quality/cost/latency measurements and all outstanding unknowns. Full readiness may be tested under fake controllers; it does not authorize a live resume.
-- [ ] **Step 4: Run** `scripts/run_tests.sh tests/gateway/business/ tests/plugins/test_business_policy_contract.py tests/plugins/test_business_request_proxy.py tests/plugins/test_sales_business_integration.py tests/hermes_cli/test_business_messages.py tests/agent/test_vault_business_payloads.py -v`, `node --test scripts/whatsapp-bridge/*.test.mjs`, `bash "$sales_plugin_worktree/tests/run_native.sh" --hermes-root "$PWD"`, and `python scripts/check`; require exit 0. Also run `scripts/run_tests.sh tests/gateway/test_gateway_silence_tokens.py tests/gateway/test_normalize_empty_agent_response.py tests/gateway/test_delivery_ledger.py tests/gateway/test_delivery_ledger_process_home.py tests/agent/test_vault_store.py tests/agent/test_redact.py tests/cron/test_delivery_outcome_writeback.py tests/cron/test_cron_multiplex_shared_route_delivery.py tests/cron/test_media_delivery_parity.py tests/gateway/test_whatsapp_multiplex_secret_scope.py tests/gateway/test_whatsapp_media_path_profile.py tests/tools/test_whatsapp_send_message_media.py -v`. Broaden testing only for a demonstrated unresolved concern.
-- [ ] **Step 5: Commit** named readiness/acceptance/docs files with `feat(gateway): complete offline supervised messaging readiness`; commit plugin docs/tests with `docs: document native supervised sales messaging cutover`.
+- [x] **Step 2: Run** `scripts/run_tests.sh tests/gateway/business/test_workflow_readiness.py tests/gateway/business/test_full_acceptance.py -v`; expect absent complete workflow capability.
+- [x] **Step 3: Implement** readiness integration and the actual-plugin/fake-transport acceptance scenario: inbound/triage, compose/rewrite, operator edit, fresh approval, delayed paced dispatch, early/late receipts, CRM cursor consumption, lesson proposal/confirmation, new-context cancellation, credential release, and restart/rollback. Document setup keys, commands, outcome meanings, paused cutover, and the separate authorized pilot checklist. Keep raw evidence out of commits; summarize sanitized quality/cost/latency measurements and all outstanding unknowns. Full readiness may be tested under fake controllers; it does not authorize a live resume.
+- [x] **Step 4: Run** `scripts/run_tests.sh tests/gateway/business/ tests/plugins/test_business_policy_contract.py tests/plugins/test_business_request_proxy.py tests/plugins/test_sales_business_integration.py tests/hermes_cli/test_business_messages.py tests/agent/test_vault_business_payloads.py -v`, `node --test scripts/whatsapp-bridge/*.test.mjs`, `bash "$sales_plugin_worktree/tests/run_native.sh" --hermes-root "$PWD"`, and `python scripts/check`; require exit 0. Also run `scripts/run_tests.sh tests/gateway/test_gateway_silence_tokens.py tests/gateway/test_normalize_empty_agent_response.py tests/gateway/test_delivery_ledger.py tests/gateway/test_delivery_ledger_process_home.py tests/agent/test_vault_store.py tests/agent/test_redact.py tests/cron/test_delivery_outcome_writeback.py tests/cron/test_cron_multiplex_shared_route_delivery.py tests/cron/test_media_delivery_parity.py tests/gateway/test_whatsapp_multiplex_secret_scope.py tests/gateway/test_whatsapp_media_path_profile.py tests/tools/test_whatsapp_send_message_media.py -v`. Broaden testing only for a demonstrated unresolved concern.
+- [x] **Step 5: Commit** named readiness/acceptance/docs files with `feat(gateway): complete offline supervised messaging readiness`; commit plugin docs/tests with `docs: document native supervised sales messaging cutover`.
 
 ## Live pilot and retirement checkpoint (not executed by this plan)
 
@@ -271,8 +271,8 @@ assert physical_send_times_obey_config is True
 
 ## Plan exit
 
-- [ ] All native software and offline verification are reviewable, with no hidden live
+- [x] All native software and offline verification are reviewable, with no hidden live
   deployment side effects. Remaining pilot/retirement steps have explicit evidence
   and authorization checkpoints rather than guessed completion.
-- [ ] Review sanitized semantic evaluation alongside deterministic transport checks.
+- [x] Review sanitized semantic evaluation alongside deterministic transport checks.
   Human approval stays enabled regardless of reviewer agreement statistics.

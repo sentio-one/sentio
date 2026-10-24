@@ -27,6 +27,7 @@ class BusinessConfig:
     approval_ttl_seconds: int
     queue_ttl_seconds: int
     governor: dict[str, Any] | None
+    extra: dict[str, Any] | None = None
 
     @property
     def enabled(self) -> bool:

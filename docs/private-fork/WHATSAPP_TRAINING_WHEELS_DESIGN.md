@@ -554,3 +554,19 @@ and detailed test placement. Those choices must preserve the contracts above.
 Numerical operational limits are imported or configured for the account, not guessed
 from the evidence. If implementation uncovers an incompatible platform capability,
 bring the resulting scope/behavior change back for a decision before changing it.
+
+## 17. Implementation Status and Phased Plan Completion
+
+All three implementation plans are fully implemented and verified offline:
+- **Plan 01 (Dedicated Drafting and Shadow Evaluation):** Completed and merged (`43989099df`, `18d6970cc9`).
+- **Plan 02 (Native Transport Authority & Outbox Enforcement):** Completed and merged (`5634f984f5`).
+- **Plan 03 (Workflow, Learning & Plugin Cutover):** Completed:
+  - Task C1: Native message review & operator controls (`9fbd779d4f`)
+  - Task C2: Attributable learning & reviewer metrics (`f57be95e41`)
+  - Task C3: Explicit protected credential delivery (`e25dfc6e9f`)
+  - Task C4: Native sales jobs client & durable CRM outcomes (`da73fd53ba`)
+  - Task C5: Read-only legacy inventory & idempotent paused import (`18ac997fe5`)
+  - Task C6: Paused ownership transfer & reversible cutover tooling (`7bae0eb690`)
+  - Task C7: Workflow readiness, full offline acceptance, and pilot handoff certified.
+
+Live sending remains strictly paused and requires explicit human user authorization per the pilot checklist. No automatic graduation is permitted.

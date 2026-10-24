@@ -139,3 +139,76 @@ Supervised turn separation prevents unapproved payloads from reaching external c
 - Failed turns record operator tasks; customer socket calls remain 0.
 - Raw text footers, voice TTS syntheses, and typing/progress updates cannot reach customer destinations without an explicitly approved draft revision.
 - Ambiguous bridge timeouts are marked `unknown` and never automatically retried.
+
+---
+
+## Workflow Readiness & Pilot Handoff Operations (Plan 03 - Task C7)
+
+### Verification Protocol (`workflow_protocol=1`)
+
+Full supervised activation requires `check_workflow_readiness(service, account)` to validate six mandatory checks:
+1. **Operator Controls:** Authorized operators configured with permissions for review, edit, approve, and lesson proposal.
+2. **Required Policy:** Concrete policy bundle registered and responsive.
+3. **Native Plugin Mode:** External sales plugin configured with `plugin_mode: native` (stock bridge without patcher scripts).
+4. **Credential Capability:** Explicit credential grant and encrypted payload preview capabilities validated when credentials are required.
+5. **Import & Cutover Manifest:** Auditable migration manifest prepared and verified quiescent, with zero unresolved attention blockers.
+6. **Exclusive Ownership:** All legacy writer processes quiescent; single native messaging authority verified.
+
+### Setup Configuration Keys
+
+```yaml
+platforms:
+  whatsapp:
+    extra:
+      business:
+        mode: supervised
+        required_policies:
+          - sales_ops
+        operators:
+          - "27600000000@s.whatsapp.net"
+        plugin_mode: native
+        credentials_required: false
+        migration_required: true
+        governor:
+          timezone: Africa/Johannesburg
+          min_gap_seconds: 15
+          reply_min_gap_seconds: 5
+          jitter_seconds: 3
+          hard_max_per_day: 100
+          failure_count: 5
+          failure_window_seconds: 300
+```
+
+### Operator CLI Commands
+
+| Command | Action | Authority |
+|---|---|---|
+| `hermes messages list` | List pending, held, and scheduled drafts | Read |
+| `hermes messages review <rev_id>` | Inspect draft text, policy checks, and candidate metadata | Reviewer |
+| `hermes messages edit <rev_id> --text "..."` | Edit candidate text and produce new immutable revision | Reviewer |
+| `hermes messages approve <rev_id>` | Approve candidate revision and schedule release | Operator |
+| `hermes messages reject <rev_id> --reason "..."` | Reject draft and release to attention tasks | Operator |
+| `hermes messages digest` | Produce operator digest snapshot | Operator |
+| `hermes messages cutover --plan` | Dry-run migration and verify quiescent writers | Admin |
+| `hermes messages cutover --apply` | Apply paused ownership transfer to native generation | Admin |
+| `hermes messages cutover --rollback` | Roll back to legacy ownership and export unresolved state | Admin |
+
+### Delivery Outcome Meanings
+
+- **`held`**: Candidate drafted and awaiting human operator review/approval; physical sends remain 0.
+- **`scheduled`**: Approved by human operator, placed into paced outbox queue respecting governor windows.
+- **`accepted`**: Bridge accepted payload for physical transmission; socket dispatch in progress.
+- **`delivered`**: Verified receipt confirmed from WhatsApp network; terminal success state.
+- **`failed`**: Transmission or policy check failure; draft held for operator attention.
+- **`unknown`**: Bridge socket timeout or ambiguous network receipt; never automatically retried without operator reconciliation.
+
+### Authorized Live Pilot Checklist (Pre-Deployment Authorization)
+
+Before any live resume or production messaging is authorized:
+- [ ] Offline test suites pass 100% across Plan 01, Plan 02, and Plan 03.
+- [ ] Stock bridge updates and restarts invoke zero legacy patch scripts (`patch_invocations == 0`).
+- [ ] Dry-run cutover manifest is verified with zero competing legacy writer PIDs.
+- [ ] Target account is paired and verified quiescent.
+- [ ] Explicit written user authorization obtained for initial supervised pilot on test/operator recipients.
+- [ ] Pilot metrics reviewed: p95 latency, agreement statistics, and zero unconfirmed lessons.
+- [ ] Automatic graduation remains strictly disabled (`auto_graduation_refused: true`).
