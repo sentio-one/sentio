@@ -62,7 +62,6 @@ from hermes_cli.plugins_state import (
     _plugin_relative_segments, _plugin_settings_entry, save_plugin_setting,
 )
 
-
 def get_bundled_plugins_dir() -> Path:
     """Bundled ``plugins/`` dir: ``HERMES_BUNDLED_PLUGINS`` (Nix wrapper / packaged installs, read-only
     store paths) first, else the in-repo path."""
@@ -71,10 +70,8 @@ def get_bundled_plugins_dir() -> Path:
         return Path(env_override)
     return Path(__file__).resolve().parent.parent / "plugins"
 
-
 class PluginToolOverrideError(PermissionError):
     """Plugin tried to override a built-in tool without ``plugins.entries.<id>.allow_tool_override``."""
-
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +79,6 @@ logger = logging.getLogger(__name__)
 # once at import; tests flip it mid-process via ``_install_plugin_debug_handler(force=True)``.
 _PLUGINS_DEBUG = env_var_enabled("HERMES_PLUGINS_DEBUG")
 _DEBUG_HANDLER_INSTALLED = False
-
 
 def _install_plugin_debug_handler(force: bool = False) -> None:
     """When HERMES_PLUGINS_DEBUG is on, tee plugin logs to stderr at DEBUG (once per process)."""
@@ -207,7 +203,6 @@ SHELL_UNSUPPORTED_HOOKS: set[str] = {"transform_api_error_classification"}
 _env_enabled = env_var_enabled  # imported by plugins/memory
 _UNSET = object()
 
-
 @dataclass
 class LoadedPlugin:
     """Runtime state for a single loaded plugin."""
@@ -251,6 +246,11 @@ class PluginContext:
             loaded.enabled and (key == plugin_id or loaded.manifest.name == plugin_id)
             for key, loaded in self._manager._plugins.items()
         )
+
+    def business_request(self, operation: str, params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+        """Scoped business gateway request proxy for plugins (Task C1)."""
+        from hermes_cli.plugins_business_client import handle_plugin_business_request
+        return handle_plugin_business_request(self, operation=operation, params=params or {})
 
     def _segments(self, key: str) -> tuple[str, ...]:
         """Validated plugin-relative settings path (warn + re-raise on rejection)."""
@@ -1023,8 +1023,6 @@ class PluginContext:
 
 # -- scoped provider registrars ------------------------------------------------------------------
 # One generated ``register_<category>_provider`` method per row of plugins_registrars.py's table.
-
-
 
 def _make_scoped_provider_registrar(method_name, kind, registry_mod, base_ref, label, doc, options):
     """Build one ``register_<category>_provider`` method from a ``_SCOPED_PROVIDER_REGISTRARS`` row."""

@@ -124,6 +124,11 @@ CREATE TABLE IF NOT EXISTS business_bridge_states (
  state TEXT NOT NULL, code TEXT, respawn_count INTEGER NOT NULL DEFAULT 0,
  updated_at_ms INTEGER NOT NULL,
  PRIMARY KEY(transport_profile, account_id));
+CREATE TABLE IF NOT EXISTS business_digests (
+ digest_id TEXT PRIMARY KEY, runtime_profile TEXT NOT NULL,
+ transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ contact_id TEXT NOT NULL, revision_ids TEXT NOT NULL,
+ created_at_ms INTEGER NOT NULL);
 """
 
 
