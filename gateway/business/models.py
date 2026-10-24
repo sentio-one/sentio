@@ -18,6 +18,18 @@ class BusinessProtocolError(ValueError):
         super().__init__(code)
 
 
+class BusinessConflict(RuntimeError):
+    """A durable business operation lost an idempotency or revision race."""
+
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(code)
+
+
+class BusinessDenied(PermissionError):
+    """A requested business record is not owned by the supplied scope."""
+
+
 @dataclass(frozen=True)
 class Scope:
     runtime_profile: str
