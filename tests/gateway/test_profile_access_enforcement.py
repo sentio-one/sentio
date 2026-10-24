@@ -22,7 +22,7 @@ class _Transport:
 
 
 def _identity(**extra):
-    return {'user_id': 'u-alice', 'provider': 'self_hosted', 'issuer': 'https://sso.corp.example', **extra}
+    return {'user_id': 'u-alice', 'provider': 'self-hosted', 'issuer': 'https://sso.corp.example', **extra}
 
 
 @pytest_asyncio.fixture

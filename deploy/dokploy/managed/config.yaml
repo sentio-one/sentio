@@ -13,7 +13,7 @@ access:
     - "${HERMES_ADMIN_EMAILS}"
   profile_group_prefix: "hermes-profile-"
   group_providers:
-    - self_hosted
+    - self-hosted
   admins: []
   users: []
 

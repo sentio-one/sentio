@@ -22,7 +22,7 @@ def _caps():
 
 
 def _actor(launch: Path, allowed):
-    return Principal('auth:v1:["self_hosted","https://sso.corp.example","u-alice"]', str(launch), _caps(), 't',
+    return Principal('auth:v1:["self-hosted","https://sso.corp.example","u-alice"]', str(launch), _caps(), 't',
                      None if allowed is None else frozenset(allowed))
 
 

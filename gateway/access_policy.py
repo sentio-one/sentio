@@ -23,7 +23,7 @@ from typing import Any, Iterable, Mapping, Optional
 logger = logging.getLogger(__name__)
 
 DEFAULT_GROUP_PREFIX = "hermes-profile-"
-DEFAULT_GROUP_PROVIDERS = frozenset({"self_hosted"})
+DEFAULT_GROUP_PROVIDERS = frozenset({"self-hosted"})  # the plugin's `name`; tests/gateway/test_access_admin_emails.py keeps them equal
 
 
 def _profile(name: Any) -> Optional[str]:

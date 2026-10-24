@@ -45,7 +45,7 @@ Profiles are **not** an OS boundary (SECURITY.md 2.2); see D9 for what that leav
   `admin_groups` grants everything. `users`/`admins` rows add static grants for IdPs without groups.
 - **Subject = full `(provider, issuer, sub)` triple**, via `gateway.session_identity.dashboard_subject`.
   Never a bare `sub` or an issuer host (two tenants on one Entra host would collide).
-- **`group_providers` (default `self_hosted`)**: group grants count only for these providers, so another
+- **`group_providers` (default `self-hosted`)**: group grants count only for these providers, so another
   provider cannot mint a grant by emitting a matching group name.
 - Only the `groups` claim is read, not `roles`. An empty `profile_group_prefix` turns group grants off.
 - **No `access:` configured = behaviour identical to upstream.** Every fork gate checks `policy.configured`

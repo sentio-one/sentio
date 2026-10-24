@@ -23,7 +23,7 @@ POLICY = parse_access_policy({"admin_groups": ["hermes-admins"]})
 
 
 class _Stub(StubAuthProvider):
-    name = "self_hosted"
+    name = "self-hosted"
 
     def verify_session(self, *, access_token):
         payload = _unsign(access_token)
@@ -83,7 +83,7 @@ def test_a_redeemed_invite_shows_up_as_a_profile(world):
 
     store = default_store()
     created = store.create_invite(profile="default", created_by="admin")
-    store.redeem(created.token, subject=POLICY.subject_key("self_hosted", ISSUER, "u-invited"))
+    store.redeem(created.token, subject=POLICY.subject_key("self-hosted", ISSUER, "u-invited"))
     assert _me(world, sub="u-invited")["access"] == {"configured": True, "admin": False, "profiles": ["default"]}
     assert _me(world, sub="someone-else")["access"]["profiles"] == []
 
