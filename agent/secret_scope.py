@@ -407,6 +407,12 @@ def build_profile_secret_scope(hermes_home: Path) -> dict[str, str]:
     except Exception:
         external_secrets = {}
     secrets.update((k, v) for k, v in external_secrets.items() if not _is_global_env(k))
+    # A profile an admin let use the company's model keys (private fork, ``gateway/profile_key_sharing.py``):
+    # its own ``.env`` and sources keep precedence.
+    from gateway.profile_key_sharing import shared_credentials_for
+
+    for name, value in shared_credentials_for(Path(hermes_home)).items():
+        secrets.setdefault(name, value)
     # The DEFAULT profile's config.yaml allow_all_users grant lives only in os.environ (bridged by
     # gateway.config_loader); scoped gate readers under multiplex never fall to os.environ, so seed it
     # into that profile's own mapping. A secondary never inherits it (#80099 class).
