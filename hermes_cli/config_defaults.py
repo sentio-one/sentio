@@ -793,6 +793,10 @@ DEFAULT_CONFIG = {
         "kanban_decomposer": _aux(180),
         "profile_describer": _aux(60),   # 1-2 sentence profile blurb; short, cheap
         "goal_judge": _aux(60),          # /goal satisfaction + contract drafting; JSON calls
+        # WhatsApp supervised business composition, review, and lesson extraction share aux routing.
+        "business_compose": _aux(60),
+        "business_review": _aux(60),
+        "business_lessons": _aux(60),
         # Curator skill-usage review can take minutes on reasoning models (umbrellas over hundreds
         # of skills); route cheaper via `hermes model` → auxiliary → Curator.
         "curator": _aux(600),
@@ -1620,6 +1624,24 @@ DEFAULT_CONFIG = {
 
     "whatsapp": {
         # reply_prefix: None = built-in "☤ *Hermes Agent*" header; "" disables; \n allowed.
+    },
+
+    # Native WhatsApp business behavior is disabled unless explicitly configured. The durable
+    # account latch and readiness checks are enforced by the gateway before supervised work.
+    "platforms": {
+        "whatsapp": {
+            "extra": {
+                "business": {
+                    "mode": "off",
+                    "required_policies": [],
+                    "operators": [],
+                    "rewrite_attempts": 2,
+                    "approval_ttl_seconds": 86400,
+                    "queue_ttl_seconds": 604800,
+                    "governor": None,
+                }
+            }
+        }
     },
 
     "telegram": {
