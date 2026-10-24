@@ -7,12 +7,13 @@ CREATE TABLE IF NOT EXISTS business_accounts (
 CREATE TABLE IF NOT EXISTS business_contacts (
  runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
  contact_id TEXT NOT NULL, suppressed INTEGER NOT NULL DEFAULT 0, suppression_reason TEXT,
+ held INTEGER NOT NULL DEFAULT 0, context_version INTEGER NOT NULL DEFAULT 0,
  schema_version INTEGER NOT NULL DEFAULT 1,
  PRIMARY KEY(runtime_profile, transport_profile, account_id, contact_id));
 CREATE TABLE IF NOT EXISTS business_aliases (
  runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
- alias TEXT NOT NULL, contact_id TEXT NOT NULL, held INTEGER NOT NULL DEFAULT 0,
- PRIMARY KEY(runtime_profile, transport_profile, account_id, alias, contact_id));
+ alias TEXT NOT NULL, transport_id TEXT NOT NULL, contact_id TEXT NOT NULL, held INTEGER NOT NULL DEFAULT 0,
+ PRIMARY KEY(runtime_profile, transport_profile, account_id, alias, transport_id, contact_id));
 CREATE TABLE IF NOT EXISTS business_ingress (
  runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
  contact_id TEXT NOT NULL, source_id TEXT NOT NULL, payload TEXT NOT NULL,
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS business_revisions (
  runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
  contact_id TEXT NOT NULL, revision_id TEXT NOT NULL, episode_id TEXT NOT NULL,
  number INTEGER NOT NULL, parent_revision_id TEXT, payload TEXT NOT NULL,
+ status TEXT NOT NULL DEFAULT 'pending',
  schema_version INTEGER NOT NULL DEFAULT 1,
  PRIMARY KEY(runtime_profile, transport_profile, account_id, contact_id, revision_id),
  UNIQUE(runtime_profile, transport_profile, account_id, contact_id, episode_id, number));
@@ -46,4 +48,25 @@ CREATE TABLE IF NOT EXISTS business_events (
  contact_id TEXT NOT NULL, ordinal INTEGER NOT NULL, payload TEXT NOT NULL,
  schema_version INTEGER NOT NULL DEFAULT 1,
  PRIMARY KEY(runtime_profile, transport_profile, account_id, contact_id, ordinal));
+CREATE TABLE IF NOT EXISTS business_verdicts (
+ runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ contact_id TEXT NOT NULL, episode_id TEXT NOT NULL, verdict_key TEXT NOT NULL,
+ receipt_id TEXT NOT NULL, kind TEXT NOT NULL, reason TEXT NOT NULL,
+ state TEXT NOT NULL, schema_version INTEGER NOT NULL DEFAULT 1,
+ PRIMARY KEY(runtime_profile, transport_profile, account_id, contact_id, verdict_key));
+CREATE TABLE IF NOT EXISTS business_audit (
+ runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+ contact_id TEXT NOT NULL, source_id TEXT NOT NULL, kind TEXT NOT NULL, reason TEXT NOT NULL,
+ payload TEXT NOT NULL, schema_version INTEGER NOT NULL DEFAULT 1,
+ PRIMARY KEY(runtime_profile, transport_profile, account_id, contact_id, source_id));
 """
+
+
+def initialize_schema(conn):
+    from hermes_cli.sqlite_util import add_column_if_missing
+
+    conn.executescript(SCHEMA_SQL)
+    add_column_if_missing(conn, "business_contacts", "held", "held INTEGER NOT NULL DEFAULT 0")
+    add_column_if_missing(conn, "business_contacts", "context_version", "context_version INTEGER NOT NULL DEFAULT 0")
+    add_column_if_missing(conn, "business_aliases", "transport_id", "transport_id TEXT NOT NULL DEFAULT ''")
+    add_column_if_missing(conn, "business_revisions", "status", "status TEXT NOT NULL DEFAULT 'pending'")

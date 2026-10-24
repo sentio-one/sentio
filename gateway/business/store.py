@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from hermes_cli.sqlite_util import open_db
-from gateway.business.store_schema import SCHEMA_SQL
+from gateway.business.store_schema import initialize_schema
 
 
 class BusinessStore:
@@ -13,7 +13,7 @@ class BusinessStore:
 
     def _connect(self):
         return open_db(self.db_path, db_label="business", synchronous_full=True,
-                       initialize=lambda conn: conn.executescript(SCHEMA_SQL))
+                       initialize=initialize_schema)
 
     def _initialize(self):
         conn = self._connect()
@@ -43,6 +43,22 @@ class BusinessStore:
         from gateway.business.store_episodes import is_suppressed
         return is_suppressed(self, scope)
 
+    def is_held(self, scope):
+        from gateway.business.store_episodes import is_held
+        return is_held(self, scope)
+
+    def contact_identifiers(self, scope):
+        from gateway.business.store_episodes import contact_identifiers
+        return contact_identifiers(self, scope)
+
+    def episode_status(self, scope, episode_id):
+        from gateway.business.store_episodes import episode_status
+        return episode_status(self, scope, episode_id)
+
+    def audit_events(self, scope):
+        from gateway.business.store_episodes import audit_events
+        return audit_events(self, scope)
+
     def save_snapshot(self, snapshot):
         from gateway.business.store_drafts import save_snapshot
         return save_snapshot(self, snapshot)
@@ -63,3 +79,15 @@ class BusinessStore:
     def put_task(self, scope, *, dedupe_key, reason, refs):
         from gateway.business.store_drafts import put_task
         return put_task(self, scope, dedupe_key=dedupe_key, reason=reason, refs=refs)
+
+    def get_task(self, scope, task_id):
+        from gateway.business.store_drafts import get_task
+        return get_task(self, scope, task_id)
+
+    def list_tasks(self, scope):
+        from gateway.business.store_drafts import list_tasks
+        return list_tasks(self, scope)
+
+    def revision_status(self, scope, revision_id):
+        from gateway.business.store_drafts import revision_status
+        return revision_status(self, scope, revision_id)

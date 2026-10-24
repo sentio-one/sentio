@@ -2,6 +2,7 @@
 
 import json
 import uuid
+import copy
 from dataclasses import asdict
 
 from hermes_cli.sqlite_util import transaction
@@ -33,9 +34,20 @@ def _snapshot(value):
 
 
 def _revision(value):
-    candidate = Candidate(**value["candidate"])
-    checks = CheckReport(**value["checks"]) if value["checks"] is not None else None
-    review = ReviewVerdict(**value["review"]) if value["review"] is not None else None
+    candidate_value = value["candidate"]
+    candidate_value["data"] = copy.deepcopy(candidate_value["data"])
+    for field in ("fact_ids", "completed_action_ids", "credential_slots"):
+        candidate_value[field] = tuple(candidate_value[field])
+    candidate = Candidate(**candidate_value)
+    checks_value = value["checks"]
+    if checks_value is not None:
+        checks_value["issues"] = tuple(checks_value["issues"])
+    checks = CheckReport(**checks_value) if checks_value is not None else None
+    review_value = value["review"]
+    if review_value is not None:
+        review_value["reasons"] = tuple(review_value["reasons"])
+        review_value["policy_refs"] = tuple(review_value["policy_refs"])
+    review = ReviewVerdict(**review_value) if review_value is not None else None
     return DraftRevision(value["id"], _scope(value["scope"]), EpisodeRef(**value["episode"]),
                          value["number"], candidate, value["policy_version"], value["lesson_version"], checks, review)
 
@@ -43,9 +55,11 @@ def _revision(value):
 def save_snapshot(store, snapshot):
     conn = store._connect()
     with transaction(conn, immediate=True) as db:
-        owned = db.execute("SELECT 1 FROM business_episodes WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND episode_id=?",
+        owned = db.execute("SELECT context_version FROM business_episodes WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND episode_id=?",
                            (*_scope_values(snapshot.scope), snapshot.episode.id)).fetchone()
-        if not owned:
+        current = db.execute("SELECT context_version FROM business_contacts WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=?",
+                             _scope_values(snapshot.scope)).fetchone()
+        if not owned or owned[0] != snapshot.episode.context_version or current[0] != snapshot.episode.context_version:
             raise BusinessDenied()
         db.execute("INSERT INTO business_contexts(runtime_profile,transport_profile,account_id,contact_id,snapshot_id,episode_id,payload) VALUES(?,?,?,?,?,?,?)",
                    (*_scope_values(snapshot.scope), snapshot.id, snapshot.episode.id, _json(snapshot)))
@@ -68,13 +82,22 @@ def append_revision(store, scope, episode, candidate, *, expected_revision_id, p
                            (*_scope_values(scope), episode.id)).fetchone()
         if not owned:
             raise BusinessDenied()
+        current = db.execute("SELECT context_version,held FROM business_contacts WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=?",
+                             _scope_values(scope)).fetchone()
+        stored = db.execute("SELECT context_version,state FROM business_episodes WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND episode_id=?",
+                            (*_scope_values(scope), episode.id)).fetchone()
+        if current[1] or stored[0] != episode.context_version or current[0] != episode.context_version:
+            raise BusinessConflict("stale_episode")
         row = db.execute("SELECT revision_id,number FROM business_revisions WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND episode_id=? ORDER BY number DESC LIMIT 1",
                          (*_scope_values(scope), episode.id)).fetchone()
         latest = row["revision_id"] if row else None
         if latest != expected_revision_id:
             raise BusinessConflict("revision_conflict")
         number = row["number"] + 1 if row else 1
-        revision = DraftRevision(str(uuid.uuid4()), scope, episode, number, candidate, policy_version, lesson_version, None, None)
+        stored_candidate = Candidate(
+            candidate.kind, candidate.text, copy.deepcopy(candidate.data), tuple(candidate.fact_ids),
+            tuple(candidate.completed_action_ids), tuple(candidate.credential_slots))
+        revision = DraftRevision(str(uuid.uuid4()), scope, episode, number, stored_candidate, policy_version, lesson_version, None, None)
         db.execute("INSERT INTO business_revisions(runtime_profile,transport_profile,account_id,contact_id,revision_id,episode_id,number,parent_revision_id,payload) VALUES(?,?,?,?,?,?,?,?,?)",
                    (*_scope_values(scope), revision.id, episode.id, number, latest, _json(revision)))
         return revision
@@ -88,6 +111,16 @@ def get_revision(store, scope, revision_id):
     if not row:
         raise BusinessDenied()
     return _revision(json.loads(row[0]))
+
+
+def revision_status(store, scope, revision_id):
+    conn = store._connect()
+    with transaction(conn) as db:
+        row = db.execute("SELECT status FROM business_revisions WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND revision_id=?",
+                         (*_scope_values(scope), revision_id)).fetchone()
+    if not row:
+        raise BusinessDenied()
+    return row[0]
 
 
 def put_task(store, scope, *, dedupe_key, reason, refs):
@@ -104,3 +137,21 @@ def put_task(store, scope, *, dedupe_key, reason, refs):
         db.execute("INSERT INTO business_tasks(runtime_profile,transport_profile,account_id,contact_id,task_id,dedupe_key,payload) VALUES(?,?,?,?,?,?,?)",
                    (*_scope_values(scope), task_id, dedupe_key, payload))
         return task_id
+
+
+def get_task(store, scope, task_id):
+    conn = store._connect()
+    with transaction(conn) as db:
+        row = db.execute("SELECT task_id,dedupe_key,payload FROM business_tasks WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND task_id=?",
+                         (*_scope_values(scope), task_id)).fetchone()
+    if not row:
+        raise BusinessDenied()
+    return {"id": row["task_id"], "dedupe_key": row["dedupe_key"], **json.loads(row["payload"])}
+
+
+def list_tasks(store, scope):
+    conn = store._connect()
+    with transaction(conn) as db:
+        rows = db.execute("SELECT task_id,dedupe_key,payload FROM business_tasks WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? ORDER BY task_id",
+                          _scope_values(scope)).fetchall()
+    return tuple({"id": row["task_id"], "dedupe_key": row["dedupe_key"], **json.loads(row["payload"])} for row in rows)
