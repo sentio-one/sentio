@@ -14,9 +14,10 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request supersedes its older run; every commit on main keeps its own result.
 concurrency:
   group: fork-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   python:
@@ -36,8 +37,10 @@ jobs:
       - name: Check uv.lock is current
         run: uv lock --check
 
-      - name: Release version scripts
-        run: scripts/run_tests.sh tests/scripts/test_release_version_scripts.py
+      - name: Fork script tests
+        run: |
+          scripts/run_tests.sh tests/scripts/test_release_version_scripts.py \
+            tests/scripts/test_disable_upstream_workflows.py
 
       - name: Run the fork's tests
         run: |
