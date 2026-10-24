@@ -71,7 +71,7 @@ these steps. Do not let a partially completed plan enable a sending account.
   prepared shell, `python scripts/check` is the blocking CI lint command. Use the
   existing lockfile and do not mutate environments with raw pip/uv.
 
-- [ ] After the user reviews the plans and chooses execution, make a documentation
+- [x] After the user reviews the plans and chooses execution, make a documentation
   commit containing this index, the approved design and the three linked plans
   before task implementation or transferring work into another checkout. Stage
   those five exact paths only; use `git commit -m "docs: plan native WhatsApp training wheels"`.

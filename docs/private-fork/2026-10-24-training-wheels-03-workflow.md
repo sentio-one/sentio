@@ -67,7 +67,7 @@ Native operator operations are `queue`, `show`, `edit`, `approve`, `reject`, `ta
 returns ordered `{events, next_cursor}` and persists an acknowledgement only through
 `ack_events(consumer, cursor)` after the consumer's successful idempotent write.
 
-- [ ] **Step 1: Write** `test_digest_and_reaction_bind_exact_actor_and_revision`, `test_ambiguous_operator_command_refuses`, `test_plugin_scope_cannot_approve_or_read_foreign_queue`, `test_cli_json_reports_held_and_delivery_distinctly`:
+- [x] **Step 1: Write** `test_digest_and_reaction_bind_exact_actor_and_revision`, `test_ambiguous_operator_command_refuses`, `test_plugin_scope_cannot_approve_or_read_foreign_queue`, `test_cli_json_reports_held_and_delivery_distinctly`:
 
 ```python
 assert stale_digest_result["error"] == "stale_revision"
