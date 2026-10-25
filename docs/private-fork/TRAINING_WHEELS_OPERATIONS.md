@@ -1,5 +1,12 @@
 # Native WhatsApp Business Operations: Shadow Mode (Plan 01)
 
+> **Implementation warning — 2026-10-25:** The native workflow is incomplete.
+> Operator CLI/control, dispatch, plugin migration, and delivery reconciliation
+> are not connected end to end. The commands and native supervision described
+> below are intended behavior, not working operational instructions. See the
+> [implementation review](WHATSAPP_TRAINING_WHEELS_REVIEW.md) before attempting
+> setup or cutover. No pilot is certified.
+
 ## Overview
 
 This runbook documents operational procedures, evaluation metrics, and safety invariants for **Shadow Mode** of the Native WhatsApp Training Wheels messaging architecture.

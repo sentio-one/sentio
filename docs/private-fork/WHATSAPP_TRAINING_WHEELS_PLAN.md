@@ -1,5 +1,11 @@
 # WhatsApp Training Wheels Implementation Plan
 
+> **Review status — 2026-10-25:** Implementation is incomplete despite the checked
+> steps in the linked plans. The [implementation review](WHATSAPP_TRAINING_WHEELS_REVIEW.md)
+> identifies eight blocking integration gaps. Checked steps record the earlier
+> execution report, not verified acceptance. Keep the PR in draft; no pilot or
+> cutover is certified.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the sales plugin's bridge patches with native dedicated drafting, human supervision, paced delivery, and a traceable learning loop.
