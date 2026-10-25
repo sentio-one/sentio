@@ -159,7 +159,7 @@ async def dispatch_due(
     elig = service.store.governor_reserve_attempt(
         account,
         attempt.id,
-        message_class="reply",
+        message_class=ctx["message_class"],
         now_ms=ts,
         config=gov_cfg,
     )

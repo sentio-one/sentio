@@ -247,17 +247,21 @@ A second reviewer read the repaired diff. Fixed in this change:
 
 Open items that must be resolved or explicitly accepted before any live pilot:
 
-1. **Control-socket principal (high).** Any same-uid process is treated as a human
-   admin (`control.py` `handle_request`), so the authenticity of an approval rests
-   on agent tools running in the per-profile sandbox, which does not receive the
-   socket or dispatch credential. A profile whose agent terminal runs unsandboxed
-   on the host can approve its own drafts. Readiness should refuse supervised mode
-   unless the profile's terminal backend is sandboxed, or a separate human-only
-   credential should be introduced.
-2. **Pacing class (high).** `transport.py` reserves every attempt as class `reply`;
-   the design does not define how cold, follow-up and reply sends are classified,
-   so cold outreach and follow-ups currently use reply windows, gaps and caps.
-   Needs a design decision and a stored class. Do not enable outreach before then.
+1. ~~Control-socket principal (high).~~ **Fixed.** The same-user socket still cannot
+   tell an operator from the agent's own tools, so authority now depends on the
+   owning profile's terminal backend being off the host (`sandbox_boundary.py`):
+   readiness reports `agent_tools_not_sandboxed` and refuses supervised activation,
+   and a supervised profile whose terminal backend is `local` refuses every socket
+   operation that can authorize sending (anything except queue, show, tasks, status,
+   readiness, digest, pause and reject). The verified WhatsApp operator channel is
+   unaffected. Consequence: the launch profile, which is host-level by design, cannot
+   run supervised mode; run it on a sandboxed (routed) profile.
+2. ~~Pacing class (high).~~ **Fixed.** The class is stored on the outbox row at
+   submission: `reply` for the first outbox of an episode that began with an inbound
+   customer message, `follow-up` for later sends to a contact we have dispatched to
+   or heard from, and `cold` otherwise (also the default for legacy rows). Dispatch
+   reserves governor capacity with that class, so cold outreach uses cold windows,
+   gaps and caps.
 3. **Operator edit** does not stop an `unavailable` or `revise` advisory review
    from being rendered and approvable without an audited override.
 4. **Registration preflight** is never wired: `submit_external` only checks
@@ -275,5 +279,5 @@ Open items that must be resolved or explicitly accepted before any live pilot:
 9. `handle_operator_event` (reaction, shorthand, digest approval over WhatsApp)
    has no production caller.
 
-The verdict stays **draft: not ready to merge or pilot** until items 1 and 2 are
-settled. No live configuration, queue, deployment or customer messaging was changed.
+The verdict stays **draft: not ready to merge or pilot** until the remaining items
+are resolved or explicitly accepted. No live configuration, queue, deployment or customer messaging was changed.

@@ -21,6 +21,32 @@ from gateway.business.outbox import Attempt
 from gateway.business.store_episodes import _scope_values
 
 
+_DISPATCHED = "('awaiting_delivery','delivered','unknown')"
+
+
+def _message_class(db, scope: Scope, episode_id: str) -> str:
+    """Pacing class: reply to an inbound episode, follow-up to a known contact, else cold."""
+    values = _scope_values(scope)
+    origin = db.execute(
+        "SELECT payload FROM business_ingress WHERE runtime_profile=? AND transport_profile=? AND account_id=? "
+        "AND contact_id=? AND episode_id=?", (*values, episode_id)).fetchone()
+    inbound_origin = bool(origin) and json.loads(origin["payload"]).get("evidence") == "inbound"
+    dispatched = (
+        "SELECT 1 FROM business_outbox o JOIN business_revisions r ON r.revision_id=o.revision_id "
+        "WHERE o.runtime_profile=? AND o.transport_profile=? AND o.account_id=? AND o.contact_id=? "
+        f"AND o.state IN {_DISPATCHED}")
+    if inbound_origin:
+        if not db.execute(dispatched + " AND r.episode_id=?", (*values, episode_id)).fetchone():
+            return "reply"
+        return "followup"
+    if db.execute(dispatched, values).fetchone():
+        return "followup"
+    heard_from = db.execute(
+        "SELECT 1 FROM business_ingress WHERE runtime_profile=? AND transport_profile=? AND account_id=? "
+        "AND contact_id=? AND json_extract(payload, '$.evidence')='inbound' LIMIT 1", values).fetchone()
+    return "followup" if heard_from else "cold"
+
+
 def submit_revision(
     store,
     scope: Scope,
@@ -76,9 +102,10 @@ def submit_revision(
 
         outbox_id = str(uuid.uuid4())
         db.execute(
-            "INSERT INTO business_outbox(runtime_profile, transport_profile, account_id, contact_id, outbox_id, revision_id, plan_id, request_id, state, created_at_ms, expires_at_ms) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-            (*_scope_values(scope), outbox_id, revision_id, plan_id, request_id, "held", now_ms, expires_at),
+            "INSERT INTO business_outbox(runtime_profile, transport_profile, account_id, contact_id, outbox_id, revision_id, plan_id, request_id, state, created_at_ms, expires_at_ms, message_class) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            (*_scope_values(scope), outbox_id, revision_id, plan_id, request_id, "held", now_ms, expires_at,
+             _message_class(db, scope, rev_row["episode_id"])),
         )
         return Receipt(id=outbox_id, state="held", revision_id=revision_id, reason=None)
 
@@ -337,7 +364,7 @@ def get_attempt_context(store, attempt_id: str) -> dict | None:
     with transaction(conn) as db:
         row = db.execute(
             "SELECT a.attempt_id, a.outbox_id, a.part_index, a.generation, a.state, a.platform_ids, a.error_code, "
-            "       o.runtime_profile, o.transport_profile, o.account_id, o.contact_id, o.revision_id, o.plan_id "
+            "       o.runtime_profile, o.transport_profile, o.account_id, o.contact_id, o.revision_id, o.plan_id, o.message_class "
             "FROM business_attempts a "
             "JOIN business_outbox o ON a.outbox_id = o.outbox_id "
             "WHERE a.attempt_id = ?",

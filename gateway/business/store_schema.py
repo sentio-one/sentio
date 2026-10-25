@@ -167,6 +167,8 @@ def initialize_schema(conn):
     add_column_if_missing(conn, "business_tasks", "resolved_at_ms", "resolved_at_ms INTEGER")
     add_column_if_missing(conn, "business_tasks", "resolution", "resolution TEXT")
     add_column_if_missing(conn, "business_tasks", "resolved_by", "resolved_by TEXT")
+    # Legacy rows predate classification; the strictest class is the safe default.
+    add_column_if_missing(conn, "business_outbox", "message_class", "message_class TEXT NOT NULL DEFAULT 'cold'")
     add_column_if_missing(conn, "business_digests", "plan_digests", "plan_digests TEXT NOT NULL DEFAULT '{}'")
     conn.execute("""CREATE TABLE IF NOT EXISTS business_credential_grants (
       grant_id TEXT PRIMARY KEY, runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL,

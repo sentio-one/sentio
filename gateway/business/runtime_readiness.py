@@ -11,6 +11,9 @@ async def probe_runtime(service, account, runtime_profile):
     from hermes_cli.plugins_business import callbacks_for_required_policy
 
     blockers = []
+    from gateway.business.sandbox_boundary import agent_tools_sandboxed
+    if not agent_tools_sandboxed(service, runtime_profile):
+        blockers.append("agent_tools_not_sandboxed")
     runner = getattr(service, "runner", None)
     server = getattr(runner, "session_control_server", None)
     handlers = getattr(server, "private_handlers", {})

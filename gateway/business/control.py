@@ -10,6 +10,7 @@ from typing import Any
 
 from gateway.business.models import BusinessConflict, BusinessDenied, BusinessProtocolError, Principal, Scope
 from gateway.business.permissions import OPERATOR_OPERATIONS, PERMITTED_PLUGIN_OPERATIONS
+from gateway.business.sandbox_boundary import socket_operation_refused
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +133,8 @@ def register_business_control_handlers(server: Any, service: Any, *, runner=None
             operations=PERMITTED_PLUGIN_OPERATIONS if plugin else OPERATOR_OPERATIONS | frozenset({"admin"}),
             kind='plugin' if plugin else 'human',
         )
+        if not plugin and socket_operation_refused(service, profile, op):
+            return {'ok': False, 'error': 'sandbox_required_for_socket_operation'}
         return handle_business_request(service, operation=op, params=payload, principal=principal)
 
     def handle_transport(params, peer_subject):
