@@ -212,8 +212,10 @@ class GatewayInboundMixin(GatewayInboundHooksMixin, GatewayInboundTranscriptionM
         # scale-to-zero: only real user-originated inbound stamps the last-inbound clock;
         # counting internal/system events would keep a genuinely idle gateway awake.
         self._scale_to_zero_note_real_inbound()
-        from gateway.business.operators import handle_business_operator_message
+        from gateway.business.operators import handle_business_operator_message, handle_business_operator_reaction
         if await handle_business_operator_message(self, event) is not None:
+            return None
+        if await handle_business_operator_reaction(self,event):
             return None
         await self._hm_business_ingress(event)
         _observed = event

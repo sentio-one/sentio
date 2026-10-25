@@ -7,10 +7,12 @@ import pytest
 
 from gateway.business.models import (
     AccountKey,
+    BusinessConflict,
     Candidate,
     ContextEvent,
     Principal,
     Scope,
+    ReviewVerdict,
 )
 from gateway.business.operators import (
     create_digest,
@@ -122,3 +124,20 @@ async def test_ambiguous_operator_command_refuses(service):
     )
     deduplicated_alert_count = 1 if alert1.get("alert_id") == alert2.get("alert_id") or not alert2.get("emitted") else 2
     assert deduplicated_alert_count == 1
+
+
+@pytest.mark.asyncio
+async def test_advisory_unavailable_requires_audited_approval_override(store):
+    scope=_scope('27600000009@s.whatsapp.net')
+    store.bind_contact(scope.runtime_profile,scope.transport_profile,scope.account_id,[scope.contact_id])
+    store.record_ingress(scope,ContextEvent('review-in','message','customer','Hello',None,'inbound'),source_id='review-in')
+    episode=store.episode_for_source(scope,'review-in')
+    revision=store.append_revision(scope,episode,Candidate('text','Reviewed copy',{},(),(),()),expected_revision_id=None,policy_version='v1',lesson_version=0)
+    store.attach_review(scope,revision.id,verdict=ReviewVerdict('unavailable',('reviewer offline',),(),'timeout'),expected_context_version=episode.context_version)
+    plan=DeliveryPlan('review-plan',revision.id,scope,episode.context_version,'v1',(DeliveryPart(0,'text',{'text':'Reviewed copy'},None),),2_000_000,'sha256:review')
+    store.save_plan(plan)
+    store.submit_revision(scope,revision.id,request_id='review-request',now_ms=1_000)
+    with pytest.raises(BusinessConflict,match='override_reason_required'):
+        store.approve_revision(_operator_principal(),scope,revision_id=revision.id,plan_digest=plan.digest,now_ms=1_000)
+    approval=store.approve_revision(_operator_principal(),scope,revision_id=revision.id,plan_digest=plan.digest,now_ms=1_001,override_reason='I reviewed the unavailable advisory result')
+    assert approval.override_reason=='I reviewed the unavailable advisory result'

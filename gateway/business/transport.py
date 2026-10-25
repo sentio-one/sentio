@@ -50,6 +50,8 @@ async def preflight_recipient(
                 res = await contact_checker(scope.contact_id)
             else:
                 res = contact_checker(scope.contact_id)
+            if res is None:
+                return "unknown"
             if res:
                 return "known_valid"
             return "no_whatsapp_account"
@@ -84,10 +86,26 @@ async def submit_external(
 ) -> Receipt:
     """Submit an outbound candidate via the supervised outbox with recipient preflight."""
     ts = int(time.time() * 1000) if now_ms is None else now_ms
+    if contact_checker is None:
+        from gateway.business.worker import delivery_adapter
+        adapter = delivery_adapter(
+            getattr(service, "runner", None) or getattr(service, "_transport_runner", None),
+            AccountKey(scope.transport_profile, scope.account_id),
+        )
+        if adapter is not None and callable(getattr(adapter, "check_business_registration", None)):
+            try:
+                target = resolve_transport_target(service.store, scope)
+            except BusinessConflict:
+                target = None
+            async def check_registered(_contact):
+                if target is None:
+                    return None
+                return await adapter.check_business_registration(target)
+            contact_checker = check_registered
     preflight = await preflight_recipient(scope, store=service.store, contact_checker=contact_checker)
     if preflight == "no_whatsapp_account":
         return Receipt(id=str(uuid.uuid4()), state="failed", revision_id=None, reason="no_whatsapp_account")
-    if preflight == "unknown" and contact_checker is not None:
+    if preflight == "unknown":
         return Receipt(id=str(uuid.uuid4()), state="held", revision_id=None, reason="lookup_error")
 
     # Producer targets are aliases; every durable record uses the canonical contact.

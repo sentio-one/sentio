@@ -221,10 +221,11 @@ network boundary are faked.
 
 | Check | Result |
 | --- | --- |
-| Business, plugin, CLI and vault suites | 34 files, 131 passed, 1 skipped |
+| Business, plugin, CLI and vault suites | 34 files, 138 passed, 1 skipped |
 | Named C7 regression files | 12 files, 346 passed |
-| WhatsApp, runner and busy-routing suites | 60 files, 380 passed, 4 skipped |
 | `node --test` in `scripts/whatsapp-bridge` | 33 passed |
+| Focused WhatsApp inbound/busy-routing and transport suites | 6 files, 63 passed, 1 skipped |
+| Focused follow-up regressions | 3 files, 20 passed, 1 skipped |
 | `python3 scripts/check` with pinned Ruff 0.15.22 | 12 checks OK, zero blocking findings |
 | Plugin `tests/run_native.sh` on `native-training-wheels` | exit 0; all native, bridge and legacy suites pass |
 
@@ -245,39 +246,31 @@ A second reviewer read the repaired diff. Fixed in this change:
   service configured, was dropped before ingress recording. It now falls through as
   an ordinary inbound message.
 
-Open items that must be resolved or explicitly accepted before any live pilot:
+Follow-up review findings (resolved in the current branch; evidence below):
 
-1. ~~Control-socket principal (high).~~ **Fixed.** The same-user socket still cannot
-   tell an operator from the agent's own tools, so authority now depends on the
-   owning profile's terminal backend being off the host (`sandbox_boundary.py`):
-   readiness reports `agent_tools_not_sandboxed` and refuses supervised activation,
-   and a supervised profile whose terminal backend is `local` refuses every socket
-   operation that can authorize sending (anything except queue, show, tasks, status,
-   readiness, digest, pause and reject). The verified WhatsApp operator channel is
-   unaffected. Consequence: the launch profile, which is host-level by design, cannot
-   run supervised mode; run it on a sandboxed (routed) profile.
-2. ~~Pacing class (high).~~ **Fixed.** The class is stored on the outbox row at
-   submission: `reply` for the first outbox of an episode that began with an inbound
-   customer message, `follow-up` for later sends to a contact we have dispatched to
-   or heard from, and `cold` otherwise (also the default for legacy rows). Dispatch
-   reserves governor capacity with that class, so cold outreach uses cold windows,
-   gaps and caps.
-3. **Operator edit** does not stop an `unavailable` or `revise` advisory review
-   from being rendered and approvable without an audited override.
-4. **Registration preflight** is never wired: `submit_external` only checks
-   registration when a `contact_checker` is passed, and no caller passes one.
-5. **Pre-socket failures** in the bridge (`quote_target_unavailable`,
-   `media_hash_mismatch`, `invalid_attachment`) are reported as submitted-unknown
-   rather than definitively unsubmitted, and then block the account queue.
-6. **Restart recovery** replays the whole attempt journal, resetting finished
-   attempts to `sent` and re-completing governor reservations, which distorts
-   pacing history.
-7. **Queue head blocking:** `claim_part` considers only the oldest approved outbox,
-   so one paced or unknown item delays every other contact.
-8. **Outbound scope** is built from the adapter's transport profile as the runtime
-   profile; the routed-secondary case was not traced end to end.
-9. `handle_operator_event` (reaction, shorthand, digest approval over WhatsApp)
-   has no production caller.
+3. **Advisory review override. Fixed.** Approval for `unavailable`, `revise`, or
+   `reject` requires a nonempty override reason persisted in the approval record.
+   Covered by `test_advisory_unavailable_requires_audited_approval_override`.
+4. **Registration preflight. Fixed.** Cold external submissions use the owning
+   bridge's registration endpoint. Negative results fail; lookup errors remain held.
+   The bridge endpoint test covers registered and unregistered results.
+5. **Pre-socket failures. Fixed.** Quote and attachment validation now runs before
+   one-use authorization is consumed. The endpoint test proves a missing quote
+   returns `submitted: false` and leaves the authorization unconsumed.
+6. **Restart recovery. Fixed.** Completed attempts are not replayed from the journal.
+   A leftover governor reservation is finalized once; repeated recovery does not
+   duplicate history. Covered by `test_recovery_does_not_replay_finished_attempt_or_governor_history`.
+7. **Queue head blocking. Fixed.** A future-scheduled or unresolved item blocks its
+   own contact while other approved contacts remain claimable. Covered by
+   `test_future_paced_contact_does_not_block_another_contact`.
+8. **Outbound scope. Fixed and traced.** Persisted attempt context retains the
+   serving runtime profile while adapter ownership resolves by transport profile.
+   The secondary-profile transport test asserts the physical request scope.
+9. **WhatsApp operator events. Fixed.** `/messages recard` sends an exact-revision
+   card with its durable digest and plan binding; the inbound path routes authorized
+   thumbs-up reactions and explicit digest approvals through `handle_operator_event`.
+   Covered by the operator card persistence, reaction, and digest-command tests.
 
-The verdict stays **draft: not ready to merge or pilot** until the remaining items
-are resolved or explicitly accepted. No live configuration, queue, deployment or customer messaging was changed.
+The repaired branch is ready for code review as an offline implementation. This
+does not authorize a live pilot, legacy cutover, or customer sends. No live
+configuration, queue, deployment, or customer messaging was changed.

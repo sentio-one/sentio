@@ -74,7 +74,7 @@ def run_messages_command(args: Any) -> int:
         print(json.dumps({"ok": False, "error": "subcommand_required"}))
         return 2
     params = {key: value for key, value in vars(args).items()
-              if key in {"outbox_id", "revision_id", "plan_digest", "override_reason", "reason",
+              if key in {"outbox_id", "revision_id", "plan_digest", "digest_id", "override_reason", "reason",
                          "text", "task_id", "mode", "runtime_profile", "transport_profile", "account_id",
                          "contact_id", "lesson_id", "policy_id", "texts", "evidence_revision_ids",
                          "vault_item_id", "expires_at_ms", "path", "manifest_id", "source_digest", "legacy_stopped"}

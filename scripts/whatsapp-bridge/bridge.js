@@ -30,7 +30,7 @@ import { randomBytes, createHash } from 'crypto';
 import { execFileSync } from 'child_process';
 import { tmpdir } from 'os';
 import qrcode from 'qrcode-terminal';
-import { matchesAllowedSender, matchesAllowedUser, matchesInboundWhatsAppGroup, parseAllowedUsers } from './allowlist.js';
+import { matchesAllowedSender, matchesAllowedUser, matchesInboundWhatsAppGroup, normalizeWhatsAppIdentifier, parseAllowedUsers } from './allowlist.js';
 import { createOutboundIdTracker } from './outbound_ids.js';
 import { classifyOwnerMessageGate } from './owner_message_gate.js';
 import { normalizeDeliveryUpdates } from './business_receipts.js';
@@ -873,6 +873,7 @@ installBusinessRoutes(app, {
   messageStore,
   track: sent => {trackSentMessageId(sent); messageStore.remember(sent);},
   authorize: () => businessAuthorize,
+  checkRegistration: recipient => sock.onWhatsApp(`${normalizeWhatsAppIdentifier(recipient)}@s.whatsapp.net`),
 });
 
 // Poll for new messages (long-poll style)

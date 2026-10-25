@@ -178,3 +178,7 @@ def initialize_schema(conn):
       runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
       revision_id TEXT NOT NULL PRIMARY KEY, elapsed_ms REAL NOT NULL,
       schema_version INTEGER NOT NULL DEFAULT 1)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS business_operator_cards (
+      message_id TEXT PRIMARY KEY, runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL,
+      account_id TEXT NOT NULL, contact_id TEXT NOT NULL, digest_id TEXT NOT NULL,
+      revision_id TEXT NOT NULL, plan_digest TEXT NOT NULL, created_at_ms INTEGER NOT NULL)""")

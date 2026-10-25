@@ -9,7 +9,8 @@ test('physical endpoints refuse raw sends across bridge restart and exact dispat
   const session=mkdtempSync(path.join(os.tmpdir(),'wa-business-'));
   const calls=[];
   let consumed=false;
-  const configure=()=>configureBridgeTransport({socket:{sendMessage:async (...args)=>{calls.push(args); return {key:{id:'physical-id'}};}},state:'connected',sessionDir:session,authorize:async request=>{
+  let registered=true;
+  const configure=()=>configureBridgeTransport({socket:{sendMessage:async (...args)=>{calls.push(args); return {key:{id:'physical-id'}};},onWhatsApp:async jid=>[{jid,exists:registered}]},state:'connected',sessionDir:session,authorize:async request=>{
     assert.equal(request.part.payload.text,'approved  bytes\n');
     if(consumed) return {ok:false,error:'authorization_consumed'};
     consumed=true;
@@ -37,6 +38,15 @@ test('physical endpoints refuse raw sends across bridge restart and exact dispat
     configure();
     assert.equal((await post('/send',raw))[0],409,'restart retains latch');
     const req={authorization_token:'token',token:'token',attempt_id:'attempt',plan_id:'plan',plan_digest:'digest',payload_digest:'digest',scope:{runtime_profile:'satellite',transport_profile:'secondary',account_id:'secondary',contact_id:'123@s.whatsapp.net'},part:{index:0,operation:'text',payload:{text:'approved  bytes\n'},media_hash:null}};
+    const invalid={...req,part:{index:0,operation:'text',payload:{text:'quoted',reply_target:'missing'},media_hash:null}};
+    const [invalidStatus,invalidBody]=await post('/business/dispatch',invalid);
+    assert.equal(invalidStatus,409);
+    assert.equal(invalidBody.submitted,false);
+    assert.equal(consumed,false,'local validation must not consume a one-use token');
+    assert.deepEqual(await (await post('/business/check-registration',{recipient:'123@s.whatsapp.net'}))[1],{ok:true,registered:true});
+    registered=false;
+    assert.deepEqual(await (await post('/business/check-registration',{recipient:'123@s.whatsapp.net'}))[1],{ok:true,registered:false});
+    registered=true;
     assert.equal((await post('/business/dispatch',req))[0],200);
     assert.equal(calls.length,1);
     assert.equal(calls[0][0],'123@s.whatsapp.net');

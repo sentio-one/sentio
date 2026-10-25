@@ -122,14 +122,87 @@ async def handle_business_operator_message(runner,event) -> str | None:
             raise BusinessDenied()
         params['runtime_profile'] = runtime
         principal = Principal(f'whatsapp:{event.source.user_id}',runtime,OPERATOR_OPERATIONS,'human')
-        result = await execute_business_request(service,operation=f'operator.{action}',params=params,principal=principal)
+        if action == 'approve' and params.get('digest_id'):
+            result = await handle_operator_event(service, {
+                'action':'approve_digest', 'digest_id':params['digest_id'],
+                'revision_id':params['revision_id'], 'plan_digest':params['plan_digest'],
+                'scope':{'runtime_profile':runtime,'transport_profile':transport,
+                         'account_id':transport,'contact_id':destination},
+            }, principal=principal)
+        else:
+            result = await execute_business_request(service,operation=f'operator.{action}',params=params,principal=principal)
     except (ValueError,BusinessDenied) as exc:
         result = {'ok':False,'error':str(exc) or 'permission_denied'}
     from gateway.business.transport import send_operator_notice
-    notice = await send_operator_notice(service,scope,json.dumps(result,ensure_ascii=False))
+    notice_text = json.dumps(result,ensure_ascii=False,default=str)
+    card = _review_card(service,principal,result) if action in {'show','recard'} else None
+    if card:
+        notice_text = json.dumps({'review_card':card['public'],'details':result},ensure_ascii=False,default=str)
+    notice = await send_operator_notice(service,scope,notice_text)
+    if card and notice.get('ok') and (message_id := notice.get('message_id') or notice.get('messageId')):
+        from hermes_cli.sqlite_util import transaction
+        with transaction(service.store._connect(),immediate=True) as db:
+            db.execute('INSERT OR REPLACE INTO business_operator_cards(message_id,runtime_profile,transport_profile,account_id,contact_id,digest_id,revision_id,plan_digest,created_at_ms) VALUES(?,?,?,?,?,?,?,?,?)',
+                       (str(message_id),*asdict(card['scope']).values(),card['digest_id'],card['revision_id'],card['plan_digest'],int(time.time()*1000)))
     if not notice.get('ok'):
         service.store.put_task(scope,dedupe_key=f"operator-notice:{event.message_id or uuid.uuid4()}",reason=str(notice.get('error') or 'operator_notice_unavailable'),refs=(json.dumps(result,ensure_ascii=False),))
     return ''
+
+
+def _review_card(service,principal,result):
+    plan=result.get('plan') if isinstance(result,dict) else None
+    if isinstance(plan,dict):
+        scope=plan.get('scope')
+        scope=Scope(**scope) if isinstance(scope,dict) else scope
+        revision_id=plan.get('revision_id')
+        plan_digest=plan.get('digest')
+    else:
+        scope=getattr(plan,'scope',None)
+        revision_id=getattr(plan,'revision_id',None)
+        plan_digest=getattr(plan,'digest',None)
+    if not scope or not revision_id or not plan_digest:
+        return None
+    digest=create_digest(principal,scope,(revision_id,),store=service.store)
+    return {'scope':scope,'digest_id':digest['digest_id'],'revision_id':revision_id,
+            'plan_digest':plan_digest,'public':{'digest_id':digest['digest_id'],
+              'revision_id':revision_id,'plan_digest':plan_digest,
+              'instruction':'React 👍 to approve this exact revision.'}}
+
+
+async def handle_business_operator_reaction(runner,event) -> bool:
+    """Apply a WhatsApp thumbs-up only when it targets a sent, exact-revision card."""
+    metadata=getattr(event,'metadata',None) or {}
+    target=metadata.get('reaction_target_id')
+    emoji=metadata.get('reaction_emoji')
+    source=event.source
+    if not target or emoji not in {'👍','✅'} or getattr(source,'chat_type',None)!='dm':
+        return False
+    service=getattr(runner,'_business_service',None)
+    if service is None or not runner._is_user_authorized_for_source(source):
+        return False
+    from gateway.session_identity import identity_of
+    identity=identity_of(source)
+    runtime=identity.runtime_profile if identity else getattr(source,'profile',None) or 'default'
+    transport=identity.transport_profile if identity else runtime
+    operator_scope=Scope(runtime,transport,transport,source.chat_id)
+    config=service.resolve_config(operator_scope)
+    if not config or not _operator_destination(service,operator_scope,source,config.operators):
+        return False
+    row=service.store._connect().execute('SELECT * FROM business_operator_cards WHERE message_id=? AND runtime_profile=? AND transport_profile=? AND account_id=?',
+            (str(target),runtime,transport,transport)).fetchone()
+    if not row:
+        return False
+    principal=Principal(f'whatsapp:{source.user_id}',runtime,OPERATOR_OPERATIONS,'human')
+    result=await handle_operator_event(service,{'action':'reaction','digest_id':row['digest_id'],
+        'revision_id':row['revision_id'],'plan_digest':row['plan_digest'],
+        'target_message_id':str(target),'scope':{key:row[key] for key in ('runtime_profile','transport_profile','account_id','contact_id')}},principal=principal)
+    destination=_operator_destination(service,operator_scope,source,config.operators)
+    notice_scope=Scope(runtime,transport,transport,destination)
+    from gateway.business.transport import send_operator_notice
+    notice=await send_operator_notice(service,notice_scope,json.dumps(result,ensure_ascii=False,default=str))
+    if not notice.get('ok'):
+        service.store.put_task(notice_scope,dedupe_key=f'operator-reaction:{target}:{event.message_id}',reason='operator_notice_unavailable',refs=(str(target),))
+    return True
 
 
 def _operator_destination(service,scope,source,operators):

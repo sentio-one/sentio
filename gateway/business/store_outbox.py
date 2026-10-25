@@ -159,7 +159,7 @@ def approve_revision(
         if review is not None:
             recommendation = review.get("recommendation", "")
             confidence = float(review.get("confidence", 1.0))
-            if recommendation == "reject" or confidence < 0.5:
+            if recommendation in {"reject", "revise", "unavailable"} or confidence < 0.5:
                 if not override_reason or not str(override_reason).strip():
                     raise BusinessConflict("override_reason_required")
 
@@ -259,7 +259,7 @@ def claim_part(
     """Claim the next ready outbox delivery part atomically."""
     conn = store._connect()
     with transaction(conn, immediate=True) as db:
-        row = db.execute(
+        rows = db.execute(
             "SELECT o.outbox_id, o.runtime_profile, o.transport_profile, o.account_id, o.contact_id, "
             "       o.revision_id, o.plan_id, o.approval_id, "
             "       c.context_version AS contact_context_version, c.held, c.suppressed, "
@@ -273,10 +273,18 @@ def claim_part(
             "LEFT JOIN business_approvals a ON o.approval_id = a.approval_id "
             "LEFT JOIN business_plans p ON o.plan_id = p.plan_id "
             "WHERE o.transport_profile = ? AND o.account_id = ? AND o.state = 'approved' "
-            "ORDER BY o.created_at_ms ASC LIMIT 1",
-            (account.transport_profile, account.account_id),
-        ).fetchone()
+            "AND NOT EXISTS (SELECT 1 FROM business_outbox blocked "
+            "JOIN business_attempts ba ON ba.outbox_id=blocked.outbox_id "
+            "WHERE blocked.runtime_profile=o.runtime_profile AND blocked.transport_profile=o.transport_profile "
+            "AND blocked.account_id=o.account_id AND blocked.contact_id=o.contact_id "
+            "AND ba.state IN ('unknown','claimed','in_flight')) "
+            "AND NOT EXISTS (SELECT 1 FROM business_attempts delayed "
+            "WHERE delayed.outbox_id=o.outbox_id AND delayed.state='scheduled' AND delayed.claimed_at_ms>?) "
+            "ORDER BY o.created_at_ms ASC",
+            (account.transport_profile, account.account_id, now_ms),
+        ).fetchall()
 
+        row = rows[0] if rows else None
         if not row:
             return None
 

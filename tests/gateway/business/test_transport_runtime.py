@@ -44,10 +44,31 @@ async def test_each_part_waits_for_governor_and_recovers_held_claim(tmp_path):
         calls.append(req)
         return {'message_id':f'msg-{len(calls)}'}
     assert (await dispatch_due(svc,account,transport_executor=send,now_ms=NOW))[0].state == 'sent'
+    assert calls[0]['scope']['runtime_profile']=='secondary'
     assert await dispatch_due(svc,account,transport_executor=send,now_ms=NOW+1) == []
     assert len(calls)==1
     assert len(await dispatch_due(svc,account,transport_executor=send,now_ms=NOW+10_000))==1
     assert len(calls)==2
+
+
+@pytest.mark.asyncio
+async def test_future_paced_contact_does_not_block_another_contact(tmp_path):
+    store,_svc,scope,account,_plan=await prepared(tmp_path,now_ms=NOW)
+    delayed=store.claim_part(account,now_ms=NOW)
+    from gateway.business.store_outbox import reschedule_attempt
+    reschedule_attempt(store,delayed.id,not_before_ms=NOW+60_000,reason='minimum_gap')
+    other=Scope(scope.runtime_profile,scope.transport_profile,scope.account_id,'456@s.whatsapp.net')
+    store.bind_contact(other.runtime_profile,other.transport_profile,other.account_id,[other.contact_id])
+    store.record_ingress(other,ContextEvent('other-in','message','customer','hello',None,'inbound'),source_id='other-in')
+    episode=store.episode_for_source(other,'other-in')
+    rev=store.append_revision(other,episode,Candidate('text','reply',{},(),(),()),expected_revision_id=None,policy_version='v1',lesson_version=0)
+    other_plan=await render_delivery_plan(other,rev,now_ms=NOW)
+    store.save_plan(other_plan)
+    store.submit_revision(other,rev.id,request_id='other',now_ms=NOW)
+    store.approve_revision(Principal('human','secondary',frozenset({'approve'}),'human'),other,revision_id=rev.id,plan_digest=other_plan.digest,now_ms=NOW)
+    next_attempt=store.claim_part(account,now_ms=NOW+1)
+    assert next_attempt is not None
+    assert next_attempt.outbox_id != delayed.outbox_id
 
 @pytest.mark.asyncio
 async def test_missing_governor_holds_without_losing_dispatch(tmp_path):
@@ -100,6 +121,34 @@ async def test_journal_success_reconciles_platform_id_and_early_receipt(tmp_path
     try:
         assert db.execute('SELECT state FROM business_outbox').fetchone()['state']=='delivered'
     finally: db.close()
+
+
+@pytest.mark.asyncio
+async def test_recovery_does_not_replay_finished_attempt_or_governor_history(tmp_path):
+    from gateway.business.recovery import reconcile_account
+    store,svc,_scope,account,_plan=await prepared(tmp_path,now_ms=NOW)
+    attempt=store.claim_part(account,now_ms=NOW)
+    store.governor_reserve_attempt(account,attempt.id,message_class='reply',now_ms=NOW,config=CFG)
+    store.update_attempt_state(attempt.id,state='sent',platform_ids=('message-1',))
+    store.governor_complete_attempt(account,attempt.id,submitted=True,finished_at_ms=NOW+1)
+    journal=({'event':'outcome','attempt_id':attempt.id,'success':True,'message_id':'message-1','timestamp':NOW},)
+    assert await reconcile_account(svc,account,journal=journal)==()
+    assert await reconcile_account(svc,account,journal=journal)==()
+    with store._connect() as db:
+        assert db.execute('SELECT COUNT(*) FROM business_governor_attempts').fetchone()[0]==1
+
+
+@pytest.mark.asyncio
+async def test_recovery_joins_early_receipt_after_socket_result_was_persisted(tmp_path):
+    from gateway.business.recovery import reconcile_account
+    store,svc,_scope,account,_plan=await prepared(tmp_path,now_ms=NOW)
+    attempt=store.claim_part(account,now_ms=NOW)
+    apply_delivery_event(store,DeliveryEvent(account,'early-restart',3,'DELIVERY_ACK',NOW+2))
+    store.update_attempt_state(attempt.id,state='sent',platform_ids=('early-restart',))
+    assert await reconcile_account(svc,account)==()
+    with store._connect() as db:
+        assert db.execute('SELECT state FROM business_attempts WHERE attempt_id=?',(attempt.id,)).fetchone()['state']=='delivered'
+        assert db.execute('SELECT state FROM business_outbox').fetchone()['state']=='delivered'
 
 @pytest.mark.asyncio
 async def test_native_adapter_bridge_and_authenticated_consumption(tmp_path):

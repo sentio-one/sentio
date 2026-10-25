@@ -416,6 +416,16 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         async with self._bridge_req("post", "business/dispatch", 70, json=request) as response:
             return await response.json()
 
+    async def check_business_registration(self, recipient: str) -> bool | None:
+        """Return registration state; ``None`` means the bridge could not establish it."""
+        if not self._http_session:
+            return None
+        async with self._bridge_req("post", "business/check-registration", 8, json={"recipient": recipient}) as response:
+            if response.status != 200:
+                return None
+            result = await response.json()
+            return result.get("registered") if isinstance(result, dict) and result.get("ok") else None
+
     def _consume_business_receipt(self, data: dict[str, Any]) -> None:
         from gateway.business.models import AccountKey
         from gateway.business.receipts import DeliveryEvent, apply_delivery_event
@@ -424,7 +434,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             return
         receipt = data.get("deliveryReceipt") or {}
         profile = getattr(self, "_hermes_profile_name", None) or "default"
-        account = AccountKey(profile, profile)
+        account = getattr(self, "_business_account", None) or AccountKey(profile, profile)
         if not isinstance(receipt.get("status"), int) or not receipt.get("messageId"):
             return
         apply_delivery_event(store, DeliveryEvent(account, str(receipt["messageId"]), receipt["status"],

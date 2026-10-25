@@ -9,7 +9,7 @@ import { buildTextSendPayload, buildPollPayload, buildLocationPayload, mediaPayl
 
 const PHYSICAL=new Set(['/send','/edit','/send-media','/send-poll','/send-location','/typing']);
 
-export function installBusinessRoutes(app, {sessionDir, connected, send, messageStore, track, authorize}) {
+export function installBusinessRoutes(app, {sessionDir, connected, send, messageStore, track, authorize, checkRegistration}) {
   const latchPath=()=>path.join(sessionDir(),'business-latch.json');
   app.use((req,res,next)=>{
     if(req.method==='POST' && PHYSICAL.has(req.path.toLowerCase().replace(/\/+$/,'')) && fs.existsSync(latchPath())) return res.status(409).json({ok:false,error:'business_authorization_required',submit:'business.request'});
@@ -21,19 +21,28 @@ export function installBusinessRoutes(app, {sessionDir, connected, send, message
       const latch=JSON.parse(fs.readFileSync(latchPath(),'utf8'));
       const request=req.body;
       if(!latch.home || request.scope?.transport_profile!==latch.transport_profile || request.scope?.account_id!==latch.account_id) return res.status(409).json({ok:false,error:'account_mismatch',submitted:false});
+      // Validate quote/media targets before consuming the one-use authorization.
+      // These are deterministic local checks, so they prove no socket submission.
+      const prepared=physicalPayload(request.part,request.recipient || request.scope.contact_id,messageStore);
       const journal=createAttemptJournal(path.join(sessionDir(),'business-attempts.jsonl'));
       const result=await dispatchAuthorized(request,{
         journal,
         authorize:params=>authorize() ? authorize()(params) : requestTransport(latch.home,params),
         sendSocket:async current=>{
-          const {content,options}=physicalPayload(current.part,current.recipient || current.scope.contact_id,messageStore);
-          const sent=await send(current.recipient || current.scope.contact_id,content,options);
+          const sent=await send(current.recipient || current.scope.contact_id,prepared.content,prepared.options);
           track(sent);
           return sent;
         },
       });
       return res.status(result.ok ? 200 : 409).json(result);
     } catch(error) {return res.status(409).json({ok:false,error:error.message,submitted:false});}
+  });
+  app.post('/business/check-registration',async(req,res)=>{
+    if(!connected())return res.status(503).json({ok:false,error:'not_connected'});
+    try {
+      const result=await checkRegistration(req.body?.recipient);
+      return res.json({ok:true,registered:Array.isArray(result) && result.some(item=>item?.exists===true)});
+    } catch(error) {return res.status(503).json({ok:false,error:'registration_lookup_unavailable'});}
   });
 }
 

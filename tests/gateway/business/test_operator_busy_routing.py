@@ -1,5 +1,6 @@
 """Explicit operator commands cross both busy guards without becoming a turn."""
 import asyncio
+import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -7,7 +8,8 @@ import pytest
 
 from gateway.business.config import BusinessConfig
 from gateway.business.models import Candidate, ContextEvent, Scope
-from gateway.business.operators import handle_business_operator_message
+from gateway.business.operators import handle_business_operator_message, handle_business_operator_reaction
+from gateway.business.render import render_delivery_plan
 from gateway.business.service import BusinessService
 from gateway.business.store import BusinessStore
 from gateway.config import GatewayConfig, Platform, PlatformConfig
@@ -118,3 +120,71 @@ async def test_verified_command_uses_signed_one_use_notice(tmp_path):
     assert '"ok": true' in requests[0]['part']['payload']['text']
     duplicate = await execute_business_request(runner._business_service,operation='business.consume',params=requests[0],principal=Principal('bridge','default',frozenset({'transport'}),'transport'))
     assert duplicate['ok'] is False
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_digest_approval_routes_through_operator_event(tmp_path,monkeypatch):
+    runner,adapter,event=setup(tmp_path)
+    event.text='/messages approve revision-1 --plan-digest sha256:exact --digest-id dig-1'
+    handler=AsyncMock(return_value={'ok':True,'approval_count':1})
+    monkeypatch.setattr('gateway.business.operators.handle_operator_event',handler)
+    async def dispatch(request):
+        adapter.sent.append(request['part']['payload']['text'])
+        return {'ok':True,'message_id':'operator-card'}
+    adapter.dispatch_business_part=dispatch
+    assert await handle_business_operator_message(runner,event)==''
+    assert handler.await_count==1
+    payload=handler.await_args.args[1]
+    assert payload['action']=='approve_digest'
+    assert payload['digest_id']=='dig-1'
+    assert payload['plan_digest']=='sha256:exact'
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_reaction_uses_the_exact_sent_review_card(tmp_path,monkeypatch):
+    from gateway.session_identity import identity_of
+    runner,_adapter,event=setup(tmp_path)
+    identity=identity_of(event.source)
+    runtime=identity.runtime_profile if identity else 'default'
+    transport=identity.transport_profile if identity else runtime
+    with runner._business_service.store._connect() as db:
+        db.execute('INSERT INTO business_operator_cards(message_id,runtime_profile,transport_profile,account_id,contact_id,digest_id,revision_id,plan_digest,created_at_ms) VALUES(?,?,?,?,?,?,?,?,?)',
+                   ('card',runtime,transport,transport,'customer@s.whatsapp.net','digest','revision','sha256:exact',1))
+    event.metadata={'reaction_target_id':'card','reaction_emoji':'👍'}
+    event.message_id='reaction-1'
+    event.text=''
+    approval=AsyncMock(return_value={'approval_count':1})
+    notice=AsyncMock(return_value={'ok':True})
+    monkeypatch.setattr('gateway.business.operators.handle_operator_event',approval)
+    monkeypatch.setattr('gateway.business.transport.send_operator_notice',notice)
+    assert await handle_business_operator_reaction(runner,event) is True
+    payload=approval.await_args.args[1]
+    assert payload['action']=='reaction'
+    assert payload['revision_id']=='revision'
+    assert payload['plan_digest']=='sha256:exact'
+    assert payload['target_message_id']=='card'
+    assert notice.await_count==1
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_recard_notice_persists_reaction_binding(tmp_path):
+    from gateway.session_identity import identity_of
+    runner,_adapter,event=setup(tmp_path)
+    identity=identity_of(event.source)
+    runtime=identity.runtime_profile if identity else 'default'
+    transport=identity.transport_profile if identity else runtime
+    customer=Scope(runtime,transport,transport,'customer@s.whatsapp.net')
+    store=runner._business_service.store
+    store.bind_contact(runtime,transport,transport,[customer.contact_id])
+    store.record_ingress(customer,ContextEvent('in','message','customer','hello',None,'inbound'),source_id='in')
+    episode=store.episode_for_source(customer,'in')
+    revision=store.append_revision(customer,episode,Candidate('text','approved copy',{},(),(),()),expected_revision_id=None,policy_version='v1',lesson_version=0)
+    plan=await render_delivery_plan(customer,revision,now_ms=int(time.time()*1000))
+    store.save_plan(plan)
+    event.text=f'/messages recard {revision.id}'
+    await handle_business_operator_message(runner,event)
+    with store._connect() as db:
+        row=db.execute('SELECT digest_id,revision_id,plan_digest FROM business_operator_cards WHERE message_id=?',('operator-card',)).fetchone()
+    assert row['revision_id']==revision.id
+    assert row['plan_digest']==plan.digest
+    assert row['digest_id']

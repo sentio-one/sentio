@@ -45,6 +45,7 @@ def _arguments(parser, name):
         parser.add_argument(argument)
     if name == 'approve':
         parser.add_argument('--plan-digest',required=True,help='Digest displayed by show/recard')
+        parser.add_argument('--digest-id',help='Immutable WhatsApp review digest that contains this revision')
         parser.add_argument('--override-reason')
     if name in {'reject','resolve-task','pause','revoke-lesson'}:
         parser.add_argument('--reason',required=name in {'resolve-task','revoke-lesson'})
