@@ -339,6 +339,10 @@ def _needs_bridge(method):
     """Adapter-method decorator: return ``SendResult(error=...)`` when ``_bridge_unavailable()`` says so."""
     @wraps(method)
     async def _guarded(self, *args, **kwargs):
+        from .business_egress import maybe_submit
+        receipt = await maybe_submit(self, method.__name__, args, kwargs)
+        if receipt is not None:
+            return receipt
         unavailable = await self._bridge_unavailable()
         return SendResult(success=False, error=unavailable) if unavailable else await method(self, *args, **kwargs)
     return _guarded
@@ -400,6 +404,41 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         """``session.<method>`` context manager for a bridge endpoint (caller must ``async with``)."""
         import aiohttp
         return getattr(self._http_session, method)(self._bridge_url(path), **kwargs, timeout=aiohttp.ClientTimeout(total=timeout))
+
+    async def get_business_capabilities(self) -> dict[str, Any]:
+        ok, health = await self._probe_bridge_health()
+        return (health.get("capabilities") or {}) if ok and isinstance(health, dict) else {}
+
+    async def dispatch_business_part(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Send exactly one rendered part; bridge consumption owns final authorization."""
+        if not self._http_session:
+            return {"ok": False, "error": "bridge_unavailable", "submitted": False}
+        async with self._bridge_req("post", "business/dispatch", 70, json=request) as response:
+            return await response.json()
+
+    async def check_business_registration(self, recipient: str) -> bool | None:
+        """Return registration state; ``None`` means the bridge could not establish it."""
+        if not self._http_session:
+            return None
+        async with self._bridge_req("post", "business/check-registration", 8, json={"recipient": recipient}) as response:
+            if response.status != 200:
+                return None
+            result = await response.json()
+            return result.get("registered") if isinstance(result, dict) and result.get("ok") else None
+
+    def _consume_business_receipt(self, data: dict[str, Any]) -> None:
+        from gateway.business.models import AccountKey
+        from gateway.business.receipts import DeliveryEvent, apply_delivery_event
+        store = getattr(self, "_business_store", None)
+        if store is None:
+            return
+        receipt = data.get("deliveryReceipt") or {}
+        profile = getattr(self, "_hermes_profile_name", None) or "default"
+        account = getattr(self, "_business_account", None) or AccountKey(profile, profile)
+        if not isinstance(receipt.get("status"), int) or not receipt.get("messageId"):
+            return
+        apply_delivery_event(store, DeliveryEvent(account, str(receipt["messageId"]), receipt["status"],
+                             str(receipt.get("statusName", "")), int(receipt.get("timestampMs", 0))))
 
     async def _probe_bridge_health(self) -> tuple[bool, Any]:
         """GET /health with a fresh session → ``(http_200, json)``; unparseable 200 body → ``(True, None)``; connection errors and timeouts propagate."""
@@ -606,6 +645,8 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
 
     async def connect(self, *, is_reconnect: bool = False) -> bool:
         """Start (or adopt) the Node.js bridge and wait for it to be ready."""
+        from .business_egress import latch_if_supervised
+        latch_if_supervised(self)
         if find_node_executable("node") is None:
             import pm
 
@@ -1027,6 +1068,9 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
     async def _build_message_event(self, data: dict[str, Any]) -> Optional[MessageEvent]:
         """Build a MessageEvent from bridge message data, downloading images to cache."""
         try:
+            if "deliveryReceipt" in data or data.get("mediaType") == "delivery_receipt":
+                self._consume_business_receipt(data)
+                return None
             if not self._should_process_message(data):
                 return None
             msg_type = self._classify_bridge_message(data)
@@ -1060,6 +1104,13 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                 metadata["whatsapp_from_owner"] = True
                 if not body.startswith(_OWNER_REPLY_PREFIX):
                     body = f"{_OWNER_REPLY_PREFIX}{body}"
+            reaction_target = data.get("reactionTargetId") or (native_metadata.get("reactionTargetId") if isinstance(native_metadata, dict) else None)
+            if reaction_target:
+                metadata["reaction_target_id"] = reaction_target
+                metadata["reaction_emoji"] = data.get("reactionEmoji") or (native_metadata.get("reactionEmoji") if isinstance(native_metadata, dict) else "")
+            voice_trans = data.get("voiceTranscript") or (native_metadata.get("voiceTranscript") if isinstance(native_metadata, dict) else None)
+            if voice_trans:
+                metadata["voice_transcript"] = voice_trans
             return MessageEvent(
                 text=body, message_type=msg_type, source=source, raw_message=data, message_id=data.get("messageId"),
                 media_urls=cached_urls, media_types=media_types, media_text_inlined=media_text_inlined, metadata=metadata,
@@ -1111,6 +1162,11 @@ async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_f
         # A caption only applies to a single media file — never repeat it across a multi-file send.
         media_caption = caption if (caption and len(media) == 1) else None
         pending_mentions = _normalize_outbound_mentions(mentions)
+        latch = Path(own_session) / "business-latch.json"
+        if latch.exists():
+            from .business_egress import submit_standalone
+            return await submit_standalone(get_hermes_home(), latch, normalized_chat_id, message,
+                                           media, caption, pending_mentions, force_document)
 
         def _mention_first_payload(payload):
             nonlocal pending_mentions

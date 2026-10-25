@@ -224,6 +224,30 @@ export function addMentions(payload, mentions) {
   return payload;
 }
 
+export function splitLongMessage(message, maxLength = 4096) {
+  const text = String(message || '');
+  if (!text) return [];
+  if (!Number.isFinite(maxLength) || maxLength < 1 || text.length <= maxLength) {
+    return [text];
+  }
+
+  const chunks = [];
+  let remaining = text;
+  while (remaining.length > maxLength) {
+    let splitAt = remaining.lastIndexOf('\n', maxLength);
+    if (splitAt < Math.floor(maxLength / 2)) {
+      splitAt = remaining.lastIndexOf(' ', maxLength);
+    }
+    if (splitAt < 1) splitAt = maxLength;
+
+    chunks.push(remaining.slice(0, splitAt).trimEnd());
+    remaining = remaining.slice(splitAt).trimStart();
+  }
+  if (remaining) chunks.push(remaining);
+  return chunks;
+}
+
+
 export function buildTextSendPayload(text, { replyTo, messageStore, mentions } = {}) {
   const content = addMentions({ text }, mentions);
   const options = {};

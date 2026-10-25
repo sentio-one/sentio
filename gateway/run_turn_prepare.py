@@ -717,6 +717,28 @@ class GatewayTurnPrepareMixin:
             self._hmwa_apply_message_timestamp(event, message_text)
         )
 
+        # Supervised business mode: append outcome schema, episode identity, and policy
+        try:
+            from gateway.business.turns import is_business_mode_active, business_turn_input
+            if is_business_mode_active(self, source):
+                svc = getattr(self, "_business_service", None)
+                if svc is not None:
+                    from gateway.business.turns import _source_scope
+                    cfg = svc.resolve_config(_source_scope(source))
+                    if cfg and cfg.mode == "supervised":
+                        from gateway.business.ingress import _resolve
+                        from gateway.business.policy import collect_policy
+                        resolved = _resolve(self, event)
+                        if resolved is not None:
+                            _b_store, _b_scope, _b_source_id = resolved
+                            _b_ep = _b_store.episode_for_source(_b_scope, _b_source_id)
+                            if _b_ep is not None:
+                                _b_policy = await collect_policy(_b_scope, _b_ep, required_policies=cfg.required_policies)
+                                _b_note = business_turn_input(self, event, _b_ep, _b_policy)
+                                turn_sidecar_notes.append(_b_note)
+        except Exception:
+            logger.debug("Failed to append business sidecar note", exc_info=True)
+
         # Stage the notes (one-shot; consumed in run_sync) AFTER the early-out so an aborted turn
         # cannot leak them into the next turn.
         if turn_sidecar_notes and session_key:

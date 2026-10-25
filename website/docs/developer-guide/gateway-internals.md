@@ -8,6 +8,17 @@ description: "How the messaging gateway boots, authorizes users, routes sessions
 
 The messaging gateway is the long-running process that connects Hermes to 20+ external messaging platforms through a unified architecture.
 
+## Native WhatsApp business messaging
+
+Native WhatsApp business messaging is configured at
+`platforms.whatsapp.extra.business`. Its mode defaults to `off`; `shadow` records
+comparisons without changing legacy delivery, and `supervised` requires the durable
+account latch plus gateway readiness checks. A governor must be configured before
+outbound work can be eligible. Missing required policy callbacks, invalid model
+outcomes, and unavailable checks hold work; `no_reply`, `escalate`, and `failed`
+never produce customer copy. Supervision can propose drafts and route them for
+review, but it does not replace human approval or authorize a native send by itself.
+
 ## Canonical group metadata and profile discovery
 
 The authenticated canonical WebSocket exposes `groups.capabilities`, `groups.list`,

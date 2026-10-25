@@ -19,7 +19,7 @@
  *   node bridge.js --port 3000 --session ~/.hermes/whatsapp/session
  */
 
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, getAggregateVotesInPollMessage, decryptPollVote, getKeyAuthor, jidNormalizedUser } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadMediaMessage, getAggregateVotesInPollMessage, decryptPollVote, getKeyAuthor, jidNormalizedUser, WAMessageStatus } from '@whiskeysockets/baileys';
 import express from 'express';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
@@ -30,9 +30,12 @@ import { randomBytes, createHash } from 'crypto';
 import { execFileSync } from 'child_process';
 import { tmpdir } from 'os';
 import qrcode from 'qrcode-terminal';
-import { matchesAllowedSender, matchesAllowedUser, matchesInboundWhatsAppGroup, parseAllowedUsers } from './allowlist.js';
+import { matchesAllowedSender, matchesAllowedUser, matchesInboundWhatsAppGroup, normalizeWhatsAppIdentifier, parseAllowedUsers } from './allowlist.js';
 import { createOutboundIdTracker } from './outbound_ids.js';
 import { classifyOwnerMessageGate } from './owner_message_gate.js';
+import { normalizeDeliveryUpdates } from './business_receipts.js';
+import { installBusinessRoutes } from './business_routes.js';
+import { renderBusinessPlan } from './business_render.js';
 import {
   addMentions,
   buildPollPayload,
@@ -233,7 +236,8 @@ function emitDebugEvent(payload) {
   } catch {}
 }
 
-mkdirSync(SESSION_DIR, { recursive: true });
+const IS_MAIN = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (IS_MAIN) mkdirSync(SESSION_DIR, { recursive: true });
 
 // Build LID → phone reverse map from session files (lid-mapping-{phone}.json)
 function buildLidMap() {
@@ -470,6 +474,29 @@ async function startSocket() {
   });
 
   sock.ev.on('messages.update', async (updates) => {
+    try {
+      const receipts = normalizeDeliveryUpdates(updates, {
+        account: {
+          transport_profile: 'whatsapp',
+          account_id: (sock.user?.id || 'default').split(':')[0].split('@')[0],
+        },
+        statusEnum: WAMessageStatus,
+      });
+      for (const rec of receipts) {
+        messageQueue.push({
+          messageId: rec.messageId,
+          chatId: rec.remoteJid,
+          senderId: rec.remoteJid,
+          hasMedia: false,
+          mediaType: 'delivery_receipt',
+          deliveryReceipt: rec,
+          timestamp: Math.floor(Date.now() / 1000),
+        });
+      }
+    } catch (err) {
+      console.warn('[bridge] failed to normalize delivery updates:', err.message);
+    }
+
     for (const { key, update } of updates || []) {
       if (!update?.pollUpdates) continue;
       const pollCreationId = key?.id || update.pollUpdates?.[0]?.pollCreationMessageKey?.id;
@@ -797,7 +824,7 @@ async function startSocket() {
 }
 
 // HTTP server
-const app = express();
+export const app = express();
 app.use(express.json());
 
 // Host-header validation — defends against DNS rebinding.
@@ -829,6 +856,24 @@ app.use((req, res, next) => {
     });
   }
   next();
+});
+
+let businessSessionDir = SESSION_DIR;
+let businessAuthorize = null;
+export function configureBridgeTransport({socket, state, sessionDir, authorize}) {
+  sock = socket;
+  connectionState = state;
+  businessSessionDir = sessionDir;
+  businessAuthorize = authorize;
+}
+installBusinessRoutes(app, {
+  sessionDir: () => businessSessionDir,
+  connected: () => !!sock && connectionState === 'connected',
+  send: sendWithTimeout,
+  messageStore,
+  track: sent => {trackSentMessageId(sent); messageStore.remember(sent);},
+  authorize: () => businessAuthorize,
+  checkRegistration: recipient => sock.onWhatsApp(`${normalizeWhatsAppIdentifier(recipient)}@s.whatsapp.net`),
 });
 
 // Poll for new messages (long-poll style)
@@ -1099,6 +1144,16 @@ app.post('/read', async (req, res) => {
   }
 });
 
+// Render immutable message delivery plan for exact approval without sending
+app.post('/business/render', async (req, res) => {
+  try {
+    const plan = await renderBusinessPlan(req.body, { messageStore });
+    res.json(plan);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Chat info
 app.get('/chat/:id', async (req, res) => {
   const chatId = req.params.id;
@@ -1134,12 +1189,12 @@ app.get('/health', (req, res) => {
     sendReadReceipts: SEND_READ_RECEIPTS,
     // path.resolve, not realpath: the adapter compares against os.path.abspath, which keeps symlinks.
     session: path.resolve(SESSION_DIR),
-    capabilities: { outboundMentions: true },
+    capabilities: { outboundMentions: true, businessDispatch: 1, businessReceipts: 1, businessLatch: 1 },
   });
 });
 
 // Start
-if (PAIR_ONLY) {
+if (IS_MAIN && PAIR_ONLY) {
   // Pair-only mode: just connect, show QR, save creds, exit. No HTTP server.
   if (PAIR_JSON) {
     emitPairEvent({ event: 'started', session: SESSION_DIR });
@@ -1155,7 +1210,7 @@ if (PAIR_ONLY) {
     }
     process.exit(1);
   });
-} else {
+} else if (IS_MAIN) {
   app.listen(PORT, '127.0.0.1', () => {
     console.log(`🌉 WhatsApp bridge listening on port ${PORT} (mode: ${WHATSAPP_MODE})`);
     console.log(`📁 Session stored in: ${SESSION_DIR}`);

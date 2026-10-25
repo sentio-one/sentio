@@ -7,6 +7,7 @@ Covers:
 """
 
 import asyncio
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -37,7 +38,7 @@ def _make_adapter():
     adapter.config.extra = {}
     adapter._bridge_port = 3000
     adapter._bridge_script = "/tmp/test-bridge.js"
-    adapter._session_path = MagicMock()
+    adapter._session_path = Path('/nonexistent/whatsapp-session')
     adapter._bridge_log_fh = None
     adapter._bridge_log = None
     adapter._bridge_process = None

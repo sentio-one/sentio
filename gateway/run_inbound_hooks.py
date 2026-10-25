@@ -62,6 +62,22 @@ class GatewayInboundHooksMixin:
         from gateway.run_inbound_consumer import run_post_admission_hook
         return await run_post_admission_hook(self, event, source, session_key)
 
+    async def _hm_business_ingress(
+        self, event: MessageEvent, *, verdict: Optional[str] = None, reason: str = ""
+    ) -> None:
+        """Business admission ledger (``gateway.business.ingress``): observe *event*, or attach *verdict*.
+        A no-op for any profile without business mode. A ledger fault is logged, never a dropped message."""
+        if getattr(self, "_business_store", None) is None:
+            return
+        from gateway.business.ingress import finish_ingress, observe_ingress
+        try:
+            if verdict is None:
+                await observe_ingress(self, event)
+            else:
+                await finish_ingress(self, event, verdict=verdict, reason=reason)
+        except Exception:  # health: allow BLE001 -- the ledger observes admission; a fault must not drop customer input
+            logger.warning("business ingress ledger failed", exc_info=True)
+
     async def _hm_pre_gateway_dispatch_hook(
         self, event: MessageEvent, source: SessionSource
     ) -> Optional[MessageEvent]:

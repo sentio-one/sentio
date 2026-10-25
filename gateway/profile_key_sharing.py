@@ -29,7 +29,7 @@ def _path() -> Path:
 def sharing_profiles() -> frozenset:
     """Profiles an admin let use the company's keys. An unreadable or malformed file shares nothing."""
     try:
-        raw = json.loads(_path().read_text(encoding="utf-8"))
+        raw = json.loads(_path().read_text(encoding="utf-8-sig"))
     except FileNotFoundError:
         return frozenset()
     except (OSError, ValueError):
