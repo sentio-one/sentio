@@ -1,173 +1,162 @@
-"""Full offline acceptance tests for native WhatsApp supervised messaging (Task C7)."""
+"""Offline acceptance: real service, operator operations, outbox, governor and receipts.
+
+Only the model, policy plugin and network boundary are faked; every state transition
+below is produced by production code against a real SQLite store.
+"""
 
 from __future__ import annotations
 
-import time
+import json
+
 import pytest
 
+from gateway.business.config import BusinessConfig
 from gateway.business.context import build_context
+from gateway.business.control import execute_business_request
 from gateway.business.learning import confirm_lesson, propose_lesson
-from gateway.business.models import (
-    AccountKey,
-    Candidate,
-    ContextEvent,
-    Principal,
-    Scope,
-)
-from gateway.business.render import DeliveryPart, DeliveryPlan
+from gateway.business.models import AccountKey, CheckReport, ContextEvent, Principal, Scope
+from gateway.business.policy import PolicyBundle
+from gateway.business.receipts import DeliveryEvent, apply_delivery_event
+from gateway.business.service import BusinessService
 from gateway.business.store import BusinessStore
+from gateway.business.transport import dispatch_due
+
+NOW = 1_000_000
+GOVERNOR = {
+    "timezone": "UTC",
+    "windows": {k: [{"weekdays": list(range(7)), "start": "00:00", "end": "24:00"}] for k in ("cold", "reply", "followup")},
+    "min_gap_seconds": 10,
+    "caps": {},
+    "hard_max_per_day": 100,
+}
+POLICY = PolicyBundle("sales", "v1", (), (), ("Use verified facts",), (), ())
+CAPABILITIES = frozenset({"admin", "review", "approve", "operator", "propose_lessons", "confirm_lesson"})
 
 
-class FakeEndToEnd:
-    """Simulates end-to-end lifecycle and collects transition states and sent text."""
-
-    def __init__(self):
-        self.states: tuple[str, ...] = ()
-        self.sent_text: str = ""
-        self.send_timestamps: list[float] = []
-
-    def record_transition(self, state: str) -> None:
-        self.states = (*self.states, state)
-
-    def record_physical_send(self, text: str, timestamp: float) -> None:
-        self.sent_text = text
-        self.send_timestamps.append(timestamp)
+def _operator(runtime="default"):
+    return Principal("operator-1", runtime, CAPABILITIES, "human")
 
 
-class UpgradedStockBridge:
-    """Simulates an upgraded stock bridge without legacy patcher hooks."""
-
-    def __init__(self, version: str = "2.0.0"):
-        self.version = version
-        self.patch_invocations = 0
-
-    def apply_patch(self) -> None:
-        self.patch_invocations += 1
-
-    def run_native_checks(self) -> bool:
-        return True
+async def _model(*, task, **kwargs):
+    if task == "business_compose":
+        return {"kind": "text", "text": "Our standard pricing is R500 per user per month.", "data": {},
+                "fact_ids": [], "completed_action_ids": [], "credential_slots": []}
+    return {"recommendation": "approve", "reasons": [], "policy_refs": []}
 
 
 @pytest.fixture
-def store(tmp_path):
-    return BusinessStore(tmp_path)
+def stack(tmp_path, monkeypatch):
+    async def policy(*args, **kwargs):
+        return POLICY
 
+    async def checks(*args, **kwargs):
+        return CheckReport(True, (), "v1")
 
-def _scope():
-    return Scope("default", "whatsapp", "account-1", "27800000001@s.whatsapp.net")
-
-
-def _account():
-    return AccountKey(transport_profile="whatsapp", account_id="account-1")
-
-
-def _operator():
-    return Principal("operator-1", "default", frozenset({"admin", "review", "approve", "operator", "propose_lessons", "confirm_lesson"}), "human")
+    monkeypatch.setattr("gateway.business.service.collect_policy", policy)
+    monkeypatch.setattr("gateway.business.policy.collect_policy", policy)
+    monkeypatch.setattr("gateway.business.review.check_candidate", checks)
+    monkeypatch.setattr("gateway.business.policy.check_candidate", checks)
+    monkeypatch.setattr("gateway.business.compose.async_call_llm", _model)
+    monkeypatch.setattr("gateway.business.review.async_call_llm", _model)
+    store = BusinessStore(tmp_path)
+    scope = store.bind_contact("default", "default", "default", ["27800000001@s.whatsapp.net"])
+    service = BusinessService(store, config_resolver=lambda _: BusinessConfig(
+        "supervised", ("sales",), ("operator-1",), 2, 86400, 604800, GOVERNOR))
+    return store, service, scope
 
 
 @pytest.mark.asyncio
-async def test_real_plugin_approval_delivery_and_learning_roundtrip(store):
-    scope = _scope()
+async def test_inbound_to_edit_approval_paced_delivery_and_learning(stack):
+    store, service, scope = stack
+    account = AccountKey(scope.transport_profile, scope.account_id)
     operator = _operator()
-    fake_end_to_end = FakeEndToEnd()
 
-    # 1. Inbound message creates episode & candidate draft held for review
-    store.bind_contact(scope.runtime_profile, scope.transport_profile, scope.account_id, [scope.contact_id])
-    store.record_ingress(
-        scope,
-        ContextEvent("e1", "message", "customer", "Can I get pricing for 50 users?", None, "inbound"),
-        source_id="src-1",
-    )
-    ep = store.episode_for_source(scope, "src-1")
+    # 1. Inbound message -> agent decision -> composed, checked, reviewed draft held in the outbox.
+    episode = store.record_ingress(
+        scope, ContextEvent("e1", "message", "customer", "Can I get pricing for 50 users?", None, "inbound"),
+        source_id="src-1")
+    decision = {"kind": "compose", "reason": "answer", "intent": "quote", "fact_ids": [],
+                "action_ids": [], "policy_version": "v1"}
+    held = await service.handle_turn(scope, episode, {"final_response": json.dumps(decision)}, main_runtime={})
+    assert held.state == "held"
+    original_plan = store.get_plan_by_revision(scope, held.revision_id)
 
-    initial_candidate = Candidate("text", "Our standard pricing is R500 per user per month.", {}, (), (), ())
-    rev1 = store.append_revision(scope, ep, initial_candidate, expected_revision_id=None, policy_version="v1", lesson_version=0)
-    part = DeliveryPart(0, "text", {"text": initial_candidate.text}, None)
-    plan = DeliveryPlan("p1", rev1.id, scope, ep.context_version, "v1", (part,), 2000000, "sha256:d1")
-    store.save_plan(plan)
-    store.submit_revision(scope, rev1.id, request_id="req-1", now_ms=1000)
-    fake_end_to_end.record_transition("held")
+    # 2. Operator edits the draft; the first plan can no longer be approved.
+    exact_text = "Our tier 2 pricing is R450 per user per month for 50 users."
+    edited = await execute_business_request(
+        service, operation="operator.edit", principal=operator,
+        params={"revision_id": held.revision_id, "text": exact_text})
+    assert edited["ok"], edited
+    new_revision = edited["revision"]["id"]
+    new_plan = store.get_plan_by_revision(scope, new_revision)
+    assert new_plan.digest != original_plan.digest
 
-    # 2. Operator reviews, edits draft, and approves it
-    exact_approved_text = "Our tier 2 pricing is R450 per user per month for 50 users."
-    edited_candidate = Candidate("text", exact_approved_text, {}, (), (), ())
-    rev2 = store.append_revision(scope, ep, edited_candidate, expected_revision_id=rev1.id, policy_version="v1", lesson_version=0)
-    edited_part = DeliveryPart(0, "text", {"text": exact_approved_text}, None)
-    edited_plan = DeliveryPlan("p2", rev2.id, scope, ep.context_version, "v1", (edited_part,), 2000000, "sha256:d2")
-    store.save_plan(edited_plan)
-    store.submit_revision(scope, rev2.id, request_id="req-2", now_ms=1001)
-    fake_end_to_end.record_transition("scheduled")
+    stale = await execute_business_request(
+        service, operation="operator.approve", principal=operator,
+        params={"revision_id": held.revision_id, "plan_digest": original_plan.digest})
+    assert stale["ok"] is False
 
-    # 3. Paced transport execution obeys pacing gap and transitions to accepted & delivered
-    t0 = time.time()
-    fake_end_to_end.record_physical_send(exact_approved_text, t0)
-    fake_end_to_end.record_transition("accepted")
+    # 3. Approval requires the exact digest of what will be sent.
+    wrong = await execute_business_request(
+        service, operation="operator.approve", principal=operator,
+        params={"revision_id": new_revision, "plan_digest": "sha256:wrong"})
+    assert wrong["ok"] is False
+    approved = await execute_business_request(
+        service, operation="operator.approve", principal=operator,
+        params={"revision_id": new_revision, "plan_digest": new_plan.digest})
+    assert approved["ok"], approved
 
-    t1 = t0 + 0.15  # min gap observed
-    fake_end_to_end.record_physical_send(exact_approved_text, t1)
-    fake_end_to_end.record_transition("delivered")
+    # 4. Physical dispatch sends the approved bytes once and is paced by the governor.
+    sent = []
 
-    assert fake_end_to_end.states == ("held", "scheduled", "accepted", "delivered")
-    assert fake_end_to_end.sent_text == exact_approved_text
+    async def network(request):
+        sent.append(request)
+        return {"message_id": "wa-1"}
 
-    # Verify physical send pacing obeys min-gap config
-    min_gap = 0.10
-    gaps = [
-        fake_end_to_end.send_timestamps[i] - fake_end_to_end.send_timestamps[i - 1]
-        for i in range(1, len(fake_end_to_end.send_timestamps))
-    ]
-    physical_send_times_obey_config = all(g >= min_gap for g in gaps)
-    assert physical_send_times_obey_config is True
+    assert (await dispatch_due(service, account, transport_executor=network, now_ms=NOW))[0].state == "sent"
+    assert sent[0]["part"]["payload"]["text"] == exact_text
+    assert await dispatch_due(service, account, transport_executor=network, now_ms=NOW + 1) == []
+    assert len(sent) == 1
 
-    # 4. Learning loop: operator review event generates proposed lesson
+    # 5. The platform receipt reconciles to the outbox.
+    apply_delivery_event(store, DeliveryEvent(account, "wa-1", 3, "DELIVERY_ACK", NOW + 2))
+    with store._connect() as db:
+        assert db.execute("SELECT state FROM business_outbox WHERE revision_id=?", (new_revision,)).fetchone()["state"] == "delivered"
+
+    # 6. A confirmed lesson from the edit reaches the next draft's context.
     store.record_review_event(
-        scope,
-        revision_id=rev2.id,
-        policy_version="v1",
-        model_version="test-model",
-        message_class="reply",
-        outcome="edited_and_approved",
-        agreed=True,
-    )
+        scope, revision_id=new_revision, policy_version="v1", model_version="test-model",
+        message_class="reply", outcome="edited_and_approved", agreed=True)
+    lesson = propose_lesson(operator, scope, topic="volume_discount",
+                            rule="For 50+ users apply Tier 2 volume discount of R450/user",
+                            category="pricing", policy_id=POLICY.id, store=store)
+    confirm_lesson(operator, scope, lesson_id=lesson.id, store=store)
+    next_episode = store.record_ingress(
+        scope, ContextEvent("e2", "message", "customer", "Quote for 60 users?", None, "inbound"),
+        source_id="src-2")
+    context = build_context(store, scope, next_episode, policy=POLICY, lesson_version=1)
+    assert any("Tier 2 volume discount" in text for text in context.confirmed_lessons)
 
-    lesson_after_review = propose_lesson(
-        operator,
-        scope,
-        topic="volume_discount",
-        rule="For 50+ users apply Tier 2 volume discount of R450/user",
-        category="pricing",
-        store=store,
-    )
-    assert lesson_after_review.state == "proposed"
 
-    # Operator confirms lesson and verifies it populates into future context
-    confirmed = confirm_lesson(operator, scope, lesson_id=lesson_after_review.id, store=store)
-    assert confirmed.state == "confirmed"
+@pytest.mark.asyncio
+async def test_new_inbound_message_invalidates_pending_approval(stack):
+    store, service, scope = stack
+    account = AccountKey(scope.transport_profile, scope.account_id)
+    episode = store.record_ingress(
+        scope, ContextEvent("e1", "message", "customer", "Price?", None, "inbound"), source_id="src-1")
+    decision = {"kind": "compose", "reason": "answer", "intent": "quote", "fact_ids": [],
+                "action_ids": [], "policy_version": "v1"}
+    held = await service.handle_turn(scope, episode, {"final_response": json.dumps(decision)}, main_runtime={})
+    plan = store.get_plan_by_revision(scope, held.revision_id)
+    approved = await execute_business_request(
+        service, operation="operator.approve", principal=_operator(),
+        params={"revision_id": held.revision_id, "plan_digest": plan.digest})
+    assert approved["ok"], approved
 
     store.record_ingress(
-        scope,
-        ContextEvent("e2", "message", "customer", "Quote for 60 users?", None, "inbound"),
-        source_id="src-2",
-    )
-    ep2 = store.episode_for_source(scope, "src-2")
-    from gateway.business.policy import PolicyBundle
+        scope, ContextEvent("e2", "message", "customer", "Actually, never mind", None, "inbound"), source_id="src-2")
 
-    policy = PolicyBundle(
-        id="default",
-        version="v1",
-        facts=(),
-        actions=(),
-        rules=(),
-        criteria=(),
-        missing=(),
-    )
-    ctx = build_context(store, scope, ep2, policy=policy, lesson_version=1)
-    assert any("Tier 2 volume discount" in text for text in ctx.confirmed_lessons)
+    async def network(request):
+        raise AssertionError("an approval from before a new customer message must not be sent")
 
-
-def test_native_update_needs_no_patch():
-    upgraded_stock_bridge = UpgradedStockBridge(version="2.1.0")
-
-    # In native mode, bridge updates require zero patch invocations
-    assert upgraded_stock_bridge.patch_invocations == 0
-    assert upgraded_stock_bridge.run_native_checks() is True
+    assert await dispatch_due(service, account, transport_executor=network, now_ms=NOW) == []

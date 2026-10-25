@@ -226,12 +226,22 @@ def parse_decision(payload: object) -> WorkDecision:
     )
 
 
+def _valid_targets(data: dict[str, Any]) -> bool:
+    target = data.get("reply_target")
+    if target is not None and (not _handle(target) or len(target) > 256):
+        return False
+    mentions = data.get("mentions", [])
+    return (isinstance(mentions, list) and len(mentions) <= 100
+            and all(_handle(item) and len(item) <= 256 for item in mentions))
+
+
 def _valid_text(data: dict[str, Any], text: str) -> bool:
-    return not data and bool(text.strip())
+    return not set(data) - {"reply_target", "mentions"} and _valid_targets(data) and bool(text.strip())
 
 
 def _valid_media(data: dict[str, Any], _: str) -> bool:
-    if set(data) != {"attachments"} or not isinstance(data["attachments"], list) or not data["attachments"]:
+    if (set(data) - {"attachments", "reply_target", "mentions"} or not _valid_targets(data)
+            or not isinstance(data.get("attachments"), list) or not data["attachments"]):
         return False
     return all(_valid_attachment(item) for item in data["attachments"])
 

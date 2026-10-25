@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+from dataclasses import asdict
 import logging
 import time
 import uuid
@@ -25,18 +26,6 @@ from gateway.business.store import BusinessStore
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_GOVERNOR_CONFIG: dict[str, Any] = {
-    "timezone": "UTC",
-    "windows": {
-        "cold": [{"weekdays": [0, 1, 2, 3, 4, 5, 6], "start": "00:00", "end": "24:00"}],
-        "followup": [{"weekdays": [0, 1, 2, 3, 4, 5, 6], "start": "00:00", "end": "24:00"}],
-        "reply": [{"weekdays": [0, 1, 2, 3, 4, 5, 6], "start": "00:00", "end": "24:00"}],
-        "response": [{"weekdays": [0, 1, 2, 3, 4, 5, 6], "start": "00:00", "end": "24:00"}],
-    },
-    "min_gap_seconds": 0,
-    "caps": {},
-    "hard_max_per_day": 100000,
-}
 
 
 async def preflight_recipient(
@@ -91,6 +80,7 @@ async def submit_external(
     service: BusinessService,
     contact_checker: Any | None = None,
     now_ms: int | None = None,
+    main_runtime: dict[str, Any] | None = None,
 ) -> Receipt:
     """Submit an outbound candidate via the supervised outbox with recipient preflight."""
     ts = int(time.time() * 1000) if now_ms is None else now_ms
@@ -100,7 +90,12 @@ async def submit_external(
     if preflight == "unknown" and contact_checker is not None:
         return Receipt(id=str(uuid.uuid4()), state="held", revision_id=None, reason="lookup_error")
 
-    service.store.bind_contact(scope.runtime_profile, scope.transport_profile, scope.account_id, [scope.contact_id])
+    # Producer targets are aliases; every durable record uses the canonical contact.
+    with service.store._connect() as db:
+        canonical = db.execute("SELECT 1 FROM business_contacts WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=?",
+                               tuple(asdict(scope).values())).fetchone()
+    if not canonical:
+        scope = service.store.bind_contact(scope.runtime_profile, scope.transport_profile, scope.account_id, [scope.contact_id])
 
     try:
         ep = service.store.episode_for_source(scope, request_id)
@@ -116,17 +111,21 @@ async def submit_external(
         service.store.record_ingress(scope, ingress_event, source_id=request_id)
         ep = service.store.episode_for_source(scope, request_id)
 
-    rev = service.store.append_revision(
-        scope,
-        ep,
-        candidate,
-        expected_revision_id=None,
-        policy_version="v1",
-        lesson_version=0,
-    )
-    plan = await render_delivery_plan(scope, rev, now_ms=ts)
-    service.store.save_plan(plan)
-    return service.store.submit_revision(scope, rev.id, request_id=request_id, now_ms=ts)
+    from gateway.business.policy import collect_policy
+    from gateway.business.context import build_context
+    from gateway.business.review import prepare_draft
+    from gateway.business.drafting import promote_draft
+    from gateway.business.models import WorkDecision
+    cfg = service.resolve_config(scope)
+    if not cfg or cfg.mode != "supervised":
+        return Receipt(id=str(uuid.uuid4()), state="held", revision_id=None, reason="business_unavailable")
+    policy = await collect_policy(scope, ep, required_policies=cfg.required_policies)
+    snapshot = build_context(service.store, scope, ep, policy=policy, lesson_version=0)
+    decision = WorkDecision("compose", source_kind, "Review submitted outbound candidate", (), (), policy.version)
+    receipt = await prepare_draft(service.store, snapshot, decision, policy=policy,
+                                  main_runtime=main_runtime or {}, rewrite_attempts=cfg.rewrite_attempts,
+                                  initial_candidate=candidate)
+    return await promote_draft(service.store, scope, receipt, cfg, now_ms=ts, request_id=request_id)
 
 
 async def dispatch_due(
@@ -165,14 +164,23 @@ async def dispatch_due(
         config=gov_cfg,
     )
     if not elig.allowed:
+        from gateway.business.store_outbox import reschedule_attempt
+        reschedule_attempt(service.store, attempt.id, not_before_ms=elig.not_before_ms or ts + 1000,
+                           reason=elig.reason or "governor_hold")
         return []
 
-    token = issue_authorization(account, attempt, plan, now_ms=ts)
-    part_dict = plan.parts[attempt.part_index].__dict__ if attempt.part_index < len(plan.parts) else {}
+    from gateway.business.dispatch import _default_transport_key
+    recipient = resolve_transport_target(service.store, scope)
+    token = issue_authorization(account, attempt, plan, now_ms=ts, recipient=recipient,
+                                secret_key=_default_transport_key(service.store.db_path.parent))
+    part_dict = asdict(plan.parts[attempt.part_index]) if attempt.part_index < len(plan.parts) else {}
     req = {
         "token": token,
+        "authorization_token": token,
+        "payload_digest": plan.digest,
         "attempt_id": attempt.id,
         "outbox_id": attempt.outbox_id,
+        "recipient": recipient,
         "part_index": attempt.part_index,
         "scope": {
             "runtime_profile": scope.runtime_profile,
@@ -195,14 +203,14 @@ async def dispatch_due(
     )
 
 
-def _resolve_governor_config(service: BusinessService, scope: Scope) -> dict[str, Any]:
+def _resolve_governor_config(service: BusinessService, scope: Scope) -> dict[str, Any] | None:
     try:
         cfg = service.resolve_config(scope)
         if cfg and cfg.governor:
             return cfg.governor
     except (KeyError, TypeError, ValueError) as exc:
         logger.debug("Governor config resolution fallback for %s: %s", scope, exc, exc_info=True)
-    return _DEFAULT_GOVERNOR_CONFIG
+    return None
 
 
 async def _execute_with_custom_transport(
@@ -231,9 +239,9 @@ async def _execute_with_custom_transport(
         return [Receipt(id=attempt.id, state="unknown", revision_id=revision_id, reason=str(ex))]
     except Exception as ex:  # health: allow BLE001 -- external transport errors must be recorded as failed attempts
         logger.warning("Custom transport dispatch error for %s: %s", attempt.id, ex, exc_info=True)
-        service.store.update_attempt_state(attempt.id, state="failed", error_code=str(ex))
-        service.store.governor_complete_attempt(account, attempt.id, submitted=False, finished_at_ms=now_ms)
-        return [Receipt(id=attempt.id, state="failed", revision_id=revision_id, reason=str(ex))]
+        service.store.update_attempt_state(attempt.id, state="unknown", error_code=str(ex))
+        service.store.governor_complete_attempt(account, attempt.id, submitted=True, finished_at_ms=now_ms)
+        return [Receipt(id=attempt.id, state="unknown", revision_id=revision_id, reason=str(ex))]
 
 
 async def _execute_with_native_transport(
@@ -244,26 +252,94 @@ async def _execute_with_native_transport(
     req: dict[str, Any],
     now_ms: int,
 ) -> list[Receipt]:
-    from gateway.business.client import request_business
+    from gateway.business.worker import delivery_adapter
 
     try:
-        resp = await request_business("dispatch", req)
-        if isinstance(resp, dict) and resp.get("status") == "ok":
-            msg_id = resp.get("message_id")
+        runner = getattr(service, "_transport_runner", None) or getattr(service, "runner", None)
+        adapter = delivery_adapter(runner, account)
+        if adapter is None:
+            raise ConnectionError("business_transport_unavailable")
+        resp = await adapter.dispatch_business_part(req)
+        if isinstance(resp, dict) and resp.get("ok") is True:
+            msg_id = resp.get("message_id") or resp.get("messageId")
             pids = (str(msg_id),) if msg_id else ()
             service.store.update_attempt_state(attempt.id, state="sent", platform_ids=pids)
             service.store.governor_complete_attempt(account, attempt.id, submitted=True, finished_at_ms=now_ms)
             return [Receipt(id=attempt.id, state="sent", revision_id=revision_id, reason=None)]
         error = resp.get("error", "dispatch_error") if isinstance(resp, dict) else "dispatch_failed"
-        service.store.update_attempt_state(attempt.id, state="failed", error_code=error)
-        service.store.governor_complete_attempt(account, attempt.id, submitted=False, finished_at_ms=now_ms)
-        return [Receipt(id=attempt.id, state="failed", revision_id=revision_id, reason=error)]
+        submitted = not isinstance(resp, dict) or resp.get("submitted") is not False
+        state = "unknown" if submitted else "failed"
+        service.store.update_attempt_state(attempt.id, state=state, error_code=error)
+        service.store.governor_complete_attempt(account, attempt.id, submitted=submitted, finished_at_ms=now_ms)
+        return [Receipt(id=attempt.id, state=state, revision_id=revision_id, reason=error)]
     except TimeoutError as ex:
         service.store.update_attempt_state(attempt.id, state="unknown", error_code="timeout")
         service.store.governor_complete_attempt(account, attempt.id, submitted=True, finished_at_ms=now_ms)
         return [Receipt(id=attempt.id, state="unknown", revision_id=revision_id, reason=str(ex))]
     except Exception as ex:  # health: allow BLE001 -- native transport dispatch failures must be recorded as failed attempts
         logger.warning("Native dispatch error for %s: %s", attempt.id, ex, exc_info=True)
-        service.store.update_attempt_state(attempt.id, state="failed", error_code=str(ex))
-        service.store.governor_complete_attempt(account, attempt.id, submitted=False, finished_at_ms=now_ms)
-        return [Receipt(id=attempt.id, state="failed", revision_id=revision_id, reason=str(ex))]
+        service.store.update_attempt_state(attempt.id, state="unknown", error_code=str(ex))
+        service.store.governor_complete_attempt(account, attempt.id, submitted=True, finished_at_ms=now_ms)
+        return [Receipt(id=attempt.id, state="unknown", revision_id=revision_id, reason=str(ex))]
+
+async def send_operator_notice(service, scope: Scope, text: str, *, now_ms: int | None = None) -> dict:
+    """A verified configured operator has a bounded, paced notice lane."""
+    import base64
+    import hashlib
+    import hmac
+    import json
+    from gateway.business.dispatch import _default_transport_key
+    from gateway.business.worker import delivery_adapter
+    from gateway.whatsapp_identity import to_whatsapp_jid
+    cfg = service.resolve_config(scope)
+    if not cfg or scope.contact_id not in {to_whatsapp_jid(item) for item in cfg.operators}:
+        raise BusinessDenied()
+    now = int(time.time() * 1000) if now_ms is None else now_ms
+    account = AccountKey(scope.transport_profile, scope.account_id)
+    adapter = delivery_adapter(getattr(service, "runner", None) or getattr(service, "_transport_runner", None), account)
+    if adapter is None:
+        return {"ok": False, "error": "business_transport_unavailable"}
+    attempt_id = f"operator-{uuid.uuid4()}"
+    notice_cfg = {
+        "timezone": "UTC", "windows": {"operator": [{"weekdays": list(range(7)), "start": "00:00", "end": "24:00"}]},
+        "min_gap_seconds": 2, "caps": {"operator": {"per_hour": 60, "per_day": 200}}, "hard_max_per_day": 1000,
+    }
+    eligibility = service.store.governor_reserve_attempt(account, attempt_id, message_class="operator", now_ms=now, config=notice_cfg)
+    if not eligibility.allowed:
+        return {"ok": False, "error": eligibility.reason}
+    part = {"index": 0, "operation": "text", "payload": {"text": text}, "media_hash": None}
+    digest = "sha256:" + hashlib.sha256(text.encode()).hexdigest()
+    payload = {"business_dispatch": 1, "operator_notice": 1, "attempt_id": attempt_id, "outbox_id": attempt_id,
+               "part_index": 0, "generation": 1, "plan_id": attempt_id, "plan_digest": digest, "part": part,
+               **asdict(scope), "expires_at_ms": now + 30_000}
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    token = base64.urlsafe_b64encode(raw).decode().rstrip("=") + "." + hmac.new(_default_transport_key(service.store.db_path.parent), raw, hashlib.sha256).hexdigest()
+    request = {"token": token, "authorization_token": token, "attempt_id": attempt_id, "scope": asdict(scope),
+               "part": part, "plan_id": attempt_id, "plan_digest": digest, "payload_digest": digest}
+    try:
+        return await adapter.dispatch_business_part(request)
+    finally:
+        service.store.governor_complete_attempt(account, attempt_id, submitted=True, finished_at_ms=now)
+
+
+def resolve_transport_target(store, scope: Scope) -> str:
+    """Resolve the canonical contact to one unambiguous receiving transport alias."""
+    with store._connect() as db:
+        rows = db.execute("SELECT transport_id,held FROM business_aliases WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=?",
+                          tuple(asdict(scope).values())).fetchall()
+    if any(row["held"] for row in rows):
+        raise BusinessConflict("contact_alias_held")
+    aliases = {row["transport_id"] for row in rows}
+    if not aliases and "@" in scope.contact_id:
+        return scope.contact_id
+    from gateway.whatsapp_identity import to_whatsapp_jid
+    for suffix in ("@g.us", "@s.whatsapp.net", "@lid"):
+        values = {to_whatsapp_jid(alias) for alias in aliases if alias.endswith(suffix)}
+        if len(values) > 1:
+            raise BusinessConflict("ambiguous_transport_target")
+        if values:
+            return next(iter(values))
+    values = {to_whatsapp_jid(alias) for alias in aliases if alias.removeprefix("+").isdigit()}
+    if len(values) == 1:
+        return next(iter(values))
+    raise BusinessConflict("transport_target_unavailable")

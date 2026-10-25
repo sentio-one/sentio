@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import json
+import time
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
@@ -41,12 +43,19 @@ async def reconcile_account(
             (account.transport_profile, account.account_id),
         ).fetchall()
 
+        joined = []
         for row in rows:
             att_id = row["attempt_id"]
             state = row["state"]
             rev_id = row["revision_id"]
 
             j_entry = journal_map.get(att_id)
+            if j_entry and j_entry.get("event") == "outcome" and j_entry.get("success") and j_entry.get("message_id"):
+                db.execute("UPDATE business_attempts SET state='sent', platform_ids=?, error_code=NULL WHERE attempt_id=?",
+                           (json.dumps([j_entry["message_id"]]), att_id))
+                joined.append(att_id)
+                reconciled.append(RecoveryReceipt(id=att_id,state="sent",revision_id=rev_id,reason="journal_reconciled"))
+                continue
             if state in ("claimed", "in_flight") or (j_entry and j_entry.get("status") in ("claimed", "in_flight")):
                 db.execute(
                     "UPDATE business_attempts SET state='unknown', error_code='unreconciled_crash' WHERE attempt_id=?",
@@ -61,4 +70,14 @@ async def reconcile_account(
                 )
                 reconciled.append(rec)
 
+    from gateway.business.receipts import join_attempt_receipts
+    for receipt in reconciled:
+        context = store.get_attempt_context(receipt.id)
+        store.governor_complete_attempt(account, receipt.id, submitted=True, finished_at_ms=int(time.time() * 1000))
+        if receipt.state == "unknown" and context:
+            from gateway.business.models import Scope
+            scope = Scope(**{k: context[k] for k in ("runtime_profile", "transport_profile", "account_id", "contact_id")})
+            store.put_task(scope, dedupe_key=f"attempt:{receipt.id}", reason="unknown_delivery", refs=(receipt.id,))
+    for attempt_id in joined:
+        join_attempt_receipts(store, attempt_id)
     return tuple(reconciled)

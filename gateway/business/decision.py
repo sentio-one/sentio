@@ -36,6 +36,13 @@ def decision_from_result(result: dict[str, Any]) -> WorkDecision:
         return parse_decision(result)
 
     final_resp = str(result.get("final_response") or "").strip()
+    if final_resp:
+        from gateway.business.compose import _extract_json_payload
+        try:
+            return parse_decision(_extract_json_payload(final_resp))
+        except BusinessProtocolError:
+            # Working prose is retained as a protocol failure, never as customer copy.
+            pass
     return WorkDecision(
         kind="failed",
         reason=f"unrecognized_result: {final_resp}" if final_resp else "unrecognized_result",

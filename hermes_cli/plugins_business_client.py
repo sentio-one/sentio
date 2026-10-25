@@ -1,61 +1,36 @@
-"""PluginContext.business_request handler and scoped capability proxy (Task C1)."""
-
+"""Profile-owned business requests shared by in-process and isolated plugin contexts."""
 from __future__ import annotations
 
-import logging
-from typing import Any, TYPE_CHECKING
-
-from gateway.business.models import BusinessDenied
-from gateway.business.permissions import authorize_operation
-
-if TYPE_CHECKING:
-    from gateway.business.models import Principal, Scope
-
-logger = logging.getLogger(__name__)
+from gateway.business.models import BusinessDenied, BusinessProtocolError, Principal, Scope
+from gateway.business.permissions import PERMITTED_PLUGIN_OPERATIONS, authorize_operation
 
 
-def handle_plugin_business_request(
-    context_or_principal: Any,
-    scope: Scope | None = None,
-    *,
-    operation: str,
-    params: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Execute a scoped, authenticated business request on behalf of a plugin."""
-    from gateway.business.models import Principal, Scope
-    if hasattr(context_or_principal, "manifest"):
+def handle_plugin_business_request(context_or_principal, scope: Scope | None = None, *, operation: str, params=None):
+    from gateway.business.client import request_business
+    from hermes_constants import get_hermes_home, profile_name_for_home
+
+    values = dict(params or {})
+    if hasattr(context_or_principal, 'manifest'):
         ctx = context_or_principal
-        principal = Principal(
-            subject=f"plugin:{ctx.manifest.name}",
-            runtime_profile=ctx._manager.scope_key or "default",
-            capabilities=frozenset({"plugin"}),
-            kind="plugin",
-        )
-        scope = Scope(ctx._manager.scope_key or "default", "whatsapp", "default", "")
+        home = ctx._manager.home_path
+        runtime = profile_name_for_home(home) or 'default'
+        principal = Principal(f'plugin:{ctx.plugin_id}', runtime, PERMITTED_PLUGIN_OPERATIONS, 'plugin')
     else:
         principal = context_or_principal
+        home = get_hermes_home()
+        if scope:
+            values['scope'] = scope.__dict__
     try:
-        authorize_operation(principal, scope, operation)
-    except BusinessDenied as exc:
-        logger.debug("Plugin %s denied operation %s on %s: %s", principal.subject, operation, scope, exc)
-        return {"error": "permission_denied"}
-
-    # Mock/simulated dispatch for permitted plugin operations
-    if operation == "status":
-        return {"status": "ok", "scope": scope.contact_id}
-    if operation == "events":
-        return {"events": [], "next_cursor": 0}
-    if operation == "ack_events":
-        return {"acknowledged": True}
-    if operation == "submit_job":
-        p_dict = params or {}
-        return {
-            "status": "accepted",
-            "state": "held",
-            "message_id": None,
-            "target_account": p_dict.get("account", scope.account_id),
-        }
-    if operation in ("submit_candidate", "record_fact", "record_action"):
-        return {"status": "accepted"}
-
-    return {"status": "ok"}
+        authorize_operation(principal, scope or Scope(principal.runtime_profile,'','',''), operation)
+        requested = values.get('scope') or {}
+        if not isinstance(requested, dict):
+            return {'ok':False,'error':'invalid_request'}
+        if values.get('runtime_profile', principal.runtime_profile) != principal.runtime_profile or requested.get('runtime_profile', principal.runtime_profile) != principal.runtime_profile:
+            raise BusinessDenied('permission_denied')
+        values['runtime_profile'] = principal.runtime_profile
+        values['plugin_id'] = principal.subject.removeprefix('plugin:')
+        return request_business(home,operation=f'plugin.{operation}',params=values)
+    except BusinessDenied:
+        return {'ok':False,'error':'permission_denied'}
+    except BusinessProtocolError as exc:
+        return {'ok':False,'error':exc.code}

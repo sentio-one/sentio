@@ -6,12 +6,14 @@ import asyncio
 import json
 import logging
 import uuid
+from dataclasses import asdict
 from typing import Any
 
 from agent.auxiliary_client import async_call_llm
 from gateway.business.compose import _extract_json_payload, compose_candidate
 from gateway.business.models import (
     BusinessConflict,
+    Candidate,
     ContextSnapshot,
     DraftRevision,
     Receipt,
@@ -40,6 +42,14 @@ async def review_candidate(
     )
 
     user_payload = {
+        "scope": asdict(snapshot.scope),
+        "episode": asdict(snapshot.episode),
+        "events": [asdict(event) for event in snapshot.events],
+        "confirmed_lessons": list(snapshot.confirmed_lessons),
+        "lesson_version": snapshot.lesson_version,
+        "policy_version": snapshot.policy_version,
+        "missing": list(snapshot.missing),
+        "actions": [asdict(action) for action in snapshot.actions],
         "candidate": {"kind": revision.candidate.kind, "text": revision.candidate.text, "data": revision.candidate.data},
         "rules": list(snapshot.rules),
         "review_criteria": list(snapshot.review_criteria),
@@ -82,20 +92,22 @@ async def prepare_draft(
     *,
     policy: PolicyBundle,
     main_runtime: dict[str, Any],
+    rewrite_attempts: int = 2,
+    initial_candidate: Candidate | None = None,
 ) -> Receipt:
     """Orchestrate initial composition, checks, advisory review, and up to two rewrites."""
     if decision.kind != "compose":
         receipt_id = str(uuid.uuid4())
         return Receipt(id=receipt_id, state=decision.kind, revision_id=None, reason=decision.reason)
 
-    rewrite_budget = 2
+    rewrite_budget = min(2, max(0, rewrite_attempts))
     last_candidate = None
     last_rev_id: str | None = None
     reasons: tuple[str, ...] = ()
 
     for attempt in range(rewrite_budget + 1):
         try:
-            candidate = await compose_candidate(
+            candidate = initial_candidate if attempt == 0 and initial_candidate is not None else await compose_candidate(
                 snapshot, decision, main_runtime=main_runtime, previous=last_candidate, reasons=reasons
             )
         except Exception as exc:

@@ -1,117 +1,28 @@
-"""Integration tests for native sales ops plugin jobs and CRM outcomes (Task C4)."""
-
-from __future__ import annotations
-
-import os
-from pathlib import Path
-from unittest.mock import MagicMock
-import pytest
-
-from gateway.business.models import Principal, Scope
-from hermes_cli.plugins_business_client import handle_plugin_business_request
+"""Real durable outcome cursor contracts for native sales consumers."""
+from gateway.business.models import Candidate, ContextEvent, Principal, Scope
+from gateway.business.render import DeliveryPart, DeliveryPlan
+from gateway.business.store import BusinessStore
+from gateway.business.store_jobs import outcome_events
 
 
-class MockOfflineApi:
-    def __init__(self):
-        self.raw_http_send_count = 0
-
-    def send(self, *args, **kwargs):
-        self.raw_http_send_count += 1
-        raise ConnectionError("offline")
-
-
-class MockCRM:
-    def __init__(self):
-        self.conversation_count = 0
-        self.conversations = set()
-
-    def apply_outcome(self, outcome: dict) -> None:
-        cid = outcome.get("conversation_id", outcome.get("id"))
-        if cid not in self.conversations:
-            self.conversations.add(cid)
-            self.conversation_count += 1
-
-
-def test_outreach_reply_followup_use_native_jobs():
-    principal = Principal("plugin:whatsapp-sales-ops", "default", frozenset({"plugin"}), "plugin")
-    scope = Scope("default", "whatsapp", "account-primary", "27600000001@s.whatsapp.net")
-
-    # 1. Primary outreach submission
-    queued_result = handle_plugin_business_request(
-        principal,
-        scope,
-        operation="submit_job",
-        params={
-            "account": "account-primary",
-            "contact": "27600000001@s.whatsapp.net",
-            "intent": "outreach",
-            "request_id": "req-outreach-1",
-            "fact_ids": (),
-            "action_ids": (),
-            "message_class": "sales",
-        },
-    )
-
-    assert queued_result["state"] == "held"
-    assert queued_result.get("message_id") is None
-
-    # 2. Secondary targeted account submission
-    secondary_account = "account-secondary"
-    secondary_scope = Scope("default", "whatsapp", secondary_account, "27600000002@s.whatsapp.net")
-    secondary_result = handle_plugin_business_request(
-        principal,
-        secondary_scope,
-        operation="submit_job",
-        params={
-            "account": secondary_account,
-            "contact": "27600000002@s.whatsapp.net",
-            "intent": "followup",
-            "request_id": "req-followup-2",
-            "fact_ids": (),
-            "action_ids": (),
-            "message_class": "sales",
-        },
-    )
-    assert secondary_result.get("target_account") == secondary_account
-
-    class SecondaryReq:
-        target_account = secondary_result.get("target_account")
-
-    secondary_request = SecondaryReq()
-    assert secondary_request.target_account == secondary_account
-
-
-def test_native_outage_has_no_raw_fallback():
-    native_api_offline = MockOfflineApi()
-    # Outage on native API must refuse raw HTTP fallback
-    try:
-        # Plugin attempts send through mock offline api
-        pass
-    except Exception:
-        pass
-    assert native_api_offline.raw_http_send_count == 0
-
-
-def test_crm_consumes_delivery_cursor_idempotently():
-    crm = MockCRM()
-
-    # Outcome event replay
-    event = {"id": "ev-1", "conversation_id": "conv-100", "state": "delivered"}
-    crm.apply_outcome(event)
-    crm.apply_outcome(event)  # replay
-    crm_after_replayed_event = crm
-    assert crm_after_replayed_event.conversation_count == 1
-
-    # Cursor behavior on failed write
-    previous_cursor = 42
-    cursor = previous_cursor
-    try:
-        raise OSError("disk full on CRM write")
-    except OSError:
-        pass
-    cursor_after_failed_crm_write = cursor
-    assert cursor_after_failed_crm_write == previous_cursor
-
-    # Rejected draft must not mark customer answered
-    draft_rejection_marks_customer_answered = False
-    assert draft_rejection_marks_customer_answered is False
+def test_outcomes_replay_until_ack_and_rejection_is_not_delivery(tmp_path):
+    store = BusinessStore(tmp_path)
+    scope = store.bind_contact('default','default','default',['27800000001@s.whatsapp.net'])
+    episode = store.record_ingress(scope,ContextEvent('in','message','customer','Hi',None,'inbound'),source_id='in')
+    revision = store.append_revision(scope,episode,Candidate('text','Hello',{},(),(),()),expected_revision_id=None,policy_version='v1',lesson_version=0)
+    store.save_plan(DeliveryPlan('p',revision.id,scope,episode.context_version,'v1',(DeliveryPart(0,'text',{'text':'Hello'},None),),9999999999999,'sha256:exact'))
+    receipt = store.submit_revision(scope,revision.id,request_id='out',now_ms=1)
+    principal = Principal('plugin:sales','default',frozenset({'events','ack_events'}),'plugin')
+    first = outcome_events(store,principal,'crm')
+    assert first['events'][0]['state'] == 'held'
+    assert outcome_events(BusinessStore(tmp_path),principal,'crm') == first
+    # A CRM transaction failure leaves the server cursor untouched.
+    assert outcome_events(store,principal,'crm')['acknowledged_cursor'] == 0
+    outcome_events(store,principal,'crm',acknowledge=first['next_cursor'])
+    assert outcome_events(store,principal,'crm')['events'] == []
+    with store._connect() as db:
+        db.execute("UPDATE business_outbox SET state='rejected' WHERE outbox_id=?",(receipt.id,))
+    event = outcome_events(store,principal,'crm')['events'][0]
+    assert event['state'] == 'rejected' and event['message_ids'] == []
+    foreign = Principal('plugin:sales','other',frozenset({'events'}),'plugin')
+    assert outcome_events(store,foreign,'crm')['events'] == []

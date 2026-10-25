@@ -77,7 +77,7 @@ async def test_drafting_cases_replay_evaluation(business_gateway):
     assert business_gateway.socket_calls == []
     # 3. All receipts have valid states
     for res in results:
-        assert res["receipt_state"] in {"held", "attention", "failed", "no_reply", "escalate"}
+        assert res["receipt_state"] in {"held", "attention", "failed", "no_reply", "escalate", "blocked"}
 
     # Quality / coverage / cost report summary
     held_count = sum(1 for r in results if r["receipt_state"] == "held")

@@ -1,23 +1,18 @@
-"""Client for connecting to the business gateway for operator messages commands (Task C1)."""
-
+"""Async client for authenticated operator control requests."""
 from __future__ import annotations
 
-import logging
+import asyncio
+from pathlib import Path
 from typing import Any
 
 from gateway.business.client import request_business
+from gateway.business.models import BusinessDenied, BusinessProtocolError
+from hermes_constants import get_hermes_home
 
-logger = logging.getLogger(__name__)
 
-
-async def send_operator_request(action: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Send an operator control request to the business gateway daemon."""
-    payload = {"action": action, **(params or {})}
+async def send_operator_request(action: str, params: dict[str, Any] | None = None, *, home: Path | None = None) -> dict[str, Any]:
+    """Run the blocking socket client away from the gateway event loop."""
     try:
-        resp = await request_business("operator", payload)
-        if isinstance(resp, dict):
-            return resp
-        return {"status": "ok", "raw": resp}
-    except Exception as exc:  # health: allow BLE001 -- control client errors return structured failures
-        logger.debug("Failed sending operator request: %s", exc, exc_info=True)
-        return {"error": str(exc)}
+        return await asyncio.to_thread(request_business, home or get_hermes_home(), operation=f'operator.{action}', params=params or {}, timeout=120)
+    except (BusinessDenied, BusinessProtocolError) as exc:
+        return {'ok':False,'error':str(exc) or 'permission_denied'}

@@ -22,13 +22,14 @@ async def check_workflow_readiness(
     credentials_ready: bool | None = None,
     cutover_manifest: CutoverManifest | None = None,
     legacy_writers: tuple[dict[str, Any], ...] = (),
+    runtime_profile: str = "default",
 ) -> dict[str, Any]:
     """Verify end-to-end supervised workflow prerequisites across controls, policy, cutover, and credentials."""
     blockers: list[str] = []
     warnings: list[str] = []
     checks: dict[str, bool] = {}
 
-    scope = Scope("default", account.transport_profile, account.account_id, "")
+    scope = Scope(runtime_profile, account.transport_profile, account.account_id, "")
     cfg = None
     try:
         cfg = service.resolve_config(scope)
@@ -50,7 +51,7 @@ async def check_workflow_readiness(
     extra = getattr(cfg, "extra", {}) or {}
 
     # 3. Native plugin mode check
-    plugin_mode = extra.get("plugin_mode", "native")
+    plugin_mode = extra.get("plugin_mode", "unverified")
     is_native = plugin_mode == "native"
     checks["native_plugin_mode"] = is_native
     if not is_native:
@@ -98,6 +99,13 @@ async def check_workflow_readiness(
     if active_writers:
         blockers.append(f"competing_legacy_writers:{','.join(active_writers)}")
 
+    from gateway.business.runtime_readiness import probe_runtime
+    blockers.extend(await probe_runtime(service, account, runtime_profile))
+    # Native mode is established by the callback capability, never by a missing flag.
+    if "native_plugin_mode_unverified" not in blockers and "required_policy_unavailable" not in blockers:
+        checks["native_plugin_mode"] = True
+        if plugin_mode == "unverified":
+            blockers = [b for b in blockers if b != "plugin_mode_not_native:unverified"]
     ready = len(blockers) == 0
     return {
         "ready": ready,
@@ -158,8 +166,7 @@ def pilot_report(
             "episodes": episodes_count,
             "reviews": reviews_count,
             "lessons": lessons_count,
-            "p95_draft_latency_ms": 240.0,
-            "reviewer_agreement_rate": 0.96,
+            **_measured_evidence(store, scope),
         },
         "authorizations": {
             "pilot_handoff_certified": False,
@@ -171,3 +178,9 @@ def pilot_report(
             "operator_realtime_alert_channel",
         ],
     }
+
+
+def _measured_evidence(store, scope):
+    """No observations means unknown; mixed policy/model cohorts remain separate."""
+    from gateway.business.measurements import measured_evidence
+    return measured_evidence(store, scope)

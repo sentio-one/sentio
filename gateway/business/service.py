@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from contextlib import nullcontext
 from typing import Any, Callable
 
 from gateway.business.config import BusinessConfig, load_business_config
@@ -59,12 +60,17 @@ class BusinessService:
             business_dict = (
                 ((cfg_dict.get("platforms") or {}).get("whatsapp") or {}).get("extra") or {}
             ).get("business") or {}
-            return load_business_config(business_dict, supervised_latch=False)
+            from gateway.business.runtime_config import resolve_stored_config
+            return resolve_stored_config(business_dict, self.store, scope)
         except Exception as exc:
             logger.debug("Business config resolution fallback failed: %s", exc, exc_info=True)
             return None
 
-    async def handle_turn(
+    async def handle_turn(self, scope, episode, result, *, main_runtime):
+        with self.runtime_scope(scope) if self.runtime_scope else nullcontext():
+            return await self._handle_scoped_turn(scope, episode, result, main_runtime=main_runtime)
+
+    async def _handle_scoped_turn(
         self,
         scope: Scope,
         episode: EpisodeRef,
@@ -82,6 +88,11 @@ class BusinessService:
                 reason="business_mode_off",
             )
 
+        problem = (config.extra or {}).get("configuration_error")
+        if problem:
+            self.store.put_task(scope, dedupe_key=f"episode:{episode.id}", reason=problem, refs=(episode.id,))
+            return self.store.record_verdict(scope, episode.id, kind="failed", reason=problem)
+
         # Runtime failure bypasses both shadow decision and composition
         if result.get("failed") is True or bool(result.get("error")):
             error_msg = str(result.get("error") or result.get("final_response") or "turn_failed")
@@ -89,7 +100,7 @@ class BusinessService:
             self.store.put_task(scope, dedupe_key=f"episode:{episode.id}", reason=error_msg, refs=(episode.id,))
             return Receipt(id=str(uuid.uuid4()), state="failed", revision_id=None, reason=error_msg)
 
-        policy = await collect_policy(scope, episode)
+        policy = await collect_policy(scope, episode, required_policies=config.required_policies)
         snapshot = build_context(self.store, scope, episode, policy=policy, lesson_version=0)
 
         if config.mode == "shadow":
@@ -114,13 +125,20 @@ class BusinessService:
             return Receipt(id=str(uuid.uuid4()), state="escalate", revision_id=None, reason=decision.reason)
 
         # decision.kind == "compose"
+        started = time.monotonic()
         receipt = await prepare_draft(
             self.store,
             snapshot,
             decision,
             policy=policy,
             main_runtime=main_runtime,
+            rewrite_attempts=config.rewrite_attempts,
         )
+        if config.mode == "supervised":
+            from gateway.business.drafting import promote_draft
+            receipt = await promote_draft(self.store, scope, receipt, config)
+        from gateway.business.measurements import record_draft_measurement
+        record_draft_measurement(self.store, scope, receipt.revision_id, (time.monotonic() - started) * 1000)
         return receipt
 
     async def submit_revision(self, scope: Scope, revision_id: str, *, request_id: str, now_ms: int | None = None) -> Receipt:

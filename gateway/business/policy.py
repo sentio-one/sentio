@@ -12,6 +12,7 @@ from hermes_cli.config import load_config_readonly
 from hermes_cli.plugins import discover_plugins
 from hermes_cli.plugins_business import callbacks_for_required_policy
 from gateway.business.models import ActionReceipt, Candidate, CheckReport, EpisodeRef, Fact, Scope
+from agent.memory_provider import spawn_context_thread
 
 POLICY_TIMEOUT_SECONDS = 10
 _worker_lock = threading.Lock()
@@ -28,6 +29,7 @@ class PolicyBundle:
     rules: tuple[str, ...]
     criteria: tuple[str, ...]
     missing: tuple[str, ...]
+    capabilities: tuple[dict[str, Any], ...] = ()
 
 
 def _requirements() -> tuple[str, ...]:
@@ -73,7 +75,7 @@ async def _invoke(callback: Any, **kwargs: Any) -> Any:
             with _worker_lock:
                 _running_workers -= 1
 
-    threading.Thread(target=run, name="business-policy", daemon=True).start()
+    spawn_context_thread(run, name="business-policy", daemon=True).start()
     return await asyncio.wait_for(result, timeout=POLICY_TIMEOUT_SECONDS)
 
 
@@ -84,16 +86,19 @@ def _sequence(value: object, key: str, expected: type) -> tuple:
     return tuple(expected(**row) for row in rows)
 
 
-async def collect_policy(scope: Scope, episode: EpisodeRef) -> PolicyBundle:
+async def collect_policy(scope: Scope, episode: EpisodeRef, *, required_policies: tuple[str, ...] | None = None) -> PolicyBundle:
     """Load each configured owner from discovery and aggregate only validated JSON results."""
     discover_plugins()
-    requirements = _requirements()
+    requirements = _requirements() if required_policies is None else required_policies
+    if not requirements:
+        requirements = ("required_policy_unconfigured",)
     facts: list[Fact] = []
     actions: list[ActionReceipt] = []
     rules: list[str] = []
     criteria: list[str] = []
     missing: list[str] = []
     versions: list[str] = []
+    capabilities: list[dict[str, Any]] = []
     for plugin_id in requirements:
         callbacks = callbacks_for_required_policy(plugin_id, "business_context")
         if len(callbacks) != 1:
@@ -118,11 +123,14 @@ async def collect_policy(scope: Scope, episode: EpisodeRef) -> PolicyBundle:
                     raise ValueError("invalid policy result")
                 target.extend(entries)
             versions.append(raw["version"])
+            capability = raw.get("capabilities")
+            if isinstance(capability, dict):
+                capabilities.append(capability)
         except Exception:  # health: allow BLE001 -- plugin policy failure marks policy missing
             missing.append(plugin_id)
     return PolicyBundle(id=",".join(requirements), version="+".join(versions) or "unavailable",
                         facts=tuple(facts), actions=tuple(actions), rules=tuple(rules),
-                        criteria=tuple(criteria), missing=tuple(missing))
+                        criteria=tuple(criteria), missing=tuple(missing), capabilities=tuple(capabilities))
 
 
 async def check_candidate(scope: Scope, candidate: Candidate, *, bundle: PolicyBundle) -> CheckReport:
@@ -131,7 +139,7 @@ async def check_candidate(scope: Scope, candidate: Candidate, *, bundle: PolicyB
                            bundle.version)
     discover_plugins()
     issues: list[dict[str, Any]] = []
-    for plugin_id in _requirements():
+    for plugin_id in bundle.id.split(","):
         callbacks = callbacks_for_required_policy(plugin_id, "business_check")
         if len(callbacks) != 1:
             issues.append({"code": "policy_unavailable", "policy": plugin_id})

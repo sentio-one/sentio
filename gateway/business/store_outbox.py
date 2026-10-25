@@ -52,7 +52,7 @@ def submit_revision(
 
         rev_payload = json.loads(rev_row["payload"])
         checks = rev_payload.get("checks")
-        if checks is not None and not checks.get("passed", False):
+        if checks is not None and not checks.get("ok", False):
             raise BusinessProtocolError("checks_failed")
 
         plan_row = db.execute(
@@ -125,7 +125,7 @@ def approve_revision(
 
         rev_payload = json.loads(rev_row["payload"])
         checks = rev_payload.get("checks")
-        if checks is not None and not checks.get("passed", False):
+        if checks is not None and not checks.get("ok", False):
             raise BusinessProtocolError("checks_failed")
 
         review = rev_payload.get("review")
@@ -270,7 +270,7 @@ def claim_part(
         parts = plan_dict.get("parts", [])
         for idx in range(len(parts)):
             att = db.execute(
-                "SELECT attempt_id, state FROM business_attempts WHERE outbox_id=? AND part_index=? ORDER BY generation DESC LIMIT 1",
+                "SELECT attempt_id, state, generation, claimed_at_ms FROM business_attempts WHERE outbox_id=? AND part_index=? ORDER BY generation DESC LIMIT 1",
                 (outbox_id, idx),
             ).fetchone()
             if not att:
@@ -281,10 +281,22 @@ def claim_part(
                     (attempt_id, outbox_id, account.transport_profile, account.account_id, idx, 1, "claimed", "[]", now_ms),
                 )
                 return Attempt(id=attempt_id, outbox_id=outbox_id, part_index=idx, generation=1, state="claimed", platform_ids=(), error_code=None)
-            if att["state"] not in ("sent", "delivered", "accepted"):
+            if att["state"] == "scheduled" and att["claimed_at_ms"] <= now_ms:
+                db.execute("UPDATE business_attempts SET state='claimed' WHERE attempt_id=?", (att["attempt_id"],))
+                return Attempt(id=att["attempt_id"], outbox_id=outbox_id, part_index=idx,
+                               generation=att["generation"], state="claimed", platform_ids=(), error_code=None)
+            if att["state"] not in ("sent", "delivered", "accepted", "read", "played"):
                 return None
 
+        db.execute("UPDATE business_outbox SET state='awaiting_delivery' WHERE outbox_id=?", (outbox_id,))
         return None
+
+
+def reschedule_attempt(store, attempt_id: str, *, not_before_ms: int, reason: str) -> None:
+    """A proven unsubmitted pacing hold keeps the same attempt reusable."""
+    with transaction(store._connect(), immediate=True) as db:
+        db.execute("UPDATE business_attempts SET state='scheduled', claimed_at_ms=?, error_code=? "
+                   "WHERE attempt_id=? AND state='claimed'", (not_before_ms, reason, attempt_id))
 
 
 def update_attempt_state(
@@ -309,6 +321,14 @@ def update_attempt_state(
                 "UPDATE business_attempts SET state=?, error_code=? WHERE attempt_id=?",
                 (state, error_code, attempt_id),
             )
+
+        from gateway.business.store_jobs import _refresh_outcomes
+        owner = db.execute("SELECT runtime_profile FROM business_outbox o JOIN business_attempts a ON a.outbox_id=o.outbox_id WHERE a.attempt_id=?", (attempt_id,)).fetchone()
+        if owner:
+            _refresh_outcomes(db, owner["runtime_profile"])
+    if platform_ids:
+        from gateway.business.receipts import join_attempt_receipts
+        join_attempt_receipts(store, attempt_id)
 
 
 def get_attempt_context(store, attempt_id: str) -> dict | None:

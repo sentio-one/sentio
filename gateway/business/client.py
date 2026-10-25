@@ -19,6 +19,16 @@ def request_business(
     timeout: float = 10.0,
 ) -> dict[str, Any]:
     """Execute an authenticated request over the gateway control socket."""
+    home = Path(home)
+    # Discovery validates a named profile's multiplex owner without starting a gateway.
+    if not (home / "gateway.sock").exists() and not (home / "gateway.sock.path").exists():
+        from hermes_cli.gateway_runtime import control_home_for, discover_gateway_endpoint
+        from hermes_constants import profile_name_for_home
+        selected = profile_name_for_home(home)
+        if selected and selected != "default":
+            params = {"runtime_profile": selected, **params}
+        observed = discover_gateway_endpoint(home, timeout=min(timeout, 2.0))
+        home = control_home_for(home, observed.endpoint)
     request_dict = {
         "protocol": 1,
         "id": 1,

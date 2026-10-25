@@ -138,7 +138,7 @@ async def test_workflow_blocks_partial_activation(store):
     assert competing_workflow["ready"] is False
     assert any("competing_legacy_writers" in b for b in competing_workflow["blockers"])
 
-    # 6. Full valid workflow readiness succeeds and contributes workflow_protocol=1
+    # 6. Configuration and a fake manifest do not establish live runtime capabilities.
     ready_manifest = CutoverManifest(
         id="cman-ready",
         source_digest="sha256:abc",
@@ -153,9 +153,9 @@ async def test_workflow_blocks_partial_activation(store):
         cutover_manifest=ready_manifest,
         credentials_ready=True,
     )
-    assert full_ready_workflow["ready"] is True
-    assert full_ready_workflow["workflow_protocol"] == 1
-    assert full_ready_workflow["blockers"] == []
+    assert full_ready_workflow["ready"] is False
+    assert full_ready_workflow["workflow_protocol"] is None
+    assert "operator_controls_unavailable" in full_ready_workflow["blockers"]
 
     # 7. Pilot report reflects supervised metrics without promoting mode or sending
     report = pilot_report(scope, store=store)

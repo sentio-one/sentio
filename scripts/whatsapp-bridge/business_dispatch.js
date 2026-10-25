@@ -1,9 +1,11 @@
 export async function dispatchAuthorized(request, options = {}) {
   const { authorize, journal, sendSocket } = options;
 
-  if (!request.authorization_token) {
+  if (!(request.authorization_token || request.token)) {
     return { ok: false, error: 'business_authorization_required' };
   }
+
+  if (typeof authorize !== "function" || typeof sendSocket !== "function") return {ok:false,error:"business_authority_unavailable"};
 
   const attemptId = request.attempt_id || request.authorization_token;
   if (journal?.recordAttempt) {
@@ -16,7 +18,8 @@ export async function dispatchAuthorized(request, options = {}) {
 
   if (authorize) {
     const authRes = await authorize({
-      token: request.authorization_token,
+      ...request,
+      token: request.authorization_token || request.token,
       payload_digest: request.payload_digest,
     });
     if (!authRes || !authRes.ok) {
@@ -60,6 +63,6 @@ export async function dispatchAuthorized(request, options = {}) {
         error: err.message,
       });
     }
-    return { ok: false, error: err.message };
+    return { ok: false, error: err.message, submitted: true, state: 'unknown' };
   }
 }

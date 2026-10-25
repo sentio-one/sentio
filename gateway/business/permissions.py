@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from gateway.business.models import Principal, Scope
 
 OPERATOR_OPERATIONS = frozenset({
-    "queue",
+    "queue", "submit_candidate",
     "show",
     "edit",
     "approve",
@@ -28,7 +28,8 @@ OPERATOR_OPERATIONS = frozenset({
     "shorthand",
     "reaction",
     "alert",
-    "approve_digest",
+    "approve_digest", "propose_lessons", "confirm_lesson", "revoke_lesson",
+    "credential_grant", "inventory", "import_legacy", "prepare_cutover", "apply_cutover", "rollback_cutover",
 })
 
 PERMITTED_PLUGIN_OPERATIONS = frozenset({
@@ -53,6 +54,8 @@ FORBIDDEN_PLUGIN_OPERATIONS = frozenset({
 
 def authorize_operation(principal: Principal, scope: Scope, operation: str) -> None:
     """Authorize an operation against principal capabilities, denying privilege escalation."""
+    if principal.runtime_profile != scope.runtime_profile:
+        raise BusinessDenied("cross_profile_access_denied")
     if principal.kind == "plugin":
         if operation in FORBIDDEN_PLUGIN_OPERATIONS or operation not in PERMITTED_PLUGIN_OPERATIONS:
             raise BusinessDenied("permission_denied")

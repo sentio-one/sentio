@@ -26,12 +26,12 @@ class BridgeState:
     respawn_count: int
 
 
-async def check_readiness(service: BusinessService, account: AccountKey) -> dict[str, Any]:
+async def check_readiness(service: BusinessService, account: AccountKey, *, runtime_profile: str = "default") -> dict[str, Any]:
     """Evaluate account readiness across config, store, bridge, and workflow latch."""
     blocking: list[str] = []
     warnings: list[str] = []
 
-    scope = Scope("default", account.transport_profile, account.account_id, "")
+    scope = Scope(runtime_profile, account.transport_profile, account.account_id, "")
     cfg = None
     try:
         cfg = service.resolve_config(scope)
@@ -47,6 +47,9 @@ async def check_readiness(service: BusinessService, account: AccountKey) -> dict
             blocking.append("missing_operators")
         if not cfg.governor:
             blocking.append("missing_governor")
+        error = (cfg.extra or {}).get("configuration_error")
+        if error and error != "supervised_latch_required":
+            blocking.append(error)
 
     # Bridge state check
     b_state = get_bridge_state(account, store=service.store)
@@ -56,7 +59,7 @@ async def check_readiness(service: BusinessService, account: AccountKey) -> dict
     # Supervised activation strictly requires C7 workflow readiness capability
     from gateway.business.workflow_readiness import check_workflow_readiness
 
-    wf = await check_workflow_readiness(service, account)
+    wf = await check_workflow_readiness(service, account, runtime_profile=runtime_profile)
     if not wf.get("ready"):
         for b in wf.get("blockers", []):
             if b not in blocking:
@@ -117,11 +120,19 @@ async def set_business_mode(
         return {"success": False, "mode": "unknown", "blocking": ["store_unavailable"]}
 
     current_mode = get_account_mode(active_store, account, runtime_profile=runtime_profile)
+    from gateway.business.permissions import authorize_operation
+    from gateway.business.models import BusinessDenied
+    try:
+        authorize_operation(principal, Scope(runtime_profile, account.transport_profile, account.account_id, ""), "set_mode")
+        if principal.runtime_profile != runtime_profile:
+            raise BusinessDenied()
+    except BusinessDenied:
+        return {"success": False, "mode": current_mode, "blocking": ["permission_denied"]}
 
     if mode == "supervised":
         if not service:
             return {"success": False, "mode": current_mode, "blocking": ["service_unavailable"]}
-        readiness = await check_readiness(service, account)
+        readiness = await check_readiness(service, account, runtime_profile=runtime_profile)
         if not readiness["ready"]:
             return {
                 "success": False,
@@ -129,6 +140,11 @@ async def set_business_mode(
                 "blocking": readiness["blocking"],
             }
 
+        from gateway.business.worker import delivery_adapter, latch_bridge_account
+        adapter = delivery_adapter(getattr(service, "runner", None), account)
+        if adapter is None:
+            return {"success": False, "mode": current_mode, "blocking": ["bridge_protocol_unavailable"]}
+        latch_bridge_account(adapter, account, active_store.db_path.parent)
     _set_account_mode_row(active_store, account, mode, runtime_profile=runtime_profile)
     return {"success": True, "mode": mode}
 

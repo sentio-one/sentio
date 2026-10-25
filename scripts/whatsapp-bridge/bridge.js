@@ -34,6 +34,7 @@ import { matchesAllowedSender, matchesAllowedUser, matchesInboundWhatsAppGroup, 
 import { createOutboundIdTracker } from './outbound_ids.js';
 import { classifyOwnerMessageGate } from './owner_message_gate.js';
 import { normalizeDeliveryUpdates } from './business_receipts.js';
+import { installBusinessRoutes } from './business_routes.js';
 import { renderBusinessPlan } from './business_render.js';
 import {
   addMentions,
@@ -235,7 +236,8 @@ function emitDebugEvent(payload) {
   } catch {}
 }
 
-mkdirSync(SESSION_DIR, { recursive: true });
+const IS_MAIN = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (IS_MAIN) mkdirSync(SESSION_DIR, { recursive: true });
 
 // Build LID → phone reverse map from session files (lid-mapping-{phone}.json)
 function buildLidMap() {
@@ -822,7 +824,7 @@ async function startSocket() {
 }
 
 // HTTP server
-const app = express();
+export const app = express();
 app.use(express.json());
 
 // Host-header validation — defends against DNS rebinding.
@@ -854,6 +856,23 @@ app.use((req, res, next) => {
     });
   }
   next();
+});
+
+let businessSessionDir = SESSION_DIR;
+let businessAuthorize = null;
+export function configureBridgeTransport({socket, state, sessionDir, authorize}) {
+  sock = socket;
+  connectionState = state;
+  businessSessionDir = sessionDir;
+  businessAuthorize = authorize;
+}
+installBusinessRoutes(app, {
+  sessionDir: () => businessSessionDir,
+  connected: () => !!sock && connectionState === 'connected',
+  send: sendWithTimeout,
+  messageStore,
+  track: sent => {trackSentMessageId(sent); messageStore.remember(sent);},
+  authorize: () => businessAuthorize,
 });
 
 // Poll for new messages (long-poll style)
@@ -1169,12 +1188,12 @@ app.get('/health', (req, res) => {
     sendReadReceipts: SEND_READ_RECEIPTS,
     // path.resolve, not realpath: the adapter compares against os.path.abspath, which keeps symlinks.
     session: path.resolve(SESSION_DIR),
-    capabilities: { outboundMentions: true },
+    capabilities: { outboundMentions: true, businessDispatch: 1, businessReceipts: 1, businessLatch: 1 },
   });
 });
 
 // Start
-if (PAIR_ONLY) {
+if (IS_MAIN && PAIR_ONLY) {
   // Pair-only mode: just connect, show QR, save creds, exit. No HTTP server.
   if (PAIR_JSON) {
     emitPairEvent({ event: 'started', session: SESSION_DIR });
@@ -1190,7 +1209,7 @@ if (PAIR_ONLY) {
     }
     process.exit(1);
   });
-} else {
+} else if (IS_MAIN) {
   app.listen(PORT, '127.0.0.1', () => {
     console.log(`🌉 WhatsApp bridge listening on port ${PORT} (mode: ${WHATSAPP_MODE})`);
     console.log(`📁 Session stored in: ${SESSION_DIR}`);

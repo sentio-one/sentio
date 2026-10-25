@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from dataclasses import asdict
 from typing import Any
 
 from agent.auxiliary_client import async_call_llm
@@ -92,6 +93,13 @@ async def compose_candidate(
     actions_summary = [{"id": a.id, "kind": a.kind, "subject": a.subject} for a in snapshot.actions if a.id in decision.action_ids]
 
     user_payload: dict[str, Any] = {
+        "scope": asdict(snapshot.scope),
+        "episode": asdict(snapshot.episode),
+        "events": [asdict(event) for event in snapshot.events],
+        "confirmed_lessons": list(snapshot.confirmed_lessons),
+        "lesson_version": snapshot.lesson_version,
+        "policy_version": snapshot.policy_version,
+        "missing": list(snapshot.missing),
         "intent": decision.intent,
         "verified_facts": facts_summary,
         "completed_actions": actions_summary,

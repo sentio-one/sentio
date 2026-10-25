@@ -22,7 +22,8 @@ def store(tmp_path):
 
 @pytest.fixture
 def runner(store):
-    return SimpleNamespace(_business_store=store)
+    service = SimpleNamespace(resolve_config=lambda scope: SimpleNamespace(enabled=True))
+    return SimpleNamespace(_business_store=store, _business_service=service)
 
 
 def _policy():

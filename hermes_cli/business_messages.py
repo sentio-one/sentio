@@ -19,8 +19,8 @@ def format_message_item(store: BusinessStore, scope: Scope, outbox_id: str) -> d
         row = db.execute(
             "SELECT outbox_id, runtime_profile, transport_profile, account_id, contact_id, "
             "       revision_id, plan_id, request_id, state, created_at_ms, expires_at_ms, reason "
-            "FROM business_outbox WHERE outbox_id=?",
-            (outbox_id,),
+            "FROM business_outbox WHERE outbox_id=? AND runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=?",
+            (outbox_id,scope.runtime_profile,scope.transport_profile,scope.account_id,scope.contact_id),
         ).fetchone()
 
         if not row:
@@ -64,4 +64,28 @@ def format_message_item(store: BusinessStore, scope: Scope, outbox_id: str) -> d
 
 def run_messages_command(args: Any) -> int:
     """CLI executor for ``hermes messages``."""
-    return 0
+    from gateway.business.client import request_business
+    from gateway.business.models import BusinessDenied, BusinessProtocolError
+    from hermes_constants import get_hermes_home
+    from pathlib import Path
+
+    command = getattr(args, "messages_command", None)
+    if not command:
+        print(json.dumps({"ok": False, "error": "subcommand_required"}))
+        return 2
+    params = {key: value for key, value in vars(args).items()
+              if key in {"outbox_id", "revision_id", "plan_digest", "override_reason", "reason",
+                         "text", "task_id", "mode", "runtime_profile", "transport_profile", "account_id",
+                         "contact_id", "lesson_id", "policy_id", "texts", "evidence_revision_ids",
+                         "vault_item_id", "expires_at_ms", "path", "manifest_id", "source_digest", "legacy_stopped"}
+              and value is not None}
+    if getattr(args, "profile", None) and "runtime_profile" not in params:
+        params["runtime_profile"] = args.profile
+    home = Path(getattr(args, "home", None) or get_hermes_home())
+    action = "set_mode" if command == "mode" else command.replace("-", "_")
+    try:
+        result = request_business(home, operation=f"operator.{action}", params=params, timeout=120)
+    except (BusinessDenied, BusinessProtocolError) as exc:
+        result = {"ok": False, "error": str(exc) or "permission_denied"}
+    print(json.dumps(result, ensure_ascii=False, default=str))
+    return 0 if result.get("ok") is True else 1

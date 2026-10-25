@@ -41,7 +41,8 @@ async def test_shadow_never_dispatches(business_gateway):
 
     shadow_receipt = await business_gateway.finish(legacy_result, event=event)
     assert shadow_receipt is not None
-    assert shadow_receipt.state in {"held", "attention", "failed", "no_reply", "escalate"}
+    assert shadow_receipt.state == "blocked"
+    assert shadow_receipt.reason == "policy_unavailable"
     assert business_gateway.socket_calls == []
 
 

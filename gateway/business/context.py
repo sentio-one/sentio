@@ -19,12 +19,14 @@ def build_context(store, scope: Scope, episode: EpisodeRef, *, policy, lesson_ve
     but unavailable facts, policies or transcripts are explicit ``missing`` entries.
     """
     events = store.list_events(scope)
+    from gateway.business.store_jobs import context_contributions
+    plugin_facts, plugin_actions = context_contributions(store, scope)
     confirmed = ()
     if hasattr(store, "confirmed_lesson_texts"):
         confirmed = store.confirmed_lesson_texts(scope, policy.id)
     snapshot = ContextSnapshot(
         id=str(uuid.uuid4()), scope=scope, episode=episode, policy_version=policy.version,
-        lesson_version=lesson_version, events=events, facts=policy.facts, actions=policy.actions,
+        lesson_version=lesson_version, events=events, facts=policy.facts + plugin_facts, actions=policy.actions + plugin_actions,
         rules=policy.rules, review_criteria=policy.criteria, confirmed_lessons=confirmed,
         missing=tuple(policy.missing) + _unavailable_inputs(events),
     )

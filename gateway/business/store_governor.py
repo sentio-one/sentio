@@ -95,7 +95,7 @@ def _eval_eligibility(db, account: AccountKey, message_class: str, now_ms: int, 
         "SELECT paused, pause_reason, high_watermark_ms FROM business_governor_accounts WHERE transport_profile=? AND account_id=?",
         (account.transport_profile, account.account_id),
     ).fetchone()
-    if row and row["paused"]:
+    if row and row["paused"] and message_class != "operator":
         return Eligibility(allowed=False, not_before_ms=None, reason="account_paused")
 
     high_watermark = row["high_watermark_ms"] if row else 0
@@ -118,7 +118,7 @@ def _eval_eligibility(db, account: AccountKey, message_class: str, now_ms: int, 
         return Eligibility(allowed=False, not_before_ms=None, reason="outside_window")
 
     # 4. Min gap check
-    gap_seconds = config.get("reply_min_gap_seconds" if message_class == "reply" else "min_gap_seconds", 0)
+    gap_seconds = config.get("reply_min_gap_seconds", config.get("min_gap_seconds", 0)) if message_class == "reply" else config.get("min_gap_seconds", 0)
     gap_ms = int(gap_seconds * 1000)
     last_att = db.execute(
         "SELECT timestamp_ms FROM business_governor_attempts WHERE transport_profile=? AND account_id=? ORDER BY timestamp_ms DESC LIMIT 1",
@@ -201,9 +201,11 @@ def governor_complete_attempt(
 
         message_class = row["message_class"] if row else "cold"
         if submitted:
+            attempt = db.execute("SELECT state FROM business_attempts WHERE attempt_id=?", (attempt_id,)).fetchone()
+            success = not attempt or attempt["state"] not in ("failed", "unknown")
             db.execute(
-                "INSERT INTO business_governor_attempts(transport_profile, account_id, message_class, timestamp_ms, success) VALUES(?,?,?,?,1)",
-                (account.transport_profile, account.account_id, message_class, finished_at_ms),
+                "INSERT INTO business_governor_attempts(transport_profile, account_id, message_class, timestamp_ms, success) VALUES(?,?,?,?,?)",
+                (account.transport_profile, account.account_id, message_class, finished_at_ms, int(success)),
             )
             db.execute(
                 "INSERT INTO business_governor_accounts(transport_profile, account_id, high_watermark_ms) VALUES(?,?,?) "

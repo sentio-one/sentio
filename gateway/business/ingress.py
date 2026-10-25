@@ -52,6 +52,9 @@ def _resolve(runner: Any, event: Any) -> tuple[Any, Scope, str] | None:
     source = getattr(event, "source", None)
     if store is None or source is None:
         return None
+    from gateway.business.turns import is_business_mode_active
+    if not is_business_mode_active(runner, source):
+        return None
     identity = identity_of(source)
     if identity is not None:
         runtime, transport = identity.runtime_profile, identity.transport_profile

@@ -723,8 +723,8 @@ class GatewayTurnPrepareMixin:
             if is_business_mode_active(self, source):
                 svc = getattr(self, "_business_service", None)
                 if svc is not None:
-                    profile = getattr(source, "profile", None) or "default"
-                    cfg = svc.resolve_config(profile)
+                    from gateway.business.turns import _source_scope
+                    cfg = svc.resolve_config(_source_scope(source))
                     if cfg and cfg.mode == "supervised":
                         from gateway.business.ingress import _resolve
                         from gateway.business.policy import collect_policy
@@ -733,7 +733,7 @@ class GatewayTurnPrepareMixin:
                             _b_store, _b_scope, _b_source_id = resolved
                             _b_ep = _b_store.episode_for_source(_b_scope, _b_source_id)
                             if _b_ep is not None:
-                                _b_policy = await collect_policy(_b_scope, _b_ep)
+                                _b_policy = await collect_policy(_b_scope, _b_ep, required_policies=cfg.required_policies)
                                 _b_note = business_turn_input(self, event, _b_ep, _b_policy)
                                 turn_sidecar_notes.append(_b_note)
         except Exception:

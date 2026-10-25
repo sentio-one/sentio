@@ -231,10 +231,19 @@ def _render_media_parts(
     parts: list[DeliveryPart] = []
     for idx, att in enumerate(attachments):
         att_path = att.get("path", "")
+        if not att_path:
+            handle = att.get("id", "")
+            digest = att.get("sha256", "")
+            if (capture_dir is None or not isinstance(handle, str) or len(handle) != 64
+                    or any(c not in "0123456789abcdef" for c in handle) or handle != digest):
+                raise BusinessProtocolError("invalid_attachment_handle")
+            att_path = str(capture_dir / handle)
+            if not Path(att_path).is_file() or hashlib.sha256(Path(att_path).read_bytes()).hexdigest() != digest:
+                raise BusinessProtocolError("attachment_hash_mismatch")
         captured_path, media_hash = _capture_attachment(att_path, capture_dir=capture_dir, account_id=account_id)
         payload = {
             "path": captured_path,
-            "type": att.get("type", "document"),
+            "type": att.get("media_type", att.get("type", "document")),
             "caption": text if idx == 0 else "",
         }
         if idx == 0:
@@ -326,3 +335,11 @@ async def render_delivery_plan(
         encrypted_plan_handle=None,
     )
 
+
+
+def capture_producer_media(path: str, store_home: Path, media_type: str) -> dict[str, str]:
+    """Capture trusted local producer bytes into an opaque, content-addressed handle."""
+    capture_dir = Path(store_home) / "business" / "attachments"
+    _, digest = _capture_attachment(path, capture_dir=capture_dir)
+    raw_hash = digest.split(":", 1)[1]
+    return {"id": raw_hash, "sha256": raw_hash, "media_type": media_type}

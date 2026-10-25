@@ -32,8 +32,7 @@ async def process_business_turn_output(
     if is_business_mode_active(runner, source):
         footer_line = ""
         svc = getattr(runner, "_business_service", None)
-        profile = getattr(source, "profile", None) or "default"
-        cfg = svc.resolve_config(profile) if svc else None
+        cfg = svc.resolve_config(_source_scope(source)) if svc else None
         if cfg and cfg.mode == "supervised":
             intentional_silence = True
             response = ""
@@ -141,9 +140,16 @@ def is_business_mode_active(runner: Any, source: Any) -> bool:
     platform_name = getattr(platform, "value", str(platform))
     if platform_name != "whatsapp":
         return False
-    profile = getattr(source, "profile", None) or "default"
-    cfg = service.resolve_config(profile)
+    cfg = service.resolve_config(_source_scope(source))
     return bool(cfg and cfg.enabled)
+
+
+def _source_scope(source):
+    from gateway.session_identity import identity_of
+    identity = identity_of(source)
+    runtime = identity.runtime_profile if identity else getattr(source, "profile", None) or "default"
+    transport = identity.transport_profile if identity else runtime
+    return Scope(runtime, transport, transport, "")
 
 
 def business_turn_input(runner: Any, event: Any, episode: EpisodeRef, policy: Any) -> str:
@@ -153,7 +159,9 @@ def business_turn_input(runner: Any, event: Any, episode: EpisodeRef, policy: An
         "You are operating in WhatsApp supervised business mode. Your response will be reviewed before "
         "anything is sent to the customer.\n"
         "Conclude your turn with a structured decision in JSON matching the WorkDecision schema:\n"
-        '```json\n{"kind": "compose" | "no_reply" | "escalate", "reason": "...", "intent": "...", "fact_ids": [...], "action_ids": [...]}\n```\n'
+        '```json\n{"kind": "compose", "reason": "...", "intent": "...", "fact_ids": [], "action_ids": [], '
+        f'"policy_version": {json.dumps(policy.version)}' + '}\n```\n'
+        'Use kind "no_reply" or "escalate" instead when appropriate.\n'
         f"Active Policy Version: {policy.version}\n"
         f"Applicable Rules:\n" + "\n".join(f"- {r}" for r in policy.rules)
     )

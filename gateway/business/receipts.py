@@ -60,7 +60,8 @@ def apply_delivery_event(store: BusinessStore, event: DeliveryEvent) -> Receipt 
             "INSERT INTO business_delivery_receipts(transport_profile, account_id, message_id, status, status_name, state, timestamp_ms) "
             "VALUES(?,?,?,?,?,?,?) "
             "ON CONFLICT(transport_profile, account_id, message_id) DO UPDATE SET "
-            "status=excluded.status, status_name=excluded.status_name, state=excluded.state, timestamp_ms=excluded.timestamp_ms",
+            "status=excluded.status, status_name=excluded.status_name, state=excluded.state, timestamp_ms=excluded.timestamp_ms "
+            "WHERE excluded.status > business_delivery_receipts.status OR (excluded.status=0 AND business_delivery_receipts.status<3)",
             (
                 event.account.transport_profile,
                 event.account.account_id,
@@ -81,8 +82,9 @@ def apply_delivery_event(store: BusinessStore, event: DeliveryEvent) -> Receipt 
         outbox_id = matched_attempt["outbox_id"]
         current_attempt_state = matched_attempt["state"]
 
-        if current_attempt_state == "delivered" and state in ("accepted", "pending"):
-            state = "delivered"
+        ranks = {"unknown": -1, "failed": 0, "pending": 1, "sent": 2, "accepted": 2, "delivered": 3, "read": 4, "played": 5}
+        if (event.status != 0 or ranks.get(current_attempt_state, -1) >= 3) and ranks.get(current_attempt_state, -1) > ranks.get(state, -1):
+            state = current_attempt_state
 
         db.execute("UPDATE business_attempts SET state=? WHERE attempt_id=?", (state, attempt_id))
 
@@ -145,7 +147,7 @@ def _update_delivery_aggregates(db, outbox_row, state: str) -> None:
         except (ValueError, TypeError):
             total_parts = 1
 
-    all_delivered = len(all_attempts) == total_parts and all(a["state"] == "delivered" for a in all_attempts)
+    all_delivered = len(all_attempts) == total_parts and all(a["state"] in ("delivered", "read", "played") for a in all_attempts)
 
     rev_row = db.execute(
         "SELECT episode_id FROM business_revisions "
@@ -173,3 +175,23 @@ def _update_delivery_aggregates(db, outbox_row, state: str) -> None:
             "WHERE runtime_profile=? AND transport_profile=? AND account_id=? AND contact_id=? AND episode_id=?",
             (*scope_vals, episode_id),
         )
+
+    from gateway.business.store_jobs import _refresh_outcomes
+    _refresh_outcomes(db, outbox_row["runtime_profile"])
+
+
+def join_attempt_receipts(store: BusinessStore, attempt_id: str) -> None:
+    """Reconcile receipts retained before the transport response became durable."""
+    with transaction(store._connect()) as db:
+        row = db.execute("SELECT transport_profile,account_id,platform_ids FROM business_attempts WHERE attempt_id=?", (attempt_id,)).fetchone()
+        if not row:
+            return
+        account = AccountKey(row["transport_profile"], row["account_id"])
+        events = []
+        for message_id in json.loads(row["platform_ids"]):
+            receipt = db.execute("SELECT * FROM business_delivery_receipts WHERE transport_profile=? AND account_id=? AND message_id=?",
+                                 (account.transport_profile, account.account_id, message_id)).fetchone()
+            if receipt:
+                events.append(DeliveryEvent(account, message_id, receipt["status"], receipt["status_name"], receipt["timestamp_ms"]))
+    for event in events:
+        apply_delivery_event(store, event)

@@ -4055,18 +4055,17 @@ class BasePlatformAdapter(ABC):
     async def _handle_message_while_active(self, event: MessageEvent, session_key: str) -> None:
         """Route a message that arrived while ``session_key`` is busy: bypass
         commands / clarify replies dispatch inline, everything else is queued."""
+        from gateway.business.operators import is_business_operator_command
+        if is_business_operator_command(event):
+            self._canonicalize(event.source)
+            await self._dispatch_inline_reply(event)
+            return
         # The shared runtime's durable FIFO replaces the adapter's busy-message slot.
         if self._shared_runtime_owns_input(event):
             from gateway.session_ingress_burst import dispatch_busy_burst
             await dispatch_busy_burst(self, event, session_key)  # main's photo/text burst merge
             return
-        # Bypass commands run inline: queued they'd leak as user text (/new) or deadlock
-        # (/approve, /deny — the agent is blocked on Event.wait).  Dispatch inline by
-        # calling the message handler directly and sending the response.  Do NOT use
-        # _process_message_background — it manages session lifecycle and its cleanup
-        # races with the running task (split-brain, see PR #4926).
-        # Certain commands must bypass the active-session guard and be dispatched directly to the gateway
-        # runner. Without this, they are queued as pending messages and either: See #4926.
+        # Inline dispatch avoids approval deadlocks and background session cleanup races (#4926).
         self._canonicalize(event.source)  # identity FIRST (direct callers may skip handle_message)
         cmd = event.get_command()
         from hermes_cli.commands import (is_interrupt_then_dispatch, should_bypass_active_session)

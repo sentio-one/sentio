@@ -158,7 +158,21 @@ def initialize_schema(conn):
     from hermes_cli.sqlite_util import add_column_if_missing
 
     conn.executescript(SCHEMA_SQL)
+    from gateway.business.store_jobs import SCHEMA_SQL as PLUGIN_SCHEMA_SQL
+    conn.executescript(PLUGIN_SCHEMA_SQL)
     add_column_if_missing(conn, "business_contacts", "held", "held INTEGER NOT NULL DEFAULT 0")
     add_column_if_missing(conn, "business_contacts", "context_version", "context_version INTEGER NOT NULL DEFAULT 0")
     add_column_if_missing(conn, "business_aliases", "transport_id", "transport_id TEXT NOT NULL DEFAULT ''")
     add_column_if_missing(conn, "business_revisions", "status", "status TEXT NOT NULL DEFAULT 'pending'")
+    add_column_if_missing(conn, "business_tasks", "resolved_at_ms", "resolved_at_ms INTEGER")
+    add_column_if_missing(conn, "business_tasks", "resolution", "resolution TEXT")
+    add_column_if_missing(conn, "business_tasks", "resolved_by", "resolved_by TEXT")
+    add_column_if_missing(conn, "business_digests", "plan_digests", "plan_digests TEXT NOT NULL DEFAULT '{}'")
+    conn.execute("""CREATE TABLE IF NOT EXISTS business_credential_grants (
+      grant_id TEXT PRIMARY KEY, runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL,
+      account_id TEXT NOT NULL, contact_id TEXT NOT NULL, payload TEXT NOT NULL,
+      created_at_ms INTEGER NOT NULL, schema_version INTEGER NOT NULL DEFAULT 1)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS business_draft_measurements (
+      runtime_profile TEXT NOT NULL, transport_profile TEXT NOT NULL, account_id TEXT NOT NULL,
+      revision_id TEXT NOT NULL PRIMARY KEY, elapsed_ms REAL NOT NULL,
+      schema_version INTEGER NOT NULL DEFAULT 1)""")

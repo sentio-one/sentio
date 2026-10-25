@@ -139,6 +139,11 @@ async def test_preflight_recipient_states(store):
 
 @pytest.mark.asyncio
 async def test_dispatch_due_stop_on_timeout(store, service):
+    from gateway.business.config import BusinessConfig
+    service._config_resolver = BusinessConfig("supervised", (), ("operator-1",), 2, 300, 300, {
+        "timezone": "UTC", "windows": {"reply": [{"weekdays": list(range(7)), "start": "00:00", "end": "24:00"}]},
+        "min_gap_seconds": 1, "caps": {}, "hard_max_per_day": 100,
+    })
     account = _account()
     scope = _scope()
     store.bind_contact(scope.runtime_profile, scope.transport_profile, scope.account_id, [scope.contact_id])

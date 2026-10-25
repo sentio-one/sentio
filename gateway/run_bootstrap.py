@@ -868,7 +868,7 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
         from gateway.run_runtime import start_gateway_runtime_api
         await start_gateway_runtime_api(runner)
         from gateway.business.lifecycle import start_business_service
-        await start_business_service(runner)
+        await start_business_service(runner, start_worker=False)
 
         def _lifecycle_record_startup() -> Optional[dict]:
             # Report if the previous life died uncleanly (SIGKILL / OOM / VM death), then claim the
@@ -888,6 +888,8 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
         _early_verdict = await _start_gateway_run_runner(runner, _signal_initiated_shutdown)
         if _early_verdict is not None:
             return _early_verdict
+        # Secondary configs and reconnecting adapters now exist; bind them before cron can submit.
+        await start_business_service(runner)
         if _unclean_exit is not None:
             _start_deferred_state_db_integrity_check(_unclean_exit)
 

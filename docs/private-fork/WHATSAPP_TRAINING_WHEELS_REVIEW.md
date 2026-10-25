@@ -207,3 +207,73 @@ Considered and set aside: shadow mode intentionally retains legacy delivery;
 absence of live deployment authorization is appropriate; this review does not
 claim a demonstrated OS-isolation or unauthorized external-caller vulnerability.
 Runtime corrections remain unimplemented by this review-only follow-up commit.
+
+## Repair status (2026-10-25)
+
+R1–R8 and the "other material gaps" are repaired in the working tree that follows
+commit `d349892b88`; see `2026-10-25-training-wheels-repairs.md` for the ownership
+plan. The simulated acceptance and egress tests are replaced by
+`test_full_acceptance.py` (real service → operator edit → exact-digest approval →
+paced dispatch → receipt reconciliation → lesson context, plus invalidation by a
+newer inbound message) and `test_egress_matrix.py` (real adapter send paths with a
+bridge session that fails on any call). Only the model, the policy plugin and the
+network boundary are faked.
+
+| Check | Result |
+| --- | --- |
+| Business, plugin, CLI and vault suites | 34 files, 131 passed, 1 skipped |
+| Named C7 regression files | 12 files, 346 passed |
+| WhatsApp, runner and busy-routing suites | 60 files, 380 passed, 4 skipped |
+| `node --test` in `scripts/whatsapp-bridge` | 33 passed |
+| `python3 scripts/check` with pinned Ruff 0.15.22 | 12 checks OK, zero blocking findings |
+| Plugin `tests/run_native.sh` on `native-training-wheels` | exit 0; all native, bridge and legacy suites pass |
+
+The skipped test is `test_native_adapter_bridge_and_authenticated_consumption`: it
+needs PM-managed Node, which this host lacks. Its endpoints are covered by
+`business_endpoints.test.mjs`. `run_native.sh` now uses an exec shim instead of a
+symlink for `python3`, because a venv interpreter reached through a symlink loses
+its site-packages (this caused the earlier wrapper failures).
+
+### Independent post-repair review
+
+A second reviewer read the repaired diff. Fixed in this change:
+
+- Latched bridge routes matched `/send` case- and slash-sensitively, so `/SEND` or
+  `/send/` bypassed the latch. Matching is now normalised; the endpoint test covers
+  the variants and fails without the fix.
+- A `/messages` message from anyone who was not a verified operator, or with no
+  service configured, was dropped before ingress recording. It now falls through as
+  an ordinary inbound message.
+
+Open items that must be resolved or explicitly accepted before any live pilot:
+
+1. **Control-socket principal (high).** Any same-uid process is treated as a human
+   admin (`control.py` `handle_request`), so the authenticity of an approval rests
+   on agent tools running in the per-profile sandbox, which does not receive the
+   socket or dispatch credential. A profile whose agent terminal runs unsandboxed
+   on the host can approve its own drafts. Readiness should refuse supervised mode
+   unless the profile's terminal backend is sandboxed, or a separate human-only
+   credential should be introduced.
+2. **Pacing class (high).** `transport.py` reserves every attempt as class `reply`;
+   the design does not define how cold, follow-up and reply sends are classified,
+   so cold outreach and follow-ups currently use reply windows, gaps and caps.
+   Needs a design decision and a stored class. Do not enable outreach before then.
+3. **Operator edit** does not stop an `unavailable` or `revise` advisory review
+   from being rendered and approvable without an audited override.
+4. **Registration preflight** is never wired: `submit_external` only checks
+   registration when a `contact_checker` is passed, and no caller passes one.
+5. **Pre-socket failures** in the bridge (`quote_target_unavailable`,
+   `media_hash_mismatch`, `invalid_attachment`) are reported as submitted-unknown
+   rather than definitively unsubmitted, and then block the account queue.
+6. **Restart recovery** replays the whole attempt journal, resetting finished
+   attempts to `sent` and re-completing governor reservations, which distorts
+   pacing history.
+7. **Queue head blocking:** `claim_part` considers only the oldest approved outbox,
+   so one paced or unknown item delays every other contact.
+8. **Outbound scope** is built from the adapter's transport profile as the runtime
+   profile; the routed-secondary case was not traced end to end.
+9. `handle_operator_event` (reaction, shorthand, digest approval over WhatsApp)
+   has no production caller.
+
+The verdict stays **draft: not ready to merge or pilot** until items 1 and 2 are
+settled. No live configuration, queue, deployment or customer messaging was changed.
