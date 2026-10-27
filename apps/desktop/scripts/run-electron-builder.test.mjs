@@ -34,6 +34,27 @@ test('validate-only admits real prepared inputs without launching tools and reje
   }
 })
 
+test('a Windows NSIS installer is an admitted prepared format', async () => {
+  const source = path.resolve(import.meta.dirname, '../../..')
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'builder-nsis-'))
+  try {
+    const electron = path.join(out, 'electron.zip')
+    fs.writeFileSync(electron, 'fixture archive')
+    const toolsets = { sevenZip: path.join(out, 'sevenZip'), icons: path.join(out, 'icons') }
+    for (const dir of Object.values(toolsets)) fs.mkdirSync(dir)
+    const manifest = await publishPackagingInputs({ source, out, target: 'win32-x64', formats: ['nsis'], electron, toolsets })
+    const nativeDeps = path.join(out, 'native')
+    fs.mkdirSync(path.join(nativeDeps, 'node-pty'), { recursive: true })
+    fs.writeFileSync(path.join(nativeDeps, 'node-pty/package.json'), '{}')
+    recordNativeInputs({ source, out: nativeDeps, platform: 'win32', arch: 'x64' })
+    const args = ['--validate-only', '--prepared', manifest, '--native-deps', nativeDeps, '--win', 'nsis', '--x64']
+    const options = { spawn: () => { throw new Error('validation must not launch tools') } }
+    assert.equal(runElectronBuilder(args, options), 0)
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true })
+  }
+})
+
 test('source multiarch prepares isolated native and packaging inputs before each strict invocation', () => {
   const calls = []
   const spawn = (_node, args) => { calls.push(args); return { status: 0 } }
