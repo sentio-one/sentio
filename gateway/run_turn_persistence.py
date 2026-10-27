@@ -120,7 +120,13 @@ class GatewayTurnPersistenceMixin:
 
         # Normalize empty responses: surface errors, partial failures, and work-without-text.
         # Fix for #18765.
-        if not _intentional_silence:
+        _biz_mode = False
+        try:
+            from gateway.business.turns import is_business_mode_active
+            _biz_mode = is_business_mode_active(self, source)
+        except Exception as exc:
+            logger.debug("Failed checking business mode active: %s", exc, exc_info=True)
+        if not _intentional_silence and not _biz_mode:
             response = _normalize_empty_agent_response(agent_result, response, history_len=len(history))
             response = _sanitize_gateway_final_response(source.platform, response)
 

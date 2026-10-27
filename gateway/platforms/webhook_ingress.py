@@ -164,9 +164,13 @@ async def _admit_once(authority, event, webhook, hooks, committed):
     admitted = event
     if hooks and (webhook or not committed[1]):
         runner = authority.runner
+        if hasattr(runner, "_hm_business_ingress"):
+            await runner._hm_business_ingress(event)
         if 'pre_gateway_dispatch' in hooks:
             admitted = await runner._hm_pre_gateway_dispatch_hook(event, event.source)
             if admitted is None:
+                if hasattr(runner, "_hm_business_ingress"):
+                    await runner._hm_business_ingress(event, verdict="escalate", reason="pre_gateway_dispatch skipped")
                 await _release_preparation(authority, committed[0])
                 return None
             if admitted is not event:

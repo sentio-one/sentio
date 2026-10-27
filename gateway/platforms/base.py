@@ -28,7 +28,6 @@ from agent.proxy_bypass import first_proxy_env_value, should_bypass_proxy as _sh
 
 logger = logging.getLogger(__name__)
 
-
 def _consume_detached_handler_exception(task: asyncio.Task) -> None:
     """Done-callback for a detached fatal-error handler task (carrier cancelled in
     ``_notify_fatal_error``): retrieve its exception so asyncio never logs "never retrieved"."""
@@ -37,7 +36,6 @@ def _consume_detached_handler_exception(task: asyncio.Task) -> None:
     exc = task.exception()
     if exc is not None:
         logger.error("Detached fatal-error handler task failed: %s", exc, exc_info=exc)
-
 
 # Audio exts for native audio delivery; Telegram's narrower sets stay separate (.m2a is audio to
 # Hermes but not to sendAudio).
@@ -1655,7 +1653,7 @@ class SendResult:
     # SEND_ERROR_KINDS member (failures only) via :func:`classify_send_error`, so consumers
     # branch without substring-matching ``error``.
     error_kind: Optional[str] = None
-
+    business_receipt: Optional[dict] = None
 
 # Longest server ``retry_after`` ``_send_with_retry`` will sleep inline. Longer penalties return the
 # typed failure so the delivery ledger owns the wait (#91969: a 97-minute FloodWait slept verbatim
@@ -3719,6 +3717,8 @@ class BasePlatformAdapter(ABC):
     def _send_retry_is_final(self, result: SendResult) -> bool:
         """True when a failed send must be returned as-is: neither a retry nor the plain-text
         fallback can fix it (a structured auth/target refusal). Default: never."""
+        if getattr(result, "business_receipt", None) is not None:
+            return True
         return False
 
     @staticmethod
@@ -4055,18 +4055,17 @@ class BasePlatformAdapter(ABC):
     async def _handle_message_while_active(self, event: MessageEvent, session_key: str) -> None:
         """Route a message that arrived while ``session_key`` is busy: bypass
         commands / clarify replies dispatch inline, everything else is queued."""
+        from gateway.business.operators import is_business_operator_command
+        if is_business_operator_command(event):
+            self._canonicalize(event.source)
+            await self._dispatch_inline_reply(event)
+            return
         # The shared runtime's durable FIFO replaces the adapter's busy-message slot.
         if self._shared_runtime_owns_input(event):
             from gateway.session_ingress_burst import dispatch_busy_burst
             await dispatch_busy_burst(self, event, session_key)  # main's photo/text burst merge
             return
-        # Bypass commands run inline: queued they'd leak as user text (/new) or deadlock
-        # (/approve, /deny — the agent is blocked on Event.wait).  Dispatch inline by
-        # calling the message handler directly and sending the response.  Do NOT use
-        # _process_message_background — it manages session lifecycle and its cleanup
-        # races with the running task (split-brain, see PR #4926).
-        # Certain commands must bypass the active-session guard and be dispatched directly to the gateway
-        # runner. Without this, they are queued as pending messages and either: See #4926.
+        # Inline dispatch avoids approval deadlocks and background session cleanup races (#4926).
         self._canonicalize(event.source)  # identity FIRST (direct callers may skip handle_message)
         cmd = event.get_command()
         from hermes_cli.commands import (is_interrupt_then_dispatch, should_bypass_active_session)

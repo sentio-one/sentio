@@ -2218,6 +2218,7 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
             from gateway.run_runtime import settle_gateway_runtime  # within what the leash has left
             await settle_gateway_runtime(self, _effective_watchdog_leash(self) - ctx.elapsed(), GatewayRunner._shutdown_interrupt_reason(self))
             await GatewayRunner._stop_finalize_agents_and_adapters(self, ctx)
+            from gateway.business.worker import stop_business_runtime; await stop_business_runtime(self)
             await GatewayRunner._stop_release_runtime_state(self, ctx)
             GatewayRunner._stop_quiesce_and_close_session_dbs(self, timeout, ctx)
             await GatewayRunner._stop_persist_exit_state(self, ctx)
@@ -2235,9 +2236,7 @@ class GatewayShutdownMixin(GatewaySessionEndMixin):
         if callable(_stop_guards):
             _stop_guards()
         if restart:
-            self._restart_requested = True
-            self._restart_detached = detached_restart
-            self._restart_via_service = service_restart
+            self._restart_requested, self._restart_detached, self._restart_via_service = True, detached_restart, service_restart
         if self._stop_task is not None:
             await self._stop_task
             return

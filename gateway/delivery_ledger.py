@@ -270,6 +270,10 @@ def compute_obligation_id(session_key: str, message_ref: str, content: str) -> s
 def record_obligation(*, obligation_id: str, session_key: str, platform: str, chat_id: str,
                       thread_id: Optional[str], content: str, adapter_profile: Optional[str] = None) -> None:
     """Record a final response as owed to the platform (state='pending')."""
+    from gateway.business.models import Scope
+    from gateway.business.receipts import owns_business_delivery
+    if owns_business_delivery(Scope("default", platform, str(adapter_profile or "default"), str(chat_id)), obligation_id):
+        return
     now, (pid, started) = time.time(), _owner_stamp()
     with _DB_LOCK, _transaction() as conn:
         conn.execute(
@@ -399,6 +403,10 @@ def sweep_recoverable(now: Optional[float] = None, *, deliverable_platforms: Opt
              owner_pid, owner_started_at, adapter_profile, last_error, updated_at) in rows:
             if _owner_alive(owner_pid, owner_started_at):
                 continue  # a live gateway still owns this row
+            from gateway.business.models import Scope
+            from gateway.business.receipts import owns_business_delivery
+            if owns_business_delivery(Scope("default", platform, str(adapter_profile or "default"), str(chat_id)), oid):
+                continue  # business delivery items bypass legacy sweep recovery
             if attempts >= MAX_ATTEMPTS or (now - created_at) > STALE_AFTER_SECONDS:  # exhausted -> abandoned
                 conn.execute(
                     """UPDATE delivery_obligations

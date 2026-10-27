@@ -131,7 +131,10 @@ def validate_redirect_uri(redirect_uri: str) -> None:
         raise ProviderError(f"redirect_uri path must end with '/auth/callback', got {redirect_uri!r}")
 
 
-def pkce_login_start(authorize_url: str, *, client_id: str, scope: str, redirect_uri: str) -> LoginStart:
+def pkce_login_start(
+    authorize_url: str, *, client_id: str, scope: str, redirect_uri: str,
+    extra_params: dict[str, str] | None = None,
+) -> LoginStart:
     """Build the authorization-code + PKCE (S256) redirect and cookie payload. Callers
     validate ``redirect_uri`` first. The auth-route layer expects
     ``cookie_payload["hermes_session_pkce"]`` as a flat ``state=…;verifier=…`` string
@@ -141,7 +144,7 @@ def pkce_login_start(authorize_url: str, *, client_id: str, scope: str, redirect
     params = {
         "response_type": "code", "client_id": client_id, "redirect_uri": redirect_uri, "scope": scope, "state": state,
         "code_challenge": b64url_no_pad(hashlib.sha256(code_verifier.encode("ascii")).digest()),
-        "code_challenge_method": "S256"}
+        "code_challenge_method": "S256", **(extra_params or {})}
     return LoginStart(
         redirect_url=f"{authorize_url}?{urllib.parse.urlencode(params)}",
         cookie_payload={"hermes_session_pkce": f"state={state};verifier={code_verifier}"})
