@@ -450,6 +450,22 @@ class TestStartLogin:
         assert "code_challenge" in params
 
 
+    def test_google_issuer_requests_offline_access(self):
+        """Google only issues a refresh token for access_type=offline + prompt=consent;
+        without one the ~1h ID token lapses and the user is logged out hourly."""
+        p = oidc_plugin.SelfHostedOIDCProvider(issuer="https://accounts.google.com", client_id=_CLIENT_ID)
+        p._discovery = {**_DISCOVERY_DOC, "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth"}
+        p._discovery_fetched_at = time.time()
+        result = p.start_login(redirect_uri="https://hermes.example/auth/callback")
+        params = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(result.redirect_url).query))
+        assert params["access_type"] == "offline"
+        assert params["prompt"] == "consent"
+
+    def test_non_google_issuer_gets_no_google_params(self, provider):
+        result = provider.start_login(redirect_uri="https://hermes.example/auth/callback")
+        params = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(result.redirect_url).query))
+        assert "access_type" not in params and "prompt" not in params
+
     def test_state_in_cookie_matches_url(self, provider):
         result = provider.start_login(
             redirect_uri="https://hermes.example/auth/callback"
