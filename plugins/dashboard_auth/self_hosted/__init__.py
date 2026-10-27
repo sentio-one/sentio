@@ -46,6 +46,12 @@ _TAG = "dashboard-auth-self-hosted"
 # ``openid`` is mandatory (no ID token without it); profile/email populate display_name/email.
 _DEFAULT_SCOPES = "openid profile email"
 
+# Google ignores the ``offline_access`` scope and only issues a refresh token when the
+# authorize request carries these params; without one the ~1h ID token can't be renewed
+# and every client (dashboard, desktop app) is forced to log in again hourly.
+_GOOGLE_ISSUER = "https://accounts.google.com"
+_GOOGLE_AUTHORIZE_PARAMS = {"access_type": "offline", "prompt": "consent"}
+
 # RS256 is the OIDC default; ES256 is common on modern IDPs (Zitadel, newer Keycloak).
 # HS256 is deliberately excluded: it implies a shared secret we don't hold in the
 # public-client model and is a JWT algorithm-confusion footgun.
@@ -119,7 +125,8 @@ class SelfHostedOIDCProvider(JwtOAuthProvider):
         validate_redirect_uri(redirect_uri)
         disco = self._get_discovery()
         return pkce_login_start(
-            disco["authorization_endpoint"], client_id=self._client_id, scope=self._scopes, redirect_uri=redirect_uri)
+            disco["authorization_endpoint"], client_id=self._client_id, scope=self._scopes, redirect_uri=redirect_uri,
+            extra_params=_GOOGLE_AUTHORIZE_PARAMS if self._issuer == _GOOGLE_ISSUER else None)
 
     def revoke_session(self, *, refresh_token: str) -> None:
         # Best-effort RFC 7009 revocation when the IDP advertises an endpoint.
