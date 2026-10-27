@@ -235,12 +235,30 @@ module.exports = {
   win: {
     executableName: windowsExecutableName,
     legalTrademarks: displayName,
-    target: ['msix'],
+    // NSIS produces the installable `.exe`. Unsigned MSIX needs Developer Mode or a trusted certificate to install,
+    // while an unsigned NSIS installer only raises a SmartScreen prompt. MSIX packaging is not part of this product.
+    target: ['nsis'],
     // The updaters' relaunch waiter is PowerShell run outside the package. The
     // sealed payload's snapshot omits scripts/, so it ships as a resource
     // (RELAUNCH_WAITER_SCRIPT in electron/updater/relaunch-waiter.ts).
     extraResources: [{ from: 'scripts/update-relaunch-waiter.ps1', to: 'update-relaunch-waiter.ps1' }],
     ...windowsSigning()
+  },
+  nsis: {
+    // A wizard, not a silent one-click: an unsigned install raises a SmartScreen prompt first, and the user needs a
+    // visible path after it.
+    oneClick: false,
+    perMachine: false,
+    allowToChangeInstallationDirectory: true,
+    createDesktopShortcut: true,
+    createStartMenuShortcut: true,
+    shortcutName: displayName,
+    uninstallDisplayName: displayName,
+    installerIcon: 'assets/icon.ico',
+    uninstallerIcon: 'assets/icon.ico',
+    // The assistant's state lives in its own runtime home, never under the install directory, so uninstalling the
+    // app must not take the user's conversations with it.
+    deleteAppDataOnUninstall: false
   },
   msix: {
     // A store build uses the Partner Center packaging identity (the Store
