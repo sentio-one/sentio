@@ -69,6 +69,22 @@ if (!/^\d+\.\d+\.\d+$/.test(electronVersion)) {
 const macFeed = channelRequest ? null : feedContract.darwinFeed(channel === 'canary' || channel === 'light-canary' ? 'canary' : 'stable', light)
 const publicUrl = feedContract.feedBaseUrl(process.env.CLOUDFLARE_R2_PUBLIC_URL)
 
+// Resources every platform ships next to the app. A platform block that sets its own `extraResources` replaces the
+// top-level list (a Windows build shipped without resources/icon.ico), so such a block must spread this one.
+const sharedExtraResources = [
+  {
+    from: 'build/install-stamp.json',
+    to: 'install-stamp.json'
+  },
+  ...(['bundled', 'store'].includes(process.env.HERMES_DESKTOP_VARIANT || '')
+    ? [{ from: 'build/agent-payload', to: 'agent-payload' }]
+    : []),
+  {
+    from: 'assets/icon.ico',
+    to: 'icon.ico'
+  }
+]
+
 /** @satisfies {Configuration} */
 module.exports = {
   electronVersion,
@@ -124,19 +140,7 @@ module.exports = {
   afterExtract: 'scripts/after-extract.mjs',
   afterPack: 'scripts/after-pack.mjs',
   ...(process.platform === 'darwin' ? { afterSign: 'scripts/notarize.mjs' } : {}),
-  extraResources: [
-    {
-      from: 'build/install-stamp.json',
-      to: 'install-stamp.json'
-    },
-    ...(['bundled', 'store'].includes(process.env.HERMES_DESKTOP_VARIANT || '')
-      ? [{ from: 'build/agent-payload', to: 'agent-payload' }]
-      : []),
-    {
-      from: 'assets/icon.ico',
-      to: 'icon.ico'
-    }
-  ],
+  extraResources: sharedExtraResources,
   asar: {
     unpack: ['**/*.node', '**/prebuilds/**', 'dist/**']
   },
@@ -241,7 +245,7 @@ module.exports = {
     // The updaters' relaunch waiter is PowerShell run outside the package. The
     // sealed payload's snapshot omits scripts/, so it ships as a resource
     // (RELAUNCH_WAITER_SCRIPT in electron/updater/relaunch-waiter.ts).
-    extraResources: [{ from: 'scripts/update-relaunch-waiter.ps1', to: 'update-relaunch-waiter.ps1' }],
+    extraResources: [...sharedExtraResources, { from: 'scripts/update-relaunch-waiter.ps1', to: 'update-relaunch-waiter.ps1' }],
     ...windowsSigning()
   },
   nsis: {
