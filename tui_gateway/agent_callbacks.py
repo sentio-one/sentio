@@ -391,7 +391,13 @@ def _sync_agent_fallback_with_config(sid: str, session: dict) -> None:
     GatewayRunner._apply_fallback_chain_to_agent(agent, chain)
 
 
-def _background_agent_kwargs(agent, task_id: str) -> dict:
+# Renderer-bridge callbacks a side agent needs so the GUI tools it inherits from the parent reach the
+# parent's window. Streaming/thinking callbacks are deliberately excluded: they would write the side
+# agent's output into the parent's chat.
+_SIDE_AGENT_BRIDGE_CALLBACKS = ("read_terminal_callback", "read_preview_callback", "drive_preview_callback")
+
+
+def _background_agent_kwargs(agent, task_id: str, parent_sid: str = "") -> dict:
     cfg = _load_cfg()
 
     def g(name, default=None):
@@ -421,7 +427,10 @@ def _background_agent_kwargs(agent, task_id: str) -> dict:
         # The side agent persists into the PARENT's store: a named-profile chat's ``bg_*`` rows
         # belong to that profile's state.db, not the launch handle.
         "platform": "tui", "session_db": getattr(agent, "_session_db", None) or _get_db(), "fallback_model": fallback,
-        "side_agent": True}
+        "side_agent": True,
+        # Bound to the PARENT sid: window routing is per session, never per side-agent task id.
+        **({k: v for k, v in _agent_cbs(parent_sid).items() if k in _SIDE_AGENT_BRIDGE_CALLBACKS}
+           if parent_sid else {})}
 
 
 def _ephemeral_preview_agent_kwargs(agent, task_id: str) -> dict:
