@@ -44,8 +44,8 @@ def run(tmp_path, monkeypatch):
     release.mkdir()
     (bin_dir / "gh").write_text(FAKE_GH.format(python=sys.executable), encoding="utf-8")
     (bin_dir / "gh").chmod(0o755)
-    (release / "HermesLight-0.1.0-win-x64.msix").write_bytes(b"msix")
-    (release / "HermesLight-0.1.0-win-x64.msix.sha256").write_text(f"{HASH}  HermesLight-0.1.0-win-x64.msix\n", encoding="utf-8")
+    (release / "HermesLight-0.1.0-win-x64.exe").write_bytes(b"exe")
+    (release / "HermesLight-0.1.0-win-x64.exe.sha256").write_text(f"{HASH}  HermesLight-0.1.0-win-x64.exe\n", encoding="utf-8")
     log = tmp_path / "gh.log"
     monkeypatch.setenv("FAKE_GH_LOG", str(log))
     monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
@@ -74,14 +74,14 @@ def test_the_old_release_is_removed_then_a_new_prerelease_is_created_at_the_new_
     assert delete[2] == "main-latest" and "--cleanup-tag" in delete  # the tag moves with the release
     create = next(c for c in calls if _verb(c) == "release create")
     assert create[2] == "main-latest"
-    assert str(release / "HermesLight-0.1.0-win-x64.msix") in create and str(release / "HermesLight-0.1.0-win-x64.msix.sha256") in create
+    assert str(release / "HermesLight-0.1.0-win-x64.exe") in create and str(release / "HermesLight-0.1.0-win-x64.exe.sha256") in create
     assert create[create.index("--target") + 1] == SHA
     assert "--prerelease" in create and "--latest=false" in create  # never replaces the real Latest release
     assert "0123456" in create[create.index("--title") + 1]
     notes = create[create.index("--notes") + 1]
     assert "Merge pull request #9 from x/y" in notes and "the body" not in notes  # first line of the commit message only
     assert HASH in notes and "not a stable release" in notes
-    assert "Add-AppxPackage -Path .\\HermesLight-*.msix" in notes and ".\\\\HermesLight" not in notes  # one backslash, not two
+    assert "SmartScreen" in notes and "Run anyway" in notes  # the unsigned-installer step is in the notes
 
 
 def test_the_first_ever_run_has_nothing_to_delete_and_still_publishes(run):
@@ -102,11 +102,11 @@ def test_a_failed_create_fails_the_job_instead_of_leaving_a_silent_gap(run, monk
 def test_it_refuses_to_publish_an_unexpected_file_set_and_touches_no_release(run, break_it):
     go, release = run
     if break_it == "no_installer":
-        (release / "HermesLight-0.1.0-win-x64.msix").unlink()
+        (release / "HermesLight-0.1.0-win-x64.exe").unlink()
     elif break_it == "two_installers":
-        shutil.copy(release / "HermesLight-0.1.0-win-x64.msix", release / "HermesLight-0.2.0-win-x64.msix")
+        shutil.copy(release / "HermesLight-0.1.0-win-x64.exe", release / "HermesLight-0.2.0-win-x64.exe")
     else:
-        (release / "HermesLight-0.1.0-win-x64.msix.sha256").unlink()
+        (release / "HermesLight-0.1.0-win-x64.exe.sha256").unlink()
     code, out, calls = go()
     assert code == 1 and "expected one installer and one checksum" in out, out
     assert not any(c[0] == "release" for c in calls)
