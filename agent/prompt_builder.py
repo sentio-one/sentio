@@ -710,7 +710,10 @@ PLATFORM_HINTS = {
         "height live, width from the content's first measured span — lay content flush left with no centering wrappers "
         "or it measures full-bleed. Widgets talk back: data-hermes-send=\"prompt\" on any clickable element (or "
         "window.hermes.send(\"prompt\")) sends that prompt as a hidden user turn — answer it by updating the widget's "
-        "file, not with prose."
+        "file, not with prose. "
+        "Browsers: the user sees ONLY the preview pane beside the chat. Whenever they must see or take part "
+        "(\"open your browser\", a login, a CAPTCHA), open it with desktop_preview and act with drive_preview; "
+        "browser_* tools run a separate hidden browser the user cannot see, so use them only for unattended work."
     ),
     "api_server": (
         "You're responding through an API server. The rendering layer is unknown — assume plain text. No markdown "
