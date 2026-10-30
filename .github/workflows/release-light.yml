@@ -1,6 +1,6 @@
 name: Release Light Desktop
 
-# Builds the remote-only Light desktop client (HermesLight-*.msix, unsigned).
+# Builds the remote-only Light desktop client (HermesLight-*.exe NSIS installer, unsigned) on a GitHub-hosted Windows runner.
 #   push to main      -> build; the installer is kept as a workflow artifact for 30 days and also replaces the rolling
 #                        `main-latest` pre-release, the one place to find (and be told about) the newest build
 #   push of a v* tag  -> build, then publish the installer as a GitHub release
@@ -28,9 +28,15 @@ concurrency:
 
 jobs:
   build:
-    name: Build Light MSIX
+    name: Build Light exe
+    # The package cannot be cross-built: the HUD helper is compiled by Windows' in-box .NET compiler, so this must run on
+    # Windows. GitHub-hosted Windows is free for a public repository; the self-hosted VM in WINDOWS-RUNNER.md is not in use.
     runs-on: windows-latest
     timeout-minutes: 90
+    env:
+      HERMES_DESKTOP_VARIANT: light
+      # There is no signing identity, and the build must not go looking for one.
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     outputs:
       artifact: ${{ steps.artifact.outputs.name }}
 
@@ -46,54 +52,41 @@ jobs:
         shell: bash
         run: echo "name=hermes-light-desktop-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # 7.0.0
         with:
-          python-version: '3.11'
+          node-version: 26
+          cache: npm
 
-      - name: Preflight checks
-        shell: powershell
-        run: |
-          git --version
-          python --version
-          $free = (Get-PSDrive -Name (Get-Location).Drive.Name).Free / 1GB
-          Write-Host "Free disk space: $([math]::Round($free, 1)) GB"
-          if ($free -lt 15) { throw "Need at least 15 GB free on build drive" }
+      - name: Install dependencies
+        # No --ignore-scripts: the build needs Electron's binary and the native postinstalls (node-pty) for this host.
+        run: npm ci --no-audit --no-fund
 
-      - name: Build Light Desktop (MSIX)
-        shell: powershell
-        env:
-          HERMES_BUILD_CACHE: 'C:\hermes-build-cache'
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $commit = git rev-parse HEAD
-          Write-Host "Building Light desktop client at commit: $commit"
-          New-Item -ItemType Directory -Force -Path $env:HERMES_BUILD_CACHE | Out-Null
-          python scripts/bundles/desktop.py --commit $commit --variant light --clean --cache $env:HERMES_BUILD_CACHE
-          if ($LASTEXITCODE -ne 0) { throw "desktop.py failed with exit code $LASTEXITCODE" }
+      - name: Build the installer
+        working-directory: apps/desktop
+        run: npm run dist:win
 
       - name: Verify build outputs
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $out = 'apps/desktop/release'
-          $msix = Get-ChildItem $out -Filter 'HermesLight-*.msix' | Select-Object -First 1
-          if (-not $msix) { throw "No HermesLight-*.msix found in $out" }
+          $exe = Get-ChildItem $out -Filter 'HermesLight-*.exe' | Select-Object -First 1
+          if (-not $exe) { throw "No HermesLight-*.exe found in $out" }
           if (Test-Path "$out/win-unpacked/resources/agent-payload") {
             throw 'Light build contains an unexpected agent-payload'
           }
-          $hash = (Get-FileHash $msix.FullName -Algorithm SHA256).Hash
-          Write-Host "Successfully built $($msix.Name) ($([math]::Round($msix.Length / 1MB, 1)) MB), SHA256: $hash"
-          "$hash  $($msix.Name)" | Set-Content -Encoding ascii "$out/$($msix.Name).sha256"
+          $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash
+          Write-Host "Successfully built $($exe.Name) ($([math]::Round($exe.Length / 1MB, 1)) MB), SHA256: $hash"
+          "$hash  $($exe.Name)" | Set-Content -Encoding ascii "$out/$($exe.Name).sha256"
 
       - name: Upload run artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.artifact.outputs.name }}
           path: |
-            apps/desktop/release/HermesLight-*.msix
-            apps/desktop/release/HermesLight-*.msix.sha256
-            apps/desktop/release/builder-debug.yml
+            apps/desktop/release/HermesLight-*.exe
+            apps/desktop/release/HermesLight-*.exe.sha256
           retention-days: 30
 
   # Every merge to main refreshes ONE rolling pre-release (scripts/fork/refresh-main-release.sh). Like publish below it needs
@@ -159,19 +152,17 @@ jobs:
           - **Deep-linking support**: Supports \`hermes://connect?url=&invite=\` links with confirmation dialogs.
 
           #### Installation
-          Download and install \`HermesLight-*.msix\`. Note: As an unsigned MSIX for internal/testing distributions, enable Windows Developer Mode (\`Settings > System > For developers > Developer Mode\`) or install via PowerShell:
-          \`\`\`powershell
-          Add-AppxPackage -Path .\\HermesLight-*.msix -AllowUnsigned
-          \`\`\`"
+          Download and run \`HermesLight-*.exe\`. The installer is unsigned, so Windows SmartScreen will warn first: choose
+          **More info** then **Run anyway**."
 
           if gh release view "$TAG_NAME" &>/dev/null; then
             echo "Release $TAG_NAME exists, uploading assets..."
-            gh release upload "$TAG_NAME" apps/desktop/release/HermesLight-*.msix apps/desktop/release/HermesLight-*.msix.sha256 --clobber
+            gh release upload "$TAG_NAME" apps/desktop/release/HermesLight-*.exe apps/desktop/release/HermesLight-*.exe.sha256 --clobber
           else
             echo "Creating new release $TAG_NAME..."
             gh release create "$TAG_NAME" \
-              apps/desktop/release/HermesLight-*.msix \
-              apps/desktop/release/HermesLight-*.msix.sha256 \
+              apps/desktop/release/HermesLight-*.exe \
+              apps/desktop/release/HermesLight-*.exe.sha256 \
               --title "Sentio One Light Desktop $TAG_NAME" \
               --notes "$RELEASE_NOTES" \
               --draft=false \

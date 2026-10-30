@@ -16,8 +16,8 @@ repo="${GH_REPO:?GH_REPO is not set}"
 short="${sha:0:7}"
 
 shopt -s nullglob
-installers=("$dir"/HermesLight-*.msix)
-checksums=("$dir"/HermesLight-*.msix.sha256)
+installers=("$dir"/HermesLight-*.exe)
+checksums=("$dir"/HermesLight-*.exe.sha256)
 [ "${#installers[@]}" -eq 1 ] && [ "${#checksums[@]}" -eq 1 ] \
   || { echo "refresh-main-release: expected one installer and one checksum in $dir, found ${#installers[@]} and ${#checksums[@]}" >&2; exit 1; }
 
@@ -29,7 +29,7 @@ Built $(date -u '+%Y-%m-%d %H:%MZ'). SHA-256 of the installer: \`$hash\`
 
 **This is a pre-release build of the in-progress main branch, not a stable release.** Stable releases are the version tags; the one marked Latest is the newest of those. This release is replaced on every merge to main.
 
-The installer is unsigned: turn on Windows Developer Mode, or run \`Add-AppxPackage -Path .\\HermesLight-*.msix -AllowUnsigned\`."
+The installer is unsigned, so Windows SmartScreen will warn first: choose More info, then Run anyway."
 
 gh release delete "$tag" --cleanup-tag --yes >/dev/null 2>&1 || true   # none yet, the first time
 gh release create "$tag" "${installers[0]}" "${checksums[0]}" \

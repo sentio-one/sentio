@@ -9,7 +9,7 @@ scripts/fork/bump-version.sh 0.2.0      one command, four files
         |
    tag-release.yml   sees a version file changed, creates tag v0.2.0 (with RELEASE_TOKEN)
         |
-   release-light.yml  the tag push builds HermesLight-0.2.0-win-x64.msix and publishes the GitHub release
+   release-light.yml  the tag push builds HermesLight-0.2.0-win-x64.exe and publishes the GitHub release
 ```
 
 ## Finding the newest build
