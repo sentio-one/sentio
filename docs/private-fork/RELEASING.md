@@ -1,23 +1,34 @@
 # Releasing the Light desktop client
 
-A release is a **version bump that gets merged**. Nothing is tagged by hand and nothing is published by a person.
+A release is a **version bump that has been promoted to `stable`**. Nothing is tagged by hand and nothing is published by a person.
 
 ```
-scripts/fork/bump-version.sh 0.2.0      one command, four files
+scripts/fork/bump-version.sh next         one command, four files (see "Versions" below)
         |
-   pull request  ->  merge to main
+   pull request  ->  merge to main         the hot line; every merge builds the rolling main-latest pre-release
         |
-   tag-release.yml   sees a version file changed, creates tag v0.2.0 (with RELEASE_TOKEN)
+   scripts/fork/promote-stable.sh          opens a reviewed PR: main -> stable
         |
-   release-light.yml  the tag push builds HermesLight-0.2.0-win-x64.exe and publishes the GitHub release
+   merge to stable   Dokploy redeploys every client project that follows stable
+        |
+   tag-release.yml   sees a version file changed on stable, creates tag v0.3.0 (with RELEASE_TOKEN)
+        |
+   release-light.yml  the tag push builds HermesLight-0.3.0-win-x64.exe and publishes the GitHub release
 ```
+
+## Versions
+
+The first stable release is `0.3.0`. Each later release bumps the patch (`0.3.1` ... `0.3.9`); after `X.Y.9` the next release is
+`X.(Y+1).0`, so `0.3.9` is followed by `0.4.0`. `scripts/fork/bump-version.sh next` computes it; an explicit
+`bump-version.sh 0.3.0` is accepted if it follows the rule. `tag-release.sh` refuses a patch above 9 and refuses a commit that is not on
+`origin/stable`. Builds from `main` keep the last released version and are told apart by the commit in their title.
 
 ## Finding the newest build
 
 | You want | Go to | Notes |
 |---|---|---|
 | The newest build of `main`, including every merge since the last version bump | **Releases**, the pre-release titled *Light desktop, newest main build (`<commit>`)*, tag `main-latest` | Replaced on every merge to `main`, so it is always the same address. It is a **pre-release** and is never marked *Latest*. Its notes show the commit, the merge it came from, and the installer's SHA-256. |
-| The newest *stable* version | **Releases**, the one marked *Latest* | Only changes when a version bump is merged. |
+| The newest *stable* version | **Releases**, the one marked *Latest* | Only changes when a version bump is promoted to `stable`. |
 | To be told when something new exists | **Watch** > **Custom** > tick **Releases** (on the repository page) | A fresh release is published on each merge, so watchers should be notified each time. Not yet confirmed to arrive; check the first one. |
 | A build that has not been replaced yet, or an older one | **Actions** > *Release Light Desktop* > the run > **Artifacts** | Needs a GitHub login; kept 30 days; named `hermes-light-desktop-<commit>`. |
 
@@ -50,27 +61,34 @@ the `release-tags` ruleset only lets repository admins create `v*` tags. So the 
 ## Cutting a release
 
 ```
-scripts/fork/bump-version.sh 0.2.0     # package.json, pyproject.toml, package-lock.json, uv.lock (runs `uv lock`)
-git switch -c release-0.2.0 && git commit -am "chore(release): 0.2.0" && git push -u origin release-0.2.0
+scripts/fork/bump-version.sh next      # package.json, pyproject.toml, package-lock.json, uv.lock (runs `uv lock`)
+git switch -c release-0.3.1 && git commit -am "chore(release): 0.3.1" && git push -u origin release-0.3.1
 gh pr create --base main               # review, merge with a merge commit
+scripts/fork/promote-stable.sh         # when main is tested: opens the main -> stable PR; review and merge it
 ```
 
 Then watch **Actions**: `Tag release` (seconds) then `Release Light Desktop` (about 7 minutes). The release appears under **Releases**
-as `HermesLight-0.2.0-win-x64.msix` plus its `.sha256`. The installer is unsigned (see the release notes for the install step).
+as `HermesLight-<version>-win-x64.exe` plus its `.sha256`. The installer is unsigned, so Windows SmartScreen warns first: choose
+**More info**, then **Run anyway**.
 
-The tagger refuses, and says why, when the two version files disagree, the version is not plain `MAJOR.MINOR.PATCH`, or it is not
-newer than the newest existing `v*` tag. It is safe to re-run: a version that already has a tag is left alone.
+The tagger refuses, and says why, when the two version files disagree, the version is not plain `MAJOR.MINOR.PATCH`, the patch is above 9,
+it is not newer than the newest existing `v*` tag, or the commit is not on `origin/stable`. It is safe to re-run: a version that already has a tag is left alone.
 
 To tag by hand instead (as the owner): `git tag -a v0.2.0 -m "v0.2.0" <merge-commit> && git push origin v0.2.0`.
 
 ## What the token can do, and keeping it safe
 
 - It can write to this repository's contents as the owner, but it is scoped to this one repository and one permission, and it only
-  appears in the `Tag release` workflow, which runs for pushes to `main` (reviewed code) and manual runs on `main`. It is not available
+  appears in the `Tag release` workflow, which runs for pushes to `stable` (reviewed code) and manual runs on `stable`. It is not available
   to pull-request workflows.
-- Anyone who can merge to `main` can change that workflow. With the protection from `REPO_PROTECTION.md` applied (pull request,
+- Anyone who can merge to `stable` can change that workflow. With the protection from `REPO_PROTECTION.md` applied (pull request,
   review, required checks) that takes a reviewed change.
 - **Revoke it** (Settings > Developer settings > the token > Delete) if it may have leaked, then create a new one and replace the secret.
 - **When it expires** the `Tag release` workflow fails with a clear error on the next version bump. Create a new token (steps 2 to 5,
   same name is fine), then **Actions** > **Tag release** > **Run workflow** to tag the version that was missed.
 - If the repository moves to an organization, create the token again there; a personal token does not follow it.
+
+## Hotfixes
+
+Fix on `main` first and merge it, then cherry-pick the fix onto a branch from `stable` and open a PR into `stable`. Never fix only on
+`stable`: the two lines must not diverge.

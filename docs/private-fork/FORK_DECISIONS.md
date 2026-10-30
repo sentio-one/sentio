@@ -26,11 +26,17 @@ to re-check when pulling upstream in. The detailed design lives in `ACCESS_CONTR
   rewritten then for what the Sentio One agent is for a business (it currently reads as a fork note on top of upstream's README).
 - **L4. The go-live gate (section 5) must be green before a real customer is on a gateway.** The unenforced sandbox (O1) is the
   biggest item on it. It is deliberately deferred, not forgotten.
-- **L5. A release is a merged version bump** (decided 2026-10-23). `scripts/fork/bump-version.sh X.Y.Z`, a PR, a merge; then
-  `tag-release.yml` tags `vX.Y.Z` and `release-light.yml` builds and publishes. Every other merge to `main` builds an artifact and
+- **L5. A release is a version bump promoted to `stable`** (decided 2026-10-23; amended 2026-10-30 by L6). `scripts/fork/bump-version.sh next`,
+  a PR, a merge to `main`, a promotion to `stable`; then `tag-release.yml` tags `vX.Y.Z` and `release-light.yml` builds and publishes. Every other merge to `main` builds an artifact and
   releases nothing as a version, but refreshes one rolling pre-release (`main-latest`, never marked Latest) so there is a stable place
   to find and be notified of the newest build. Needs the owner's `RELEASE_TOKEN` secret (`RELEASING.md`). Merges are not all version bumps: only one commit in the
   fork era changed the version, so tagging every merge had nothing to name the tag after.
+- **L6. `stable` is the line clients and testers follow** (decided 2026-10-30). A long-lived `stable` branch, promoted from `main` by
+  reviewed PR (`scripts/fork/promote-stable.sh`), protected like `main` (`.github/rulesets/stable.json`). Every client Dokploy
+  project deploys from it, so merging to `stable` updates them all; release tags are cut from it. `main` stays the hot line and
+  keeps the rolling `main-latest` pre-release. Versions: first stable release `0.3.0`, patch `0.3.1` to `0.3.9`, then `0.4.0`.
+  Client self-update is deferred: testers reinstall the unsigned NSIS `.exe`. Design and plan:
+  `2026-10-30-stable-branch-design.md`, `2026-10-30-stable-branch-plan.md`.
 
 ## 1. Decisions
 
