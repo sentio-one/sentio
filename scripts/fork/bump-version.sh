@@ -19,7 +19,8 @@ if [ "$arg" = next ]; then
 else
   new="$arg"
 fi
-[[ "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]$ ]]   || { echo "usage: $0 [next|MAJOR.MINOR.PATCH] (the patch is a single digit: 0.3.9 is followed by 0.4.0)" >&2; exit 2; }
+[[ "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]$ ]] \
+  || { echo "usage: $0 [next|MAJOR.MINOR.PATCH] (the patch is a single digit: 0.3.9 is followed by 0.4.0)" >&2; exit 2; }
 if [ "$(printf '%s\n%s\n' "$current" "$new" | sort -V | tail -1)" != "$new" ] || [ "$current" = "$new" ]; then
   echo "bump-version: $new is not newer than the current version $current" >&2
   exit 1

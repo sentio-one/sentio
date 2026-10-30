@@ -45,7 +45,8 @@ check_branch() {
     has_rule "$rule" <<<"$rs" && ok "$label: $rule" || fail "$label: missing the $rule rule"
   done
   methods="$(jq -c '[.[].rules[] | select(.type=="pull_request") | .parameters.allowed_merge_methods] | first // []' <<<"$rs")"
-  [ "$methods" = '["merge"]' ] && ok "$label: only merge commits are allowed (upstream history stays intact)"     || fail "$label: allowed merge methods are $methods, must be [\"merge\"] (a squash drops upstream's ancestry)"
+  [ "$methods" = '["merge"]' ] && ok "$label: only merge commits are allowed (upstream history stays intact)" \
+  || fail "$label: allowed merge methods are $methods, must be [\"merge\"] (a squash drops upstream's ancestry)"
   live="$(jq -r '[.[].rules[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context] | .[]' <<<"$rs")"
   for need in $(jq -r '.rules[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context | gsub(" ";"_")' "$file"); do
     ctx="${need//_/ }"

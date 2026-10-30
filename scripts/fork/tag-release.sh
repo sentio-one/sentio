@@ -22,7 +22,8 @@ die() { echo "tag-release: $*" >&2; exit 1; }
 [ "$desktop" = "$python_version" ] \
   || die "apps/desktop/package.json says $desktop but pyproject.toml says $python_version; bump both (scripts/fork/bump-version.sh)"
 [[ "$desktop" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "version '$desktop' is not plain MAJOR.MINOR.PATCH"
-[[ "$desktop" =~ ^[0-9]+\.[0-9]+\.[0-9]$ ]]   || die "version '$desktop' has a patch above 9; after X.Y.9 the next release is X.(Y+1).0 (scripts/fork/bump-version.sh next)"
+[[ "$desktop" =~ ^[0-9]+\.[0-9]+\.[0-9]$ ]] \
+  || die "version '$desktop' has a patch above 9; after X.Y.9 the next release is X.(Y+1).0 (scripts/fork/bump-version.sh next)"
 tag="v$desktop"
 
 if git ls-remote --exit-code --tags "$remote" "refs/tags/$tag" >/dev/null 2>&1; then
@@ -38,8 +39,10 @@ fi
 
 # Releases are cut from stable: a version bump that was merged to main but not promoted is not a release yet.
 stable="${TAG_STABLE_BRANCH:-stable}"
-git fetch --quiet "$remote" "+refs/heads/$stable:refs/remotes/$remote/$stable"   || die "cannot fetch $remote/$stable; releases are cut from the $stable branch (docs/private-fork/RELEASING.md)"
-git merge-base --is-ancestor HEAD "refs/remotes/$remote/$stable"   || die "HEAD $(git rev-parse --short HEAD) is not on $remote/$stable; promote it first (scripts/fork/promote-stable.sh)"
+git fetch --quiet "$remote" "+refs/heads/$stable:refs/remotes/$remote/$stable" \
+  || die "cannot fetch $remote/$stable; releases are cut from the $stable branch (docs/private-fork/RELEASING.md)"
+git merge-base --is-ancestor HEAD "refs/remotes/$remote/$stable" \
+  || die "HEAD $(git rev-parse --short HEAD) is not on $remote/$stable; promote it first (scripts/fork/promote-stable.sh)"
 
 if [ "$push" -eq 0 ]; then
   echo "tag-release: would tag $(git rev-parse --short HEAD) as $tag (latest tag: ${latest:+v$latest}${latest:-none}); pass --push to do it"
