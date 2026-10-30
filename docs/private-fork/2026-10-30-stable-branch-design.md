@@ -39,9 +39,12 @@ documents the exact clicks.
 
 ## Out of scope / open
 
-- **Client self-update is unverified.** Backends redeploy on merge. Whether the unsigned Light MSIX updates itself or testers
-  reinstall from the new release has not been confirmed from the code; if it is manual, "everyone updates" holds for the backend
-  only. Decide separately.
+- **Client updates are manual for now (decided 2026-10-30).** Backends redeploy on merge to `stable`; testers reinstall the Light
+  MSIX from the new release. Verified in code: Windows Light declares update mechanism `external`
+  (`apps/desktop/electron/updater/updater.test.ts`), so it has no in-app updater. The bundled Windows build gets one-click updates
+  from an App Installer feed (`.appinstaller`), which needs a **signed** MSIX and a **hosted feed**; Light is unsigned and has
+  neither. Follow-up options, not part of this work: (a) sign Light and publish an App Installer feed for a real update button;
+  (b) a small in-app "new version available" notice that links to the latest release.
 - **Client and server skew.** Both come from `stable`, so skew is limited to the window between a backend redeploy and a client
   reinstall.
 - Google OIDC verification, desktop and sign-up UI, and the website are separate sub-projects.
