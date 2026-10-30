@@ -1,6 +1,6 @@
 name: Release Light Desktop
 
-# Builds the remote-only Light desktop client (HermesLight-*.exe NSIS installer, unsigned) on the self-hosted Windows runner.
+# Builds the remote-only Light desktop client (HermesLight-*.exe NSIS installer, unsigned) on a GitHub-hosted Windows runner.
 #   push to main      -> build; the installer is kept as a workflow artifact for 30 days and also replaces the rolling
 #                        `main-latest` pre-release, the one place to find (and be told about) the newest build
 #   push of a v* tag  -> build, then publish the installer as a GitHub release
@@ -29,14 +29,12 @@ concurrency:
 jobs:
   build:
     name: Build Light exe
-    # Our own Windows VM (docs/private-fork/WINDOWS-RUNNER.md), not a GitHub-hosted runner. The package cannot be
-    # cross-built: the HUD helper is compiled by Windows' in-box .NET compiler, so this must run on Windows.
-    runs-on: [self-hosted, windows-builder]
+    # The package cannot be cross-built: the HUD helper is compiled by Windows' in-box .NET compiler, so this must run on
+    # Windows. GitHub-hosted Windows is free for a public repository; the self-hosted VM in WINDOWS-RUNNER.md is not in use.
+    runs-on: windows-latest
     timeout-minutes: 90
     env:
       HERMES_DESKTOP_VARIANT: light
-      # electron-builder's tool downloads (NSIS, rcedit) land here and persist between runs on this runner.
-      ELECTRON_BUILDER_CACHE: C:\hermes-build-cache\electron-builder
       # There is no signing identity, and the build must not go looking for one.
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     outputs:

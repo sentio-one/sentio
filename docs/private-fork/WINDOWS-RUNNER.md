@@ -1,3 +1,7 @@
+> **Not in use (2026-10-30).** `release-light.yml` builds on GitHub's hosted `windows-latest` runner, free for this public
+> repository. This page describes an optional self-hosted VM; if you adopt it, change `runs-on` back to
+> `[self-hosted, windows-builder]` and read the exposure notes in `RELEASING.md` first.
+
 # The self-hosted Windows build runner
 
 `release-light.yml` builds the Light desktop exe on our own Windows VM (`runs-on: [self-hosted, windows-builder]`), not on a
