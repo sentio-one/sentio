@@ -36,6 +36,11 @@ if [ -n "$latest" ] && [ "$(printf '%s\n%s\n' "$latest" "$desktop" | sort -V | t
   die "version $desktop is not newer than the latest tag v$latest"
 fi
 
+# Releases are cut from stable: a version bump that was merged to main but not promoted is not a release yet.
+stable="${TAG_STABLE_BRANCH:-stable}"
+git fetch --quiet "$remote" "+refs/heads/$stable:refs/remotes/$remote/$stable"   || die "cannot fetch $remote/$stable; releases are cut from the $stable branch (docs/private-fork/RELEASING.md)"
+git merge-base --is-ancestor HEAD "refs/remotes/$remote/$stable"   || die "HEAD $(git rev-parse --short HEAD) is not on $remote/$stable; promote it first (scripts/fork/promote-stable.sh)"
+
 if [ "$push" -eq 0 ]; then
   echo "tag-release: would tag $(git rev-parse --short HEAD) as $tag (latest tag: ${latest:+v$latest}${latest:-none}); pass --push to do it"
   exit 0

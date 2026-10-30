@@ -42,7 +42,7 @@ def clone(tmp_path):
     _git(work, "add", "-A")
     _git(work, "commit", "-qm", "base")
     _git(work, "tag", "-a", "v0.1.0", "-m", "v0.1.0")
-    _git(work, "push", "-q", "origin", "main", "v0.1.0")
+    _git(work, "push", "-q", "origin", "main", "main:stable", "v0.1.0")
     return work
 
 
@@ -59,7 +59,7 @@ def _bump_commit(work, desktop, python=None):
     _write_versions(work, desktop, python)
     _git(work, "add", "-A")
     _git(work, "commit", "-qm", f"bump {desktop}")
-    _git(work, "push", "-q", "origin", "main")
+    _git(work, "push", "-q", "origin", "main", "main:stable")
 
 
 def test_a_new_version_gets_an_annotated_tag_on_the_commit_that_bumped_it(clone):
@@ -155,4 +155,14 @@ def test_the_tagger_refuses_a_patch_above_9(clone):
     _bump_commit(clone, "0.2.10")
     code, out = _tagger(clone, "--push")
     assert code == 1 and "patch above 9" in out, out
+    assert _remote_tags(clone) == ["v0.1.0"]
+
+
+def test_it_refuses_a_commit_that_has_not_been_promoted_to_stable(clone):
+    _write_versions(clone, "0.2.0")
+    _git(clone, "add", "-A")
+    _git(clone, "commit", "-qm", "bump on main only")
+    _git(clone, "push", "-q", "origin", "main")  # main moves, stable does not
+    code, out = _tagger(clone, "--push")
+    assert code == 1 and "is not on origin/stable" in out, out
     assert _remote_tags(clone) == ["v0.1.0"]
