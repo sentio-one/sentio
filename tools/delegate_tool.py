@@ -59,6 +59,7 @@ from tools.delegate_tool_results import (
 )
 
 _ROLES = frozenset({"leaf", "orchestrator"})
+_GUI_BRIDGE_CALLBACKS = ("read_terminal_callback", "read_preview_callback", "drive_preview_callback")
 
 
 def _parent_live_home(parent_agent: Any) -> Optional[Path]:
@@ -296,6 +297,8 @@ def _build_child_agent(
                     ephemeral_system_prompt=child_prompt, log_prefix=f"[subagent-{task_index}]", platform="subagent",
                     side_agent=True,
                     skip_context_files=True, skip_memory=True, clarify_callback=None,
+                    # A child that inherits desktop_ui must reach the parent's window, not answer "desktop only".
+                    **{name: getattr(parent_agent, name, None) for name in _GUI_BRIDGE_CALLBACKS},
                     thinking_callback=(
                         (lambda text: _safe_progress(child_progress_cb, "_thinking", text) if text else None)
                         if child_progress_cb else None

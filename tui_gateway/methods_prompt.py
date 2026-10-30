@@ -1179,7 +1179,7 @@ def _(rid, params: dict) -> dict:
 
     def body():
         from run_agent import AIAgent
-        kwargs = _background_agent_kwargs(session["agent"], task_id)
+        kwargs = _background_agent_kwargs(session["agent"], task_id, parent)
         with _side_agent_session_db(kwargs.get("session_db")) as session_db:
             agent = AIAgent(**{**kwargs, "session_db": session_db})
             try:
