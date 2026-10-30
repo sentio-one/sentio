@@ -33,22 +33,29 @@ covering() {  # covering <target> <ref>...
 has_rule() { jq -e --arg r "$1" 'any(.[]; any(.rules[]; .type==$r))' >/dev/null; }
 
 default_branch="$(gh api "repos/$repo" --jq .default_branch)"
-main_rs="$(covering branch '~DEFAULT_BRANCH' "refs/heads/$default_branch" '~ALL')"
-if [ "$(jq length <<<"$main_rs")" -eq 0 ]; then
-  fail "no active ruleset covers $default_branch (a ruleset must include ~DEFAULT_BRANCH or refs/heads/$default_branch)"
-else
+# check_branch <label> <ruleset file> <active rulesets covering the branch, as JSON>: the four rules, merge commits only,
+# and every status check the ruleset file names.
+check_branch() {
+  local label=$1 file=$2 rs=$3 methods live need ctx
+  if [ "$(jq length <<<"$rs")" -eq 0 ]; then
+    fail "no active ruleset covers $label (a ruleset must name the branch)"
+    return
+  fi
   for rule in deletion non_fast_forward pull_request required_status_checks; do
-    has_rule "$rule" <<<"$main_rs" && ok "$default_branch: $rule" || fail "$default_branch: missing the $rule rule"
+    has_rule "$rule" <<<"$rs" && ok "$label: $rule" || fail "$label: missing the $rule rule"
   done
-  methods="$(jq -c '[.[].rules[] | select(.type=="pull_request") | .parameters.allowed_merge_methods] | first // []' <<<"$main_rs")"
-  [ "$methods" = '["merge"]' ] && ok "$default_branch: only merge commits are allowed (upstream history stays intact)" \
-    || fail "$default_branch: allowed merge methods are $methods, must be [\"merge\"] (a squash drops upstream's ancestry)"
-  live="$(jq -r '[.[].rules[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context] | .[]' <<<"$main_rs")"
-  for need in $(jq -r '.rules[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context | gsub(" ";"_")' .github/rulesets/main.json); do
+  methods="$(jq -c '[.[].rules[] | select(.type=="pull_request") | .parameters.allowed_merge_methods] | first // []' <<<"$rs")"
+  [ "$methods" = '["merge"]' ] && ok "$label: only merge commits are allowed (upstream history stays intact)" \
+  || fail "$label: allowed merge methods are $methods, must be [\"merge\"] (a squash drops upstream's ancestry)"
+  live="$(jq -r '[.[].rules[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context] | .[]' <<<"$rs")"
+  for need in $(jq -r '.rules[] | select(.type=="required_status_checks") | .parameters.required_status_checks[].context | gsub(" ";"_")' "$file"); do
     ctx="${need//_/ }"
-    grep -qxF "$ctx" <<<"$live" && ok "required check: $ctx" || fail "required check missing: $ctx"
+    grep -qxF "$ctx" <<<"$live" && ok "$label: required check: $ctx" || fail "$label: required check missing: $ctx"
   done
-fi
+}
+
+check_branch "$default_branch" .github/rulesets/main.json "$(covering branch '~DEFAULT_BRANCH' "refs/heads/$default_branch" '~ALL')"
+check_branch stable .github/rulesets/stable.json "$(covering branch refs/heads/stable)"
 
 tags_rs="$(covering tag 'refs/tags/v*')"
 if [ "$(jq length <<<"$tags_rs")" -gt 0 ] && has_rule creation <<<"$tags_rs"; then

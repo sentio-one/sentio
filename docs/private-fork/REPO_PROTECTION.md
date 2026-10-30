@@ -6,8 +6,9 @@ code in `.github/rulesets/*.json`; `scripts/fork/apply-github-protection.sh` app
 
 ## Why this matters more than usual
 
-- **A push to `main` is a production deploy.** Dokploy auto-deploys the branch it tracks (`deploy/dokploy/README.md`), so whoever can
-  push to `main` can change what runs for every company.
+- **A push to `stable` is a production deploy.** Dokploy auto-deploys the branch it tracks (`deploy/dokploy/README.md`) and every client
+  company follows `stable`, so whoever can push to `stable` can change what runs for every company. `main` is production only for the
+  maintainer's own development company.
 - **A pushed `v*` tag publishes the desktop installer** (`release-light.yml` has `contents: write`).
 - **A squash merge of an upstream merge** drops upstream's commits from our ancestry and makes the next merge conflict on everything
   the fork touched (`FORK_DECISIONS.md` section 3).
@@ -47,6 +48,7 @@ The checker catches this class of mistake: it fails on any ruleset that names an
 | | No deletion, no force push | |
 | | Required checks: the four `Fork CI` jobs (Python, compose, **sandbox isolation**, TypeScript) | The sandbox job proves a sandbox cannot reach the privileged daemon. |
 | | Repository admins may bypass **only through a pull request** | An emergency merge is possible but never a direct push. |
+| Ruleset `stable` (`refs/heads/stable`) | Same as `main`: pull request, **1 approval**, merge commits only, the four `Fork CI` jobs, no deletion, no force push | Client deployments and releases follow this branch; it moves only by a promotion PR (`scripts/fork/promote-stable.sh`). |
 | Ruleset `release-tags` (`refs/tags/v*`) | Only admins can create, update or delete | Publishing an installer is an owner decision. |
 | Ruleset `upstream-merge` | No deletion, no force push | Long-lived branch (decision L2). |
 | Repository settings | Merge commits on; squash and rebase **off**; **delete branch on merge off** | Deleting the head branch on merge would delete `upstream-merge` itself. |
@@ -78,7 +80,7 @@ the proof. If GitHub rejects a ruleset, the error names the field.
 - **Two-factor authentication on both accounts** (`sentio-one` and `TheophilusChinomona`).
 - **Settings > Actions > General > Fork pull request workflows**: require approval for all outside collaborators. `Fork CI` has no
   secrets, but a public repository still runs workflows from strangers' PRs.
-- **Dokploy:** auto-deploy follows `main`; if Dokploy offers to wait for CI checks before deploying, turn that on.
+- **Dokploy:** client projects auto-deploy `stable`; if Dokploy offers to wait for CI checks before deploying, turn that on.
 - **Security contact:** `.github/SECURITY.md` sends reports for Sentio One's own code to the owner, not to Nous Research (upstream's
   `SECURITY.md` does). GitHub prefers `.github/SECURITY.md`, so upstream's file stays untouched and does not conflict on merges.
 

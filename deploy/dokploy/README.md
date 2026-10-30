@@ -65,7 +65,7 @@ A missing required value aborts the deploy (`${VAR:?...}`), so a project cannot 
 
 ## Create a company
 
-1. **Dokploy → Create Compose → Source: Git.** Repository: `github.com/sentio-one/sentio` (Dokploy needs a deploy key or GitHub App if the repo is private), branch: the one you deploy from, compose
+1. **Dokploy → Create Compose → Source: Git.** Repository: `github.com/sentio-one/sentio` (Dokploy needs a deploy key or GitHub App if the repo is private), branch: `stable` (the line every client follows; a development company of your own may use `main`), compose
    path `./deploy/dokploy/docker-compose.yml`. Turn on auto-deploy for the branch.
 2. **Environment tab:** fill the table above.
 3. **Domains tab:** host = the company's hostname, service = `hermes`, container port = `9119`. HTTPS off at Traefik
@@ -108,7 +108,7 @@ manage it in the IdP.
 
 - **Backups:** the `hermes-data` volume holds everything this company owns (profiles, sessions, `access_grants.db`).
   Back it up on a schedule and test a restore. Dokploy's volume backups or a `docker run --rm -v ... tar` job both work.
-- **Updates:** push to the deploy branch; Dokploy rebuilds the image on the server. The first build is slow (the image
+- **Updates:** merge a promotion PR into `stable`; Dokploy rebuilds the image on the server for every project that follows it. The first build is slow (the image
   compiles and installs a lot); later ones reuse Docker layers.
 - **Rollback:** redeploy the previous commit; the volume is untouched. A schema change in a newer image is the one thing
   a rollback cannot undo, so back up before upgrading.

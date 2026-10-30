@@ -57,7 +57,7 @@ def _protected_state():
     for index, path in enumerate(RULESET_FILES, start=1):
         ruleset = json.loads(path.read_text(encoding="utf-8"))
         rulesets.append({"id": index, "source_type": "Repository", **ruleset})
-    return {"name": NAME, "rulesets": rulesets, "branches": ["main", "upstream-merge"],
+    return {"name": NAME, "rulesets": rulesets, "branches": ["main", "stable", "upstream-merge"],
             "repo": {"default_branch": "main", "allow_squash_merge": False, "allow_rebase_merge": False}}
 
 
@@ -108,6 +108,15 @@ def _drop_sandbox_check(state):
     rule["parameters"]["required_status_checks"] = [c for c in checks if "Sandbox" not in c["context"]]
 
 
+def _disable_stable(state):
+    _ruleset(state, "stable")["enforcement"] = "disabled"
+
+
+def _allow_squash_on_stable(state):
+    rule = next(r for r in _ruleset(state, "stable")["rules"] if r["type"] == "pull_request")
+    rule["parameters"]["allowed_merge_methods"] = ["merge", "squash"]
+
+
 def _drop_ruleset(name):
     return lambda state: state.__setitem__("rulesets", [r for r in state["rulesets"] if r["name"] != name])
 
@@ -127,7 +136,10 @@ def _squash_on(state):
     (_drop_ruleset("upstream-merge"), "upstream-merge branch is not protected"),
     (_disable_main, "no active ruleset covers main"),
     (_squash_on, "repository setting allow_squash_merge is on"),
-], ids=["squash-allowed", "missing-check", "no-tag-rule", "no-upstream-merge-rule", "main-disabled", "squash-setting"])
+    (_disable_stable, "no active ruleset covers stable"),
+    (_allow_squash_on_stable, "stable: allowed merge methods are"),
+], ids=["squash-allowed", "missing-check", "no-tag-rule", "no-upstream-merge-rule", "main-disabled", "squash-setting",
+        "stable-disabled", "stable-squash-allowed"])
 def test_each_gap_is_reported_and_fails_the_check(tmp_path, monkeypatch, mutate, expected):
     state = _protected_state()
     mutate(state)

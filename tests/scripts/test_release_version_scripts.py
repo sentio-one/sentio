@@ -42,7 +42,7 @@ def clone(tmp_path):
     _git(work, "add", "-A")
     _git(work, "commit", "-qm", "base")
     _git(work, "tag", "-a", "v0.1.0", "-m", "v0.1.0")
-    _git(work, "push", "-q", "origin", "main", "v0.1.0")
+    _git(work, "push", "-q", "origin", "main", "main:stable", "v0.1.0")
     return work
 
 
@@ -59,7 +59,7 @@ def _bump_commit(work, desktop, python=None):
     _write_versions(work, desktop, python)
     _git(work, "add", "-A")
     _git(work, "commit", "-qm", f"bump {desktop}")
-    _git(work, "push", "-q", "origin", "main")
+    _git(work, "push", "-q", "origin", "main", "main:stable")
 
 
 def test_a_new_version_gets_an_annotated_tag_on_the_commit_that_bumped_it(clone):
@@ -122,3 +122,47 @@ def test_bump_version_updates_every_place_and_refuses_going_backwards(clone):
         again = subprocess.run(["bash", "scripts/fork/bump-version.sh", refused], cwd=clone, capture_output=True, text=True,
                                check=False, env={**path})
         assert again.returncode != 0, refused
+
+
+LOCK = ('{\n  "packages": {\n    "apps/desktop": {\n      "name": "hermes",\n      "version": "0.0.0",\n'
+        '      "dependencies": {}\n    }\n  }\n}\n')
+
+
+def _bump(work, *args):
+    (work / "package-lock.json").write_text(LOCK, encoding="utf-8")
+    return subprocess.run(["bash", "scripts/fork/bump-version.sh", *args], cwd=work, capture_output=True, text=True,
+                          check=False, env={"PATH": "/usr/bin:/bin"})
+
+
+@pytest.mark.parametrize("current,expected", [
+    ("0.3.0", "0.3.1"), ("0.3.8", "0.3.9"), ("0.3.9", "0.4.0"), ("0.9.9", "0.10.0"),
+])
+def test_next_counts_the_patch_from_0_to_9_then_rolls_the_minor(clone, current, expected):
+    for args in ((), ("next",)):
+        _write_versions(clone, current)
+        done = _bump(clone, *args)
+        assert done.returncode == 0, done.stdout + done.stderr
+        assert json.loads((clone / "apps/desktop/package.json").read_text())["version"] == expected
+        assert re.search(rf'^version = "{re.escape(expected)}"$', (clone / "pyproject.toml").read_text(), re.MULTILINE)
+
+
+def test_bump_refuses_a_patch_above_9(clone):
+    done = _bump(clone, "0.3.10")
+    assert done.returncode != 0 and "single digit" in done.stdout + done.stderr
+
+
+def test_the_tagger_refuses_a_patch_above_9(clone):
+    _bump_commit(clone, "0.2.10")
+    code, out = _tagger(clone, "--push")
+    assert code == 1 and "patch above 9" in out, out
+    assert _remote_tags(clone) == ["v0.1.0"]
+
+
+def test_it_refuses_a_commit_that_has_not_been_promoted_to_stable(clone):
+    _write_versions(clone, "0.2.0")
+    _git(clone, "add", "-A")
+    _git(clone, "commit", "-qm", "bump on main only")
+    _git(clone, "push", "-q", "origin", "main")  # main moves, stable does not
+    code, out = _tagger(clone, "--push")
+    assert code == 1 and "is not on origin/stable" in out, out
+    assert _remote_tags(clone) == ["v0.1.0"]

@@ -1,4 +1,4 @@
-# Tags the release when a merge to main bumps the version (scripts/fork/tag-release.sh). The tag push starts release-light.yml,
+# Tags the release when a merge to stable bumps the version (scripts/fork/tag-release.sh). The tag push starts release-light.yml,
 # which builds and publishes the installer.
 #
 # The tag is pushed with RELEASE_TOKEN, not the built-in GITHUB_TOKEN, for two reasons: a tag pushed by GITHUB_TOKEN does not start
@@ -9,7 +9,7 @@ name: Tag release
 
 on:
   push:
-    branches: [main]
+    branches: [stable]
     paths:
       - 'apps/desktop/package.json'
       - 'pyproject.toml'
@@ -25,7 +25,7 @@ concurrency:
 jobs:
   tag:
     name: Tag the version if it has no tag yet
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/stable'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -41,6 +41,7 @@ jobs:
       - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           token: ${{ secrets.RELEASE_TOKEN }}
 
       # Idempotent: a version that already has a tag is left alone, so a manual re-run is always safe.
