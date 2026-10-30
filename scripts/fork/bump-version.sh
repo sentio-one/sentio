@@ -2,16 +2,24 @@
 # Set the release version everywhere it lives, so a bump cannot be half done:
 # apps/desktop/package.json, pyproject.toml, the desktop workspace entry in package-lock.json and uv.lock (via `uv lock`).
 #
-#   scripts/fork/bump-version.sh 0.2.0
+#   scripts/fork/bump-version.sh next       # the next version: 0.3.0 -> 0.3.1 ... 0.3.9 -> 0.4.0 (also the default with no argument)
+#   scripts/fork/bump-version.sh 0.3.0      # or an explicit version (the patch is a single digit)
 #
 # Then open a PR. When it merges to main, .github/workflows/tag-release.yml tags v0.2.0 and the release build publishes it.
 # Docs: docs/private-fork/RELEASING.md.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
-new="${1:-}"
-[[ "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "usage: $0 MAJOR.MINOR.PATCH" >&2; exit 2; }
+arg="${1:-next}"
 current="$(python3 -c 'import json; print(json.load(open("apps/desktop/package.json"))["version"])')"
+if [ "$arg" = next ]; then
+  IFS=. read -r major minor patch <<<"$current"
+  [[ "$patch" =~ ^[0-9]+$ ]] || { echo "bump-version: cannot compute the next version from '$current'" >&2; exit 2; }
+  if [ "$patch" -lt 9 ]; then new="$major.$minor.$((patch + 1))"; else new="$major.$((minor + 1)).0"; fi
+else
+  new="$arg"
+fi
+[[ "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]$ ]]   || { echo "usage: $0 [next|MAJOR.MINOR.PATCH] (the patch is a single digit: 0.3.9 is followed by 0.4.0)" >&2; exit 2; }
 if [ "$(printf '%s\n%s\n' "$current" "$new" | sort -V | tail -1)" != "$new" ] || [ "$current" = "$new" ]; then
   echo "bump-version: $new is not newer than the current version $current" >&2
   exit 1

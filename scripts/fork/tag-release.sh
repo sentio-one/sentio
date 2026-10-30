@@ -6,7 +6,7 @@
 #   scripts/fork/tag-release.sh --push          # create the annotated tag and push it
 #
 # Idempotent: a version that already has a tag is left alone, so this can run on every merge that touches a version file.
-# Refuses a version that is not plain semver, that differs between the two files, or that is not newer than the newest v* tag.
+# Refuses a version that is not plain semver, has a patch above 9, differs between the two files, or is not newer than the newest v* tag.
 # Docs: docs/private-fork/RELEASING.md.
 set -euo pipefail
 
@@ -22,6 +22,7 @@ die() { echo "tag-release: $*" >&2; exit 1; }
 [ "$desktop" = "$python_version" ] \
   || die "apps/desktop/package.json says $desktop but pyproject.toml says $python_version; bump both (scripts/fork/bump-version.sh)"
 [[ "$desktop" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "version '$desktop' is not plain MAJOR.MINOR.PATCH"
+[[ "$desktop" =~ ^[0-9]+\.[0-9]+\.[0-9]$ ]]   || die "version '$desktop' has a patch above 9; after X.Y.9 the next release is X.(Y+1).0 (scripts/fork/bump-version.sh next)"
 tag="v$desktop"
 
 if git ls-remote --exit-code --tags "$remote" "refs/tags/$tag" >/dev/null 2>&1; then
