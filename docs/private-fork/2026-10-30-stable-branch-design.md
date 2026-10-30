@@ -16,7 +16,10 @@ workflow is: **merge to `stable` and every client deployment updates.**
 3. **Release tags are cut from `stable`.** The release marked *Latest* is always a promoted build. `main-latest` stays the hot
    pre-release. This amends L5 in `FORK_DECISIONS.md`: a release is a version bump that has been promoted to `stable`.
 4. **Hotfixes land on `main` first and are cherry-picked into `stable`**, so the lines do not diverge.
-5. **`stable` starts at the then-current `main`**, after the pending preview-bridge PR (#28) merges, because that is what has
+5. **Versioning (decided 2026-10-30).** The first stable release is `0.3.0`. Each later release bumps the patch (`0.3.1` ... `0.3.9`);
+   after `X.Y.9` the next release is `X.(Y+1).0` (so `0.3.9` is followed by `0.4.0`). The patch never exceeds 9. The version bump rides
+   in the PR that is promoted to `stable`. Builds from `main` keep the last released version and are told apart by commit.
+6. **`stable` starts at the then-current `main`**, after the pending preview-bridge PR (#28) merges, because that is what has
    been tested.
 
 ## Changes
@@ -28,7 +31,8 @@ workflow is: **merge to `stable` and every client deployment updates.**
 | `scripts/fork/promote-stable.sh` | New. Opens a PR from `main` into `stable` listing the commits being promoted. Never pushes to `stable` directly. |
 | `.github/workflows/tag-release.yml` | Trigger on pushes to `stable`, not `main`; guard `github.ref == 'refs/heads/stable'`. A version bump merged to `main` does not tag until promoted. |
 | `.github/workflows/release-light.yml` | Unchanged for `main` (still refreshes `main-latest`). A `v*` tag already builds and publishes regardless of branch. |
-| `scripts/fork/tag-release.sh` | Refuse to tag a commit that is not on `origin/stable`. |
+| `scripts/fork/tag-release.sh` | Refuse to tag a commit that is not on `origin/stable`, and a version whose patch is above 9. |
+| `scripts/fork/bump-version.sh` | With no argument (or `next`), compute the next version by the rule above; an explicit version is still accepted but must follow the rule (patch 0-9) and be newer. |
 | Dokploy (maintainer, manual) | Point each client project at branch `stable`. Not expressible in this repository. |
 | Docs | `RELEASING.md`, `deploy/dokploy/README.md`, `REPO_PROTECTION.md`, `FORK_DECISIONS.md` (amend L5, add a decision). |
 
