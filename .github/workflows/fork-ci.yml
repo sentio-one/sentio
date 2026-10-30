@@ -42,7 +42,7 @@ jobs:
       - name: Fork script tests
         run: |
           scripts/run_tests.sh tests/scripts/test_release_version_scripts.py \
-            tests/scripts/test_disable_upstream_workflows.py tests/scripts/test_refresh_main_release.py
+            tests/scripts/test_disable_upstream_workflows.py tests/scripts/test_refresh_main_release.py \n            tests/scripts/test_promote_stable.py
 
       - name: Run the fork's tests
         run: |
