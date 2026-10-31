@@ -55,7 +55,7 @@ jobs:
             tests/hermes_cli/test_dashboard_access_scope.py tests/hermes_cli/test_access_invites_api.py \
             tests/hermes_cli/test_auth_me_access.py tests/hermes_cli/test_profile_sandbox_provisioning.py \
             tests/plugins/dashboard_auth/test_session_groups.py \
-            tests/scripts/test_check_github_protection.py \
+            tests/scripts/test_check_github_protection.py tests/hermes_cli/test_dashboard_login_branding.py \
             tests/tools/test_terminal_scope_sandbox_gap.py tests/tools/test_sandbox_host_surfaces.py
         env:
           OPENROUTER_API_KEY: ""
@@ -139,7 +139,8 @@ jobs:
         run: |
           npx vitest run --project ui \
             src/lib/connect-link.test.ts src/app/contrib/connect-link-dialog.test.tsx \
-            src/components/desktop-install-overlay.test.tsx
+            src/components/desktop-install-overlay.test.tsx \
+            src/i18n/brand.test.ts src/i18n/brand-compounds.test.ts src/i18n/runtime.test.ts
           npx vitest run --project electron electron/light-first-run.test.ts electron/first-run-setup-gate.test.ts
 
       - name: Check the checkout is clean

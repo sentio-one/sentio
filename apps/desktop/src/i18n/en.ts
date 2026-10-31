@@ -3337,7 +3337,7 @@ export const en: Translations = {
       '/resume': 'Resume a saved session',
       '/details': 'control transcript detail level',
       '/copy': 'copy selection or last assistant message',
-      '/quit': 'exit hermes',
+      '/quit': 'exit Sentio One',
       '/start': 'Acknowledge platform start pings without a reply',
       '/new': 'Start a new desktop chat',
       '/topic': 'Enable or inspect Telegram DM topic sessions',

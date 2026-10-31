@@ -3770,7 +3770,7 @@ export const deOverrides = {
       '/resume': 'Gespeicherte Session fortsetzen',
       '/details': 'Transkript-Detailgrad steuern',
       '/copy': 'Auswahl oder letzte Assistenten-Nachricht kopieren',
-      '/quit': 'hermes beenden',
+      '/quit': 'Sentio One beenden',
       '/start': 'Start-Pings der Plattform ohne Antwort bestätigen',
       '/new': 'Neuen Desktop-Chat starten',
       '/topic': 'Telegram-DM-Themen-Sessions aktivieren oder prüfen',
