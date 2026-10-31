@@ -12,9 +12,11 @@ Everything a person reads in the desktop app, its sign-in pages and its installe
 **In:** user-visible text only: translated UI strings in every language, the empty-chat wordmark, the window title, the app and
 installer name, the web dashboard, and the sign-in and OAuth result pages the backend serves.
 
-**Out, on purpose:** internal identifiers. The `hermes://connect` deep-link scheme and the app ID `com.nousresearch.hermes-light`
-(so invites already sent keep working), `HERMES_HOME` and every other env var, IPC channel names such as `hermes:openExternal`,
-`localStorage` keys, imports, code, comments, URLs, and Nous Research's model names ("Hermes" is also a model family).
+**Also in (added 2026-10-31):** the deep-link scheme. Links the app and backend generate use `sentio://` (section 6).
+
+**Out, on purpose:** internal identifiers. The app ID `com.nousresearch.hermes-light`, `HERMES_HOME` and every other env var, IPC
+channel names such as `hermes:openExternal`, `localStorage` keys, imports, code, comments, URLs, and Nous Research's model names
+("Hermes" is also a model family).
 
 Why not everything: about 15,400 occurrences of "Hermes" sit in `apps/desktop` alone, most of them identifiers. Rewriting them
 conflicts with upstream on most files at every upstream merge and risks breaking working code.
@@ -69,13 +71,38 @@ Direct edits to the visible literals outside the translation files: about 23 in 
 the app, so anyone already on `0.3.0` starts clean after the rename and re-enters their gateway URL. No testers have been
 onboarded yet, so this is the cheapest moment.
 
-### 5. Testing
+### 5. Deep links: `sentio://`
+
+Invite links and every other link that must open the app switch from `hermes://` to `sentio://`. The domain `sentiolangley.com` is
+not involved: a custom scheme needs no domain, and `https` landing links (which would use it) are deferred to the website work.
+
+- **Register with the OS: `sentio` only.** `apps/desktop/electron/main.ts` `HERMES_PROTOCOL` becomes `sentio` (dev: `sentio-dev`);
+  `electron-builder.config.cjs` `protocols[].schemes` becomes `['sentio']`. The app deliberately stops claiming `hermes://`: each
+  launch rewrites the OS handler for the scheme it registers, so claiming `hermes://` would keep fighting Nous's Hermes Desktop on a
+  machine that has both installed.
+- **Parse both.** `DEEPLINK_SCHEMES` accepts `sentio` and `hermes` (dev adds `sentio-dev` and `hermes-dev`), and the renderer parsers
+  (`lib/connect-link.ts`, `lib/hermes-open-target.ts`, `lib/mcp-deeplink.ts`) accept both prefixes. A `hermes://` link that reaches
+  the app by argv, paste or an older handler still works; it just no longer opens the app from a browser click.
+- **Generate `sentio://`.** `hermes_cli/web_routers/access_invites.py` (invite links), `tools/connectors/gateway/wire.py` (the
+  `connections/done` link the browser leg returns to), and the app's own links (`store/native-notifications.ts`, plugin and MCP
+  install links) mint `sentio://`. The implementation plan enumerates every generator from a search for `hermes://`.
+- **Effect on existing installs:** a `0.3.0` install registers only `hermes://` and cannot open `sentio://` links until it updates.
+  No invites have been sent to testers, so nothing in the wild breaks. Vendors' "Add to Hermes" buttons
+  (`hermes://mcp/install`) stop opening this app from a browser; that is accepted.
+- **Docs:** `docs/private-fork/INVITES_DESIGN.md` and `FORK_DECISIONS.md` mention the old scheme and are updated.
+- **Verify on Windows:** build the installer, install it, and confirm the handler is registered under
+  `HKCU\Software\Classes\sentio` and that a `sentio://connect?...` link opens the confirmation dialog.
+
+### 6. Testing
 
 - A behaviour test for `brand.ts`: strings and function messages are rebranded; URLs, env vars, `hermes://`, and model names are
   not; the result is stable across locales.
 - A test that every resolved English string and every locale's catalog contains no standalone, non-excluded "Hermes" (a guard so
   upstream merges that add strings cannot silently reintroduce it).
 - `product-identity` tests updated for the new display name and artifact name.
+- Deep-link tests: the main process accepts `sentio` and `hermes` and rejects other schemes; the connect-link and open-target
+  parsers accept both prefixes and still reject lookalike hosts and credentials; the invite minted by the backend starts with
+  `sentio://connect?`; the registrar registers only `sentio`.
 - Build the installer and open the app: empty chat, boot screen, settings, sign-in and an OAuth result page.
 
 ## Open
