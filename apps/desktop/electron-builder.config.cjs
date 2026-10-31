@@ -209,7 +209,7 @@ module.exports = {
     // paste onto the stock removable-drive icon). It lives in packaging/ with
     // the background so the `files` whitelist keeps it out of the app bundle.
     icon: 'packaging/dmg-volume.icns',
-    title: light ? 'Sentio One Installer' : 'Hermes Agent Installer',
+    title: 'Sentio One Installer',
     // A prebuilt .tiff on purpose, not a PNG plus a @2x sibling: dmg-builder's
     // PNG path runs `tiffutil -cathidpicheck`, which on macOS 26 rewrites both
     // frames to 72 dpi and silently drops the 2x representation. A .tiff is
@@ -305,7 +305,7 @@ module.exports = {
     maintainer: 'Nous Research <support@nousresearch.com>',
     synopsis: light
       ? 'Remote-only desktop client for Sentio One.'
-      : 'Native desktop shell for Hermes Agent.',
+      : 'Native desktop shell for Sentio One.',
     target: ['AppImage']
   }
 }

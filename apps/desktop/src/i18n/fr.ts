@@ -3776,7 +3776,7 @@ export const frOverrides = {
       '/resume': 'Reprendre une session enregistrée',
       '/details': 'contrôler le niveau de détail de la transcription',
       '/copy': "copier la sélection ou le dernier message de l'assistant",
-      '/quit': 'quitter Hermes',
+      '/quit': 'quitter Sentio One',
       '/start': 'Accuser réception des pings de démarrage de la plateforme sans répondre',
       '/new': 'Démarrer une nouvelle conversation',
       '/topic': 'Activer ou inspecter les sessions par sujet des MP Telegram',

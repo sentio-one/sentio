@@ -1,5 +1,8 @@
-const PROTECTED_SPANS = /(?<!`)`+[^`]*`+(?!`)|\b[a-z][a-z0-9+.-]*:\/\/[^\s<>"'`]+|\bNous-Hermes(?:-[A-Za-z0-9]+)*\b|\bHermes(?:\s+[34]|-[0-9]+-[A-Za-z0-9-]+)\b|\b[A-Za-z_][A-Za-z0-9]*[_-][A-Za-z0-9_-]*\b/gi
-const PRODUCT_NAME = /\bHermes(?:\s+(?:Desktop|Agent|Light))?\b/g
+// Spans left alone: code spans, URLs, Nous's model names, and identifier-shaped tokens (HERMES_HOME, hermes_cli,
+// hermes-agent, X-Hermes-Session-Token). Identifiers are matched case-sensitively on purpose: a capitalised hyphen
+// compound such as the German "Hermes-Gateway" is prose and must be branded.
+const PROTECTED_SPANS = /(?<!`)`+[^`]*`+(?!`)|\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s<>"'`]+|\bNous-Hermes(?:-[A-Za-z0-9]+)*\b|\bHermes(?:\s+[34]|-[0-9]+-[A-Za-z0-9-]+)\b|\b[A-Za-z_][A-Za-z0-9]*_[A-Za-z0-9_-]*\b|\b[a-z][a-z0-9]*-[A-Za-z0-9_-]*\b|\bX-[A-Za-z0-9-]+\b/g
+const PRODUCT_NAME = /\b[Hh]ermes\s+[Dd]esktop\b|\bHermes(?:\s+(?:Agent|Light))?\b/g
 
 /** Replace user-facing Hermes product references while preserving code and identifiers. */
 export function brandMessage(value: string): string {

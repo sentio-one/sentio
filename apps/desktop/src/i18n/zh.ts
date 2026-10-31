@@ -3232,7 +3232,7 @@ export const zhOverrides = {
       '/resume': '恢复已保存的会话',
       '/details': '控制对话记录的详细程度',
       '/copy': '复制所选内容或最后一条助手消息',
-      '/quit': '退出 hermes',
+      '/quit': '退出 Sentio One',
       '/start': '确认平台启动请求，不发送回复',
       '/new': '开始新的桌面对话',
       '/topic': '启用或查看 Telegram 私聊话题会话',
