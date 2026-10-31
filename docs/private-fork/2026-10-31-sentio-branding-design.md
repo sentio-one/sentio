@@ -1,6 +1,6 @@
 # Rebrand what people see: Hermes to Sentio One
 
-Status: design, approved in chat 2026-10-31. Implementation not started.
+Status: implemented on 2026-10-31. Focused UI/Electron tests, desktop typecheck, the Light production build and `SentioOne-0.3.0-win-x64.exe` packaging passed. Launching the unpacked app with protocol registration disabled showed the confirmation dialog for both `sentio://connect` and legacy `hermes://connect` inputs. OS-handler and installed-app verification remain pending while the existing Hermes Light app is running with the legacy `hermes://` handler; its registry entry was left unchanged.
 
 ## Goal
 
@@ -64,8 +64,8 @@ Direct edits to the visible literals outside the translation files: about 23 in 
 - `pascal` changes from `HermesLight` to `SentioOne`, so the installer is `SentioOne-<version>-win-x64.exe`. Everything that
   names the old file is updated together: the `HermesLight-*` globs in `.github/workflows/release-light.yml`,
   `scripts/fork/refresh-main-release.sh`, `tests/scripts/test_refresh_main_release.py`, and the install notes text.
-- Unchanged: `kebab` (`hermes-light`), `appId` (`com.nousresearch.hermes-light`), `cliName`, so deep links and the install identity
-  stay stable.
+- Unchanged: `kebab` (`hermes-light`), `appId` (`com.nousresearch.hermes-light`) and `cliName`, preserving the CLI and app ID.
+  Deep-link schemes are handled separately below.
 
 **Consequence, accepted:** Electron keeps each user's local data (saved gateway connections and settings) in a folder named after
 the app, so anyone already on `0.3.0` starts clean after the rename and re-enters their gateway URL. No testers have been

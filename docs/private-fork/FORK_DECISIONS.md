@@ -114,11 +114,11 @@ editable. If a new `access:` key is added, add it to this file.
 - `apps/desktop/electron/light-first-run.ts`: `payload === 'light'` stamp means the first run goes straight to
   the remote form; `createFirstRunSetupGate({canContinueLocal})` ignores a local-install request (logged).
 - One installer serves every company: **no gateway URL in the build**. The URL arrives via
-  `hermes://connect?url=&invite=`.
+  `sentio://connect?url=&invite=` (legacy `hermes://` links remain accepted).
 - Deep link: `lib/connect-link.ts` strict parser (https only, http for loopback, no credentials/query/fragment,
   lookalike hosts shown as punycode). The link only **fills the form after a confirmation screen showing the
   host**; it never connects on its own. Token held in memory only, dropped on cancel or after redeem.
-  Goes through the existing `hermes://` channel (`use-desktop-integrations.ts`), no main-process change.
+  Goes through the existing deep-link channel (`use-desktop-integrations.ts`), no main-process change.
 - Build: `scripts/bundles/desktop.py --variant light` (upstream's builder), run by
   `.github/workflows/release-light.yml` on tag `v*` (D11).
 

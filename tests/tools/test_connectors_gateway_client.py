@@ -10,8 +10,9 @@ from dataclasses import replace as dataclass_replace
 
 import pytest
 
+from tools.connectors.gateway import client
 from tools.connectors.gateway.bridge import ConnectorLeg, connector_search_hits
-from tools.connectors.gateway.client import ConnectorClient
+from tools.connectors.gateway.client import ConnectorClient, return_to_args
 from tools.connectors.gateway.errors import (
     GatewayAuthError,
     GatewayUnavailable,
@@ -54,6 +55,14 @@ def make_client(transport):
         endpoint_resolver=lambda: "https://tool-gateway.test",
         header_provider=lambda url: {"Authorization": "Bearer nous-token"},
     )
+
+
+def test_connector_return_links_use_sentio_for_the_desktop(monkeypatch):
+    monkeypatch.setattr(client, "session_platform", lambda: "desktop")
+    assert return_to_args(op="op-1") == {"return_to": "sentio-desktop", "op": "op-1"}
+
+    monkeypatch.setenv("HERMES_DESKTOP_DEV_SERVER", "1")
+    assert return_to_args() == {"return_to": "sentio-desktop-dev"}
 
 
 def execute_envelope(results):

@@ -418,7 +418,7 @@ export function formatErrorDiagnostics(input: {
   const model = input.surface?.model || input.model
 
   const lines = [
-    '── Hermes error details ──',
+    '── Sentio One error details ──',
     input.failedAt ? `time: ${new Date(input.failedAt * 1000).toISOString()}` : null,
     input.surface ? `layer: ${input.surface.layer}` : null,
     input.surface ? `code: ${input.surface.code}` : null,

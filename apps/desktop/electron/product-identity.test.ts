@@ -120,7 +120,7 @@ test('nonstable runtime pins userData before the app name can change', async ():
 test.each([
   [undefined, 'Hermes', 'hermes', 'latest', 'canary'],
   ['bundled', 'Hermes Agent', 'hermes', 'latest', 'canary'],
-  ['light', 'Hermes Light', 'hermes-light', 'light', 'light-canary']
+  ['light', 'Sentio One', 'hermes-light', 'light', 'light-canary']
 ] as const)(
   '%s separates stable, canary and independent commits',
   async (
@@ -135,6 +135,12 @@ test.each([
     assert.equal(stable.channel, channel)
     assert.equal(stable.light, variant === 'light')
     assert.equal(stable.storeMsix, undefined)
+
+    if (variant === 'light') {
+      assert.equal(stable.appNamePascal, 'SentioOne')
+      assert.equal(stable.artifactNamePascal, 'SentioOne')
+      assert.equal(stable.windowsExecutableName, 'Sentio One')
+    }
     const identities: ProductIdentity[] = [stable]
 
     for (const [tag, commit, expectedCli, expectedChannel] of [
@@ -254,7 +260,7 @@ test('packaging isolates boot metadata and executable names without renaming rel
     const artifact: ReturnType<typeof appIdentity> = appIdentity(fileURLToPath(new URL('../', import.meta.url)))
     assert.equal(artifact.name, identity.artifactNamePascal)
     assert.equal(artifact.identity.msixAppIdWithOrg, config.msix.identityName)
-    assert.deepEqual(config.protocols[0].schemes, ['hermes'])
+    assert.deepEqual(config.protocols[0].schemes, ['sentio', 'hermes'])
 
     if (build !== 'canary') {
       assert.equal(config.publish, null)

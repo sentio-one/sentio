@@ -31,11 +31,11 @@ const REJECTION_BANNERS: Record<number, PtyBanner> = {
     action: null
   },
   4404: {
-    text: 'This Hermes server does not offer the terminal chat. Update Hermes (`hermes update`) and reload the page.',
+    text: 'This Sentio One server does not offer the terminal chat. Update Sentio One (`hermes update`) and reload the page.',
     action: 'reload'
   },
   4408: {
-    text: 'This Hermes server only accepts chat from the machine it runs on. Open the dashboard on that machine, or start it with a public bind.',
+    text: 'This Sentio One server only accepts chat from the machine it runs on. Open the dashboard on that machine, or start it with a public bind.',
     action: null
   }
 }
@@ -49,7 +49,7 @@ export const PTY_RECONNECTING_BANNER = 'Chat connection interrupted. Reconnectin
 
 /** Shown after the last automatic attempt failed (overlay + banner). */
 export const PTY_GAVE_UP_BANNER: PtyBanner = {
-  text: 'Lost connection to the Hermes dashboard server. If you stopped `hermes dashboard`, start it again; otherwise click Reconnect now.',
+  text: 'Lost connection to the Sentio One dashboard server. If you stopped `hermes dashboard`, start it again; otherwise click Reconnect now.',
   action: 'check-server'
 }
 

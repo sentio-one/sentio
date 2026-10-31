@@ -42,7 +42,7 @@ def test_tag_publication_pending_rerun_stale_and_dry_run(monkeypatch, r2_server,
     prefix = f'releases/tag/{tag}/'
     visible = [f'HermesBundled-{version}-mac-arm64.dmg', f'HermesBundled-{version}-win-x64.msix',
                f'HermesBundled-{version}-win-arm64.msix', f'HermesBundled-{version}-linux-x64.AppImage',
-               f'HermesLight-{version}-win-x64.msix']
+               f'SentioOne-{version}-win-x64.exe']
     hidden = [f'HermesBundled-{version}-mac-arm64.zip', f'HermesBundled-{version}-win.msixbundle',
               f'HermesBundled-{version}-win-x64.msix.blockmap', 'latest.yml',
               'HermesBundled-9.9.9-win-x64.msix']
@@ -147,6 +147,19 @@ def test_exact_version_and_flat_name_boundaries(version, name):
     names = [name, 'HermesBundled-1.2.3+canary.20260817T000000Z-win-x64.msix', 'HermesBundled-1.2.4-win-x64.msix', name + '.blockmap']
     assert rbt.filter_names_for_version(names, version) == [name]
     assert rbt.parse_assets([name])['HermesBundled'][('win', 'x64')] == (name, 'msix')
+
+
+def test_sentio_one_artifacts_render_under_the_new_name_and_keep_legacy_assets():
+    names = ['SentioOne-1.2.3-win-x64.exe', 'HermesLight-0.3.0-mac-arm64.dmg']
+    assets = rbt.parse_assets(names)
+
+    assert assets['SentioOne'][('win', 'x64')] == (names[0], 'exe')
+    assert assets['SentioOne'][('mac', 'arm64')] == (names[1], 'dmg')
+    sections = rbt.table_rows(assets)
+    assert sections == [('Sentio One (remote-only client)', [
+        ('macOS', 'Apple Silicon (M-series)', 'DMG', names[1]),
+        ('Windows', 'x86 (64-bit)', 'EXE', names[0]),
+    ])]
 
 
 def test_attempt_archive_objects_are_listed_by_their_plain_version(monkeypatch):

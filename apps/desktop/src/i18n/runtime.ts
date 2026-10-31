@@ -1,6 +1,7 @@
 import { isRecord } from '@hermes/shared/i18n'
 import { atom } from 'nanostores'
 
+import { brandMessage } from './brand'
 import { DEFAULT_LOCALE } from './languages'
 import { resolveTranslations } from './registry'
 import type { Locale, Translations } from './types'
@@ -43,14 +44,14 @@ export function translateFrom(
   const active = render(resolvePath(source(locale), key), args)
 
   if (active !== null) {
-    return active
+    return brandMessage(active)
   }
 
   if (locale !== DEFAULT_LOCALE) {
     const fallback = render(resolvePath(source(DEFAULT_LOCALE), key), args)
 
     if (fallback !== null) {
-      return fallback
+      return brandMessage(fallback)
     }
   }
 

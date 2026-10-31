@@ -11,7 +11,7 @@ access to exactly that profile. One Light installer serves every company: the ga
 the link, never in the build.
 
 ```
-hermes://connect?url=https://gateway.acme.example&invite=<token>
+sentio://connect?url=https://gateway.acme.example&invite=<token>
 ```
 
 ## Principles
@@ -52,7 +52,7 @@ Defaults: single use, 7 days. Multi-use "team links" only when the admin sets `m
 If `email` is set, the verified ID-token email (`email_verified` true) must match.
 
 ### 3. Desktop (Light and full)
-- Handle `hermes://connect?url=&invite=` in `main.ts` next to the existing deep-link routes.
+- Handle `sentio://connect?url=&invite=` in `main.ts` next to the existing deep-link routes. Existing `hermes://` invites remain accepted.
   Accept only `https` (plain `http` for loopback), no credentials in the URL, token length bounded.
 - Show a confirmation: the gateway host, large, with the inviter's company shown only if the gateway reports it.
 - Open the remote form with the URL filled, run the existing probe and OAuth sign-in, then call redeem once
@@ -110,23 +110,23 @@ from a template (the JIT idea in the main plan). Off by default; separate from t
   `POST/GET /api/access/invites`, `DELETE /api/access/invites/{id}?revoke_grants=`, `GET/DELETE /api/access/grants`
   (admin-only by the gate's default) and `POST /api/access/invites/redeem` (any signed-in user; 10 failures per
   10 minutes per person, 30 per client address, then 429).
-- The create response returns the link once: `hermes://connect?url=<public_url or request base>&invite=<token>`.
+- The create response returns the link once: `sentio://connect?url=<public_url or request base>&invite=<token>`.
   The token is never listed, logged or audited. Audit events: created, redeemed, redeem_failed, revoked.
 - An invite may name an email; redemption then needs the signed-in session's email to match (case-insensitive).
   The session does not carry `email_verified`, so this trusts the company IdP's email claim.
 
-Not built: the desktop `hermes://connect` handler and confirmation screen; mail sending; JIT profile creation;
+Not built: the desktop `sentio://connect` handler and confirmation screen; mail sending; JIT profile creation;
 a UI for admins (the API is what a UI would call).
 
 ## Built (desktop)
 
-- `apps/desktop/src/lib/connect-link.ts`: strict parser for `hermes://connect?url=&invite=` (https only, http for loopback;
+- `apps/desktop/src/lib/connect-link.ts`: strict parser for `sentio://connect?url=&invite=` and legacy `hermes://` (https only, http for loopback;
   no credentials/query/fragment; invite token shape-checked; unknown params ignored; lookalike hosts shown in punycode) and
   `redeemInvite` (retries transport/sign-in errors while the new connection settles; the gateway's own refusals are final).
 - `src/store/connect-link.ts` + `src/app/contrib/connect-link-dialog.tsx`: the link goes to a confirmation screen showing the
   host; Continue opens the ordinary remote form pointed at that server; after "Apply and reconnect" the invitation is redeemed
   once. The token is held in memory only and dropped on cancel or after redeeming. Cancel makes no request.
-- Wired through the existing `hermes://` deep-link channel (`use-desktop-integrations.ts`), no main-process change. The dialog sits
+- Wired through the existing deep-link channel (`use-desktop-integrations.ts`), no main-process change. The dialog sits
   above the first-run overlay so a remote-only (Light) build can show it while waiting for a server.
 - Known limits: a link replaces the current server instead of adding a second connection; the strings are English only (other locales
   fall back, listed in `overlay-gaps.json`); tested against mocks, not yet against a gateway with invites enabled.

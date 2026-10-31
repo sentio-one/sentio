@@ -98,7 +98,7 @@ function writeMsixExtensions() {
       template.replace('</Applications>', `${applications}\n  </Applications>`))
   }
   // The uap3:AppExtension fragment that registers the app as a Windows
-  // Copilot hardware key provider. The press activates hermes://copilot-key/start.
+  // Copilot hardware key provider. The press activates sentio://copilot-key/start.
   //
   // Content rules (violations are an opaque makeappx 0x80080204):
   //   * xmlns:uap3 rides on the fragment root — the stock manifest template
@@ -120,9 +120,9 @@ function writeMsixExtensions() {
       Description="Launch ${xmlAttribute(displayName)} with the Copilot key"
       PublicFolder="Public">
     <uap3:Properties>
-      <SingleTap>hermes://copilot-key/start?state=Tap</SingleTap>
-      <PressAndHoldStart>hermes://copilot-key/start?state=Down</PressAndHoldStart>
-      <PressAndHoldStop>hermes://copilot-key/stop?state=Up</PressAndHoldStop>
+      <SingleTap>sentio://copilot-key/start?state=Tap</SingleTap>
+      <PressAndHoldStart>sentio://copilot-key/start?state=Down</PressAndHoldStart>
+      <PressAndHoldStop>sentio://copilot-key/stop?state=Up</PressAndHoldStop>
     </uap3:Properties>
   </uap3:AppExtension>
 </uap3:Extension>

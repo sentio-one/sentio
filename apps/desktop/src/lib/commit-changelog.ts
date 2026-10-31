@@ -203,7 +203,7 @@ export function formatFullChangelogText(
   behind: number,
   branch?: string
 ): string {
-  const lines: string[] = ['=== Hermes Update Changelog ===']
+  const lines: string[] = ['=== Sentio One Update Changelog ===']
 
   if (behind > 0) {
     lines.push(`Behind by ${behind} commit${behind === 1 ? '' : 's'}${branch ? ` on branch ${branch}` : ''}`)
