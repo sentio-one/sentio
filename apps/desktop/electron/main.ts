@@ -55,6 +55,7 @@ import {
 } from './api-transport'
 import { appIconCandidates, resolveAppIcon, shouldOverrideDockIcon } from './app-icon'
 import { stageAppInstallerFile } from './app-installer-file'
+import { appUserModelId } from './app-user-model-id'
 import {
   appVersionInfo,
   type AppVersionInfo,
@@ -1830,7 +1831,7 @@ Menu.setApplicationMenu(null)
 // need this, so gate it on Windows. (Fixes: desktop approval/turn notifications
 // never firing on Windows.)
 if (IS_WINDOWS) {
-  app.setAppUserModelId(IDENTITY_APP_NAME ? PRODUCT_IDENTITY.appId : 'com.nousresearch.hermes')
+  app.setAppUserModelId(appUserModelId(PRODUCT_IDENTITY, IDENTITY_APP_NAME))
 }
 
 // Seed the native About panel with the best-known Hermes version. This is
