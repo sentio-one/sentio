@@ -94,7 +94,7 @@ def test_an_admin_creates_an_invite_and_gets_a_link_for_this_gateway(world):
     created = _create(world)
     link = urlparse(created["link"])
     query = parse_qs(link.query)
-    assert (link.scheme, link.netloc) == ("hermes", "connect")
+    assert (link.scheme, link.netloc) == ("sentio", "connect")
     assert query["url"] == ["https://gw.example"] and len(query["invite"][0]) >= 40
     assert created["invite_id"] and created["expires_at"] > time.time()
 

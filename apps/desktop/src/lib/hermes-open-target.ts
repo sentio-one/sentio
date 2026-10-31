@@ -14,7 +14,7 @@
 
 export type HermesOpenTarget = string | { href: string } | { path: string; params?: Record<string, string> }
 
-const HERMES_PROTOCOL = 'hermes:'
+const APP_PROTOCOLS = new Set(['sentio:', 'hermes:'])
 
 /** Hostnames owned by core deep-link handlers — never treated as plugin routes. */
 const RESERVED_DEEP_LINK_KINDS = new Set([
@@ -73,9 +73,14 @@ export function normalizeHermesOpenString(raw: string): string | null {
     return null
   }
 
-  if (trimmed.startsWith('hermes://') || trimmed.startsWith(`${HERMES_PROTOCOL}//`)) {
-    try {
-      const url = new URL(trimmed)
+  try {
+    const url = new URL(trimmed)
+
+    if (APP_PROTOCOLS.has(url.protocol)) {
+      if (url.username || url.password) {
+        return null
+      }
+
       const host = url.hostname || ''
       const rest = decodeURIComponent((url.pathname || '').replace(/^\//, ''))
 
@@ -106,9 +111,9 @@ export function normalizeHermesOpenString(raw: string): string | null {
       }
 
       return appendSearch(path, url.searchParams)
-    } catch {
-      return null
     }
+  } catch {
+    // Non-URL paths continue through the hash-router path validation below.
   }
 
   const path = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed

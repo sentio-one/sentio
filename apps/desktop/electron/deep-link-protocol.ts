@@ -12,7 +12,7 @@ export interface ProtocolRegistrar {
 
 export interface DeepLinkProtocolOptions {
   app: ProtocolRegistrar
-  protocol: string
+  protocols: string[]
   env: NodeJS.ProcessEnv
   /** `process.defaultApp`: running as `electron <dir>` rather than a packaged binary. */
   defaultApp: boolean
@@ -23,26 +23,28 @@ export interface DeepLinkProtocolOptions {
 }
 
 export function registerDeepLinkProtocol(options: DeepLinkProtocolOptions): void {
-  const { app, protocol, env, defaultApp, argv, execPath, resolve, log } = options
+  const { app, protocols, env, defaultApp, argv, execPath, resolve, log } = options
 
   if (env.HERMES_DESKTOP_SKIP_PROTOCOL_REGISTRATION === '1') {
-    log(`[deeplink] ${protocol}:// registration skipped (HERMES_DESKTOP_SKIP_PROTOCOL_REGISTRATION)`)
+    log(`[deeplink] ${protocols.join(', ')} registration skipped (HERMES_DESKTOP_SKIP_PROTOCOL_REGISTRATION)`)
 
     return
   }
 
-  try {
-    if (defaultApp && argv.length >= 2) {
-      // Dev: register with the electron exec path + entry script so the OS can
-      // relaunch us with the URL. argv[1] is usually "." when launched via
-      // `electron .` from apps/desktop — resolve against cwd.
-      app.setAsDefaultProtocolClient(protocol, execPath, [resolve(argv[1])])
-    } else {
-      app.setAsDefaultProtocolClient(protocol)
-    }
+  for (const protocol of protocols) {
+    try {
+      if (defaultApp && argv.length >= 2) {
+        // Dev: register with the electron exec path + entry script so the OS can
+        // relaunch us with the URL. argv[1] is usually "." when launched via
+        // `electron .` from apps/desktop — resolve against cwd.
+        app.setAsDefaultProtocolClient(protocol, execPath, [resolve(argv[1])])
+      } else {
+        app.setAsDefaultProtocolClient(protocol)
+      }
 
-    log(`[deeplink] registered ${protocol}:// handler`)
-  } catch (err) {
-    log(`[deeplink] protocol registration failed: ${(err as Error).message}`)
+      log(`[deeplink] registered ${protocol}:// handler`)
+    } catch (err) {
+      log(`[deeplink] protocol registration failed: ${(err as Error).message}`)
+    }
   }
 }

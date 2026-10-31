@@ -13,7 +13,7 @@ scripts/fork/bump-version.sh next         one command, four files (see "Versions
         |
    tag-release.yml   sees a version file changed on stable, creates tag v0.3.0 (with RELEASE_TOKEN)
         |
-   release-light.yml  the tag push builds HermesLight-0.3.0-win-x64.exe and publishes the GitHub release
+   release-light.yml  the tag push builds SentioOne-0.3.0-win-x64.exe and publishes the GitHub release
 ```
 
 ## Versions
@@ -68,7 +68,7 @@ scripts/fork/promote-stable.sh         # when main is tested: opens the main -> 
 ```
 
 Then watch **Actions**: `Tag release` (seconds) then `Release Light Desktop` (about 7 minutes). The release appears under **Releases**
-as `HermesLight-<version>-win-x64.exe` plus its `.sha256`. The installer is unsigned, so Windows SmartScreen warns first: choose
+as `SentioOne-<version>-win-x64.exe` plus its `.sha256`. The installer is unsigned, so Windows SmartScreen warns first: choose
 **More info**, then **Run anyway**.
 
 The tagger refuses, and says why, when the two version files disagree, the version is not plain `MAJOR.MINOR.PATCH`, the patch is above 9,

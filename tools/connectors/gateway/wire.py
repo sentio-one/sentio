@@ -23,8 +23,10 @@ CONNECTOR_FILE_MAX_BYTES = 20 * 1024 * 1024
 # INITIALIZING and INITIATED both arrive as `pending`). Present only once the session binds an
 # account; a value outside this set is a contract break and fails validation.
 ConnectionStatus = Literal["pending", "active", "failed", "expired", "revoked", "inactive"]
-# Where the vendor's done page sends the browser after consent; the dev desktop registers hermes-dev://.
-ConnectorReturnTarget = Literal["hermes-desktop", "hermes-desktop-dev", "portal"]
+# Where the vendor's done page sends the browser after consent; the dev desktop registers sentio-dev://.
+ConnectorReturnTarget = Literal[
+    "sentio-desktop", "sentio-desktop-dev", "hermes-desktop", "hermes-desktop-dev", "portal"
+]
 # Who asked for a connect, so the gateway can attribute each minted link. The gateway sets
 # ``execute_link`` and ``portal`` itself; an older gateway ignores the field.
 ConnectorInitiator = Literal["agent_tool", "desktop_page", "card_retry"]
@@ -237,7 +239,7 @@ class ConnectorConnectionsRequest(_Wire):
     # The existing account a reinitiate repairs; sent instead of ``alias`` when known.
     connection_id: Optional[str] = Field(default=None, alias="connectionId")
     return_to: Optional[ConnectorReturnTarget] = Field(default=None, alias="returnTo")
-    # The caller's operation id, echoed on the hermes://connections/done link.
+    # The caller's operation id, echoed on the desktop connections/done link.
     op: Optional[str] = Field(default=None, min_length=1, max_length=128)
     initiator: Optional[ConnectorInitiator] = None
 

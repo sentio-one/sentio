@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setApiRequestConnection, setApiRequestProfile } from '@/api/client'
 import type { DesktopUpdateStatus, DesktopVersionInfo } from '@/global'
-import { en } from '@/i18n/en'
 
 const storage = new Map<string, string>()
 
@@ -270,7 +269,9 @@ describe('maybeNotifyUpdateAvailable', () => {
     )
 
     expect(notifySpy).toHaveBeenCalledTimes(1)
-    expect(notifySpy.mock.calls[0]?.[0]).toMatchObject({ message: en.notifications.updateReadyMessageAppInstaller })
+    expect(notifySpy.mock.calls[0]?.[0]).toMatchObject({
+      message: 'A new version of Sentio One is ready. Update now and Windows will finish it for you.'
+    })
   })
 
   // A native macOS (electron-updater) check has no commit to name either: its

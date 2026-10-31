@@ -1,6 +1,6 @@
 """Admin invite API and the redeem route (see ``gateway/access_grants.py``).
 
-An admin invites a person to one profile and gets a ``hermes://connect`` link; the person signs in with
+An admin invites a person to one profile and gets a ``sentio://connect`` link; the person signs in with
 the company SSO, the desktop redeems the token, and the grant is stored for their verified subject.
 Managing invites and grants is admin-only (the gate's default for ``/api/access/*``); redeeming is open to any
 signed-in user and rate-limited. The token is shown once and is never logged or audited.
@@ -97,7 +97,7 @@ def _profile_exists(name: str) -> bool:
 
 def _link(request: Request, token: str) -> str:
     base = resolve_public_url() or str(request.base_url).rstrip("/") + prefix_from_request(request)
-    return "hermes://connect?" + urlencode({"url": base, "invite": token})
+    return "sentio://connect?" + urlencode({"url": base, "invite": token})
 
 
 @router.post("/api/access/invites")

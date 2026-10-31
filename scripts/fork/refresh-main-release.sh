@@ -16,8 +16,8 @@ repo="${GH_REPO:?GH_REPO is not set}"
 short="${sha:0:7}"
 
 shopt -s nullglob
-installers=("$dir"/HermesLight-*.exe)
-checksums=("$dir"/HermesLight-*.exe.sha256)
+installers=("$dir"/SentioOne-*.exe)
+checksums=("$dir"/SentioOne-*.exe.sha256)
 [ "${#installers[@]}" -eq 1 ] && [ "${#checksums[@]}" -eq 1 ] \
   || { echo "refresh-main-release: expected one installer and one checksum in $dir, found ${#installers[@]} and ${#checksums[@]}" >&2; exit 1; }
 
@@ -34,5 +34,5 @@ The installer is unsigned, so Windows SmartScreen will warn first: choose More i
 gh release delete "$tag" --cleanup-tag --yes >/dev/null 2>&1 || true   # none yet, the first time
 gh release create "$tag" "${installers[0]}" "${checksums[0]}" \
   --target "$sha" --prerelease --latest=false \
-  --title "Light desktop, newest main build ($short)" --notes "$notes"
+  --title "Sentio One, newest main build ($short)" --notes "$notes"
 echo "refresh-main-release: $tag now points at $short"

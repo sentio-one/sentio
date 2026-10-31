@@ -61,7 +61,7 @@ export const SUBMIT_PLUGIN_URL = "/developer-guide/plugins/catalog-submission";
 /** Deep link into the Desktop app's Install Plugin dialog, catalog mode: the app
  *  resolves the reviewed pin itself, so the page never hands it a repo URL. */
 export function desktopInstallLink(name: string): string {
-  return `hermes://plugin/install?catalog=${encodeURIComponent(name)}`;
+  return `sentio://plugin/install?catalog=${encodeURIComponent(name)}`;
 }
 
 /** Site route of an entry's page (Docusaurus prefixes baseUrl/locale via <Link>). */

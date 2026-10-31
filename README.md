@@ -83,7 +83,7 @@ open before that happens, chiefly making the sandbox mandatory for everyone's ag
   Design and API: [`docs/private-fork/INVITES_DESIGN.md`](docs/private-fork/INVITES_DESIGN.md).
 - **Desktop client builds and releases:** every merge to `main` builds the Light installer and keeps it as a downloadable workflow
   artifact. To publish a release, run `scripts/fork/bump-version.sh X.Y.Z` and merge the pull request: the merge tags `vX.Y.Z` and the
-  release build publishes `HermesLight-*.msix`. Setup and details: [`docs/private-fork/RELEASING.md`](docs/private-fork/RELEASING.md).
+  release build publishes `SentioOne-*.exe`. Setup and details: [`docs/private-fork/RELEASING.md`](docs/private-fork/RELEASING.md).
   To build by hand: `scripts/bundles/desktop.py --commit <sha> --variant light` from a clean checkout.
 
 ## Working on it

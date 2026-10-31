@@ -20,6 +20,18 @@ describe('normalizeHermesOpenString', () => {
     )
   })
 
+  it('accepts sentio:// links while retaining hermes:// compatibility', () => {
+    expect(normalizeHermesOpenString('sentio://index-network/intent/1')).toBe('/index-network/intent/1')
+    expect(normalizeHermesOpenString('hermes://index-network/intent/1')).toBe('/index-network/intent/1')
+  })
+
+  it('rejects URL credentials and lookalike app hosts for both schemes', () => {
+    expect(normalizeHermesOpenString('sentio://user@example.com/open/settings')).toBeNull()
+    expect(normalizeHermesOpenString('hermes://user@example.com/open/settings')).toBeNull()
+    expect(normalizeHermesOpenString('sentio://open.evil/settings')).toBeNull()
+    expect(normalizeHermesOpenString('hermes://open.evil/settings')).toBeNull()
+  })
+
   it('maps hermes://open/… deep links by stripping the open host', () => {
     expect(normalizeHermesOpenString('hermes://open/index-network/intent/1')).toBe('/index-network/intent/1')
     expect(normalizeHermesOpenString('hermes://open/settings/plugins')).toBe('/settings/plugins')

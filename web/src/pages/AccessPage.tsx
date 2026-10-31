@@ -158,7 +158,7 @@ export default function AccessPage() {
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Invite someone to a profile</h2>
         <p className="text-sm text-muted-foreground">
-          Creates a link that opens the Hermes desktop app, signs the person in with your company login and gives
+          Creates a link that opens the Sentio One desktop app, signs the person in with your company login and gives
           them access to this one profile.
         </p>
         <div className="grid gap-3 sm:grid-cols-4">

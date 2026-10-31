@@ -1,6 +1,6 @@
 name: Release Light Desktop
 
-# Builds the remote-only Light desktop client (HermesLight-*.exe NSIS installer, unsigned) on a GitHub-hosted Windows runner.
+# Builds the remote-only Sentio One desktop client (SentioOne-*.exe NSIS installer, unsigned) on a GitHub-hosted Windows runner.
 #   push to main      -> build; the installer is kept as a workflow artifact for 30 days and also replaces the rolling
 #                        `main-latest` pre-release, the one place to find (and be told about) the newest build
 #   push of a v* tag  -> build, then publish the installer as a GitHub release
@@ -71,8 +71,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $out = 'apps/desktop/release'
-          $exe = Get-ChildItem $out -Filter 'HermesLight-*.exe' | Select-Object -First 1
-          if (-not $exe) { throw "No HermesLight-*.exe found in $out" }
+          $exe = Get-ChildItem $out -Filter 'SentioOne-*.exe' | Select-Object -First 1
+          if (-not $exe) { throw "No SentioOne-*.exe found in $out" }
           if (Test-Path "$out/win-unpacked/resources/agent-payload") {
             throw 'Light build contains an unexpected agent-payload'
           }
@@ -85,8 +85,8 @@ jobs:
         with:
           name: ${{ steps.artifact.outputs.name }}
           path: |
-            apps/desktop/release/HermesLight-*.exe
-            apps/desktop/release/HermesLight-*.exe.sha256
+            apps/desktop/release/SentioOne-*.exe
+            apps/desktop/release/SentioOne-*.exe.sha256
           retention-days: 30
 
   # Every merge to main refreshes ONE rolling pre-release (scripts/fork/refresh-main-release.sh). Like publish below it needs
@@ -149,20 +149,20 @@ jobs:
 
           - **No local agent runtime**: Lightweight client connecting directly to remote gateways.
           - **Seamless onboarding**: First run opens remote gateway configuration.
-          - **Deep-linking support**: Supports \`hermes://connect?url=&invite=\` links with confirmation dialogs.
+          - **Deep-linking support**: Supports \`sentio://connect?url=&invite=\` links and existing \`hermes://\` links with confirmation dialogs.
 
           #### Installation
-          Download and run \`HermesLight-*.exe\`. The installer is unsigned, so Windows SmartScreen will warn first: choose
+          Download and run \`SentioOne-*.exe\`. The installer is unsigned, so Windows SmartScreen will warn first: choose
           **More info** then **Run anyway**."
 
           if gh release view "$TAG_NAME" &>/dev/null; then
             echo "Release $TAG_NAME exists, uploading assets..."
-            gh release upload "$TAG_NAME" apps/desktop/release/HermesLight-*.exe apps/desktop/release/HermesLight-*.exe.sha256 --clobber
+            gh release upload "$TAG_NAME" apps/desktop/release/SentioOne-*.exe apps/desktop/release/SentioOne-*.exe.sha256 --clobber
           else
             echo "Creating new release $TAG_NAME..."
             gh release create "$TAG_NAME" \
-              apps/desktop/release/HermesLight-*.exe \
-              apps/desktop/release/HermesLight-*.exe.sha256 \
+              apps/desktop/release/SentioOne-*.exe \
+              apps/desktop/release/SentioOne-*.exe.sha256 \
               --title "Sentio One Light Desktop $TAG_NAME" \
               --notes "$RELEASE_NOTES" \
               --draft=false \
