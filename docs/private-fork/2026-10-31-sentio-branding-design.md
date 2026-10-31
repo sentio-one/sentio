@@ -76,22 +76,24 @@ onboarded yet, so this is the cheapest moment.
 Invite links and every other link that must open the app switch from `hermes://` to `sentio://`. The domain `sentiolangley.com` is
 not involved: a custom scheme needs no domain, and `https` landing links (which would use it) are deferred to the website work.
 
-- **Register with the OS: `sentio` only.** `apps/desktop/electron/main.ts` `HERMES_PROTOCOL` becomes `sentio` (dev: `sentio-dev`);
-  `electron-builder.config.cjs` `protocols[].schemes` becomes `['sentio']`. The app deliberately stops claiming `hermes://`: each
-  launch rewrites the OS handler for the scheme it registers, so claiming `hermes://` would keep fighting Nous's Hermes Desktop on a
-  machine that has both installed.
+- **Register both with the OS (decided 2026-10-31: `hermes://` links must keep working).** `apps/desktop/electron/main.ts` registers
+  `sentio` and `hermes` (dev: `sentio-dev` and `hermes-dev`): `registerDeepLinkProtocol` is called once per scheme, and
+  `electron-builder.config.cjs` `protocols[].schemes` becomes `['sentio', 'hermes']`. Invites already sent, and vendors' "Add to
+  Hermes" buttons (`hermes://mcp/install`), keep opening this app from a browser.
 - **Parse both.** `DEEPLINK_SCHEMES` accepts `sentio` and `hermes` (dev adds `sentio-dev` and `hermes-dev`), and the renderer parsers
-  (`lib/connect-link.ts`, `lib/hermes-open-target.ts`, `lib/mcp-deeplink.ts`) accept both prefixes. A `hermes://` link that reaches
-  the app by argv, paste or an older handler still works; it just no longer opens the app from a browser click.
+  (`lib/connect-link.ts`, `lib/hermes-open-target.ts`, `lib/mcp-deeplink.ts`) accept both prefixes, still rejecting lookalike hosts
+  and credentials.
 - **Generate `sentio://`.** `hermes_cli/web_routers/access_invites.py` (invite links), `tools/connectors/gateway/wire.py` (the
   `connections/done` link the browser leg returns to), and the app's own links (`store/native-notifications.ts`, plugin and MCP
   install links) mint `sentio://`. The implementation plan enumerates every generator from a search for `hermes://`.
-- **Effect on existing installs:** a `0.3.0` install registers only `hermes://` and cannot open `sentio://` links until it updates.
-  No invites have been sent to testers, so nothing in the wild breaks. Vendors' "Add to Hermes" buttons
-  (`hermes://mcp/install`) stop opening this app from a browser; that is accepted.
+- **Accepted cost: the `hermes://` handler is shared with Nous's Hermes Desktop.** Each launch rewrites the OS handler for the schemes
+  an app registers, so on a machine with both apps installed, whichever launched last owns `hermes://`. `sentio://` has no such
+  conflict, which is why new links use it. Testers are unlikely to have both apps installed.
+- **Effect on existing installs:** a `0.3.0` install registers only `hermes://`, so it cannot open `sentio://` links until it
+  updates; `hermes://` links open in both old and new versions.
 - **Docs:** `docs/private-fork/INVITES_DESIGN.md` and `FORK_DECISIONS.md` mention the old scheme and are updated.
 - **Verify on Windows:** build the installer, install it, and confirm the handler is registered under
-  `HKCU\Software\Classes\sentio` and that a `sentio://connect?...` link opens the confirmation dialog.
+  `HKCU\Software\Classes\sentio` and `HKCU\Software\Classes\hermes`, and that both a `sentio://connect?...` and a `hermes://connect?...` link open the confirmation dialog.
 
 ### 6. Testing
 
@@ -102,7 +104,7 @@ not involved: a custom scheme needs no domain, and `https` landing links (which 
 - `product-identity` tests updated for the new display name and artifact name.
 - Deep-link tests: the main process accepts `sentio` and `hermes` and rejects other schemes; the connect-link and open-target
   parsers accept both prefixes and still reject lookalike hosts and credentials; the invite minted by the backend starts with
-  `sentio://connect?`; the registrar registers only `sentio`.
+  `sentio://connect?`; the registrar is called for both `sentio` and `hermes`.
 - Build the installer and open the app: empty chat, boot screen, settings, sign-in and an OAuth result page.
 
 ## Open
