@@ -45,7 +45,7 @@ git merge-base --is-ancestor HEAD "refs/remotes/$remote/$stable" \
   || die "HEAD $(git rev-parse --short HEAD) is not on $remote/$stable; promote it first (scripts/fork/promote-stable.sh)"
 
 if [ "$push" -eq 0 ]; then
-  echo "tag-release: would tag $(git rev-parse --short HEAD) as $tag (latest tag: ${latest:+v$latest}${latest:-none}); pass --push to do it"
+  echo "tag-release: would tag $(git rev-parse --short HEAD) as $tag (latest tag: ${latest:+v}${latest:-none}); pass --push to do it"
   exit 0
 fi
 # An annotated tag needs a committer identity, and a CI runner has none configured.

@@ -77,6 +77,13 @@ def test_a_version_that_already_has_a_tag_is_left_alone(clone):
     assert _remote_tags(clone) == ["v0.1.0"]
 
 
+def test_the_dry_run_names_the_latest_tag_once(clone):
+    """The message once printed the version twice (`latest tag: v0.1.00.1.0`)."""
+    _bump_commit(clone, "0.2.0")
+    code, out = _tagger(clone)
+    assert code == 0 and "(latest tag: v0.1.0)" in out, out
+
+
 def test_without_push_it_only_says_what_it_would_do(clone):
     _bump_commit(clone, "0.2.0")
     code, out = _tagger(clone)
