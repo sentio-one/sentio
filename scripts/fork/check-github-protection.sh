@@ -17,6 +17,9 @@ failed=0
 ok()   { echo "ok    $1"; }
 fail() { echo "FAIL  $1"; failed=1; }
 warn() { echo "warn  $1"; }
+# jq built for Windows ends every line with CRLF, which breaks the string comparisons below (a stray \r made a protected repository
+# look unprotected). Strip it once here; pipefail keeps jq's own exit status for `jq -e`.
+jq() { command jq "$@" | tr -d '\r'; }
 
 rulesets="$(
   for id in $(gh api "repos/$repo/rulesets" --jq '.[].id'); do gh api "repos/$repo/rulesets/$id"; done | jq -s '.'

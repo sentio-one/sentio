@@ -86,6 +86,21 @@ def test_the_committed_rulesets_satisfy_the_checker(tmp_path, monkeypatch):
     assert "FAIL" not in out
 
 
+def test_the_checker_works_with_a_jq_that_prints_crlf(tmp_path, monkeypatch):
+    """jq built for Windows ends every output line with CRLF. The checker compared those lines with plain strings,
+    so a correctly protected repository reported required checks missing and a branch that exists as missing."""
+    real_jq = shutil.which("jq")
+    shim_dir = tmp_path / "crlf-jq"
+    shim_dir.mkdir()
+    shim = shim_dir / "jq"
+    shim.write_text(f'#!/bin/bash\nset -o pipefail\n"{real_jq}" "$@" | sed \'s/$/\\r/\'\n', encoding="utf-8")
+    shim.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{shim_dir}:{os.environ['PATH']}")
+    code, out = _run(tmp_path, monkeypatch, _protected_state())
+    assert code == 0 and "github protection: ok" in out, out
+    assert "FAIL" not in out
+
+
 def test_a_ruleset_naming_a_branch_that_does_not_exist_protects_nothing(tmp_path, monkeypatch):
     """The original mistake: active rulesets whose ref pattern was `refs/heads/protect-main`, not `main`."""
     state = _protected_state()
