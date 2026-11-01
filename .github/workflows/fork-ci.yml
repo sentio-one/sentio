@@ -141,7 +141,8 @@ jobs:
             src/lib/connect-link.test.ts src/app/contrib/connect-link-dialog.test.tsx \
             src/components/desktop-install-overlay.test.tsx \
             src/i18n/brand.test.ts src/i18n/brand-compounds.test.ts src/i18n/runtime.test.ts
-          npx vitest run --project electron electron/light-first-run.test.ts electron/first-run-setup-gate.test.ts
+          npx vitest run --project electron electron/light-first-run.test.ts electron/first-run-setup-gate.test.ts \
+            electron/app-user-model-id.test.ts
 
       - name: Check the checkout is clean
         uses: ./.github/actions/check-clean-worktree
