@@ -93,7 +93,7 @@ def test_the_checker_works_with_a_jq_that_prints_crlf(tmp_path, monkeypatch):
     shim_dir = tmp_path / "crlf-jq"
     shim_dir.mkdir()
     shim = shim_dir / "jq"
-    shim.write_text(f'#!/bin/bash\nset -o pipefail\n"{real_jq}" "$@" | sed \'s/$/\\r/\'\n', encoding="utf-8")
+    shim.write_text(f'#!/usr/bin/env bash\nset -o pipefail\n"{real_jq}" "$@" | sed \'s/$/\\r/\'\n', encoding="utf-8")
     shim.chmod(0o755)
     monkeypatch.setenv("PATH", f"{shim_dir}:{os.environ['PATH']}")
     code, out = _run(tmp_path, monkeypatch, _protected_state())
