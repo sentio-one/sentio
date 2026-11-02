@@ -783,6 +783,7 @@ from hermes_cli.web_routers import (
     dashboard_ui as _dashboard_ui_routes,
     shared_metrics as _shared_metrics_routes,
     delegation as _delegation_routes,
+    whatsapp_users as _whatsapp_users_routes,
 )
 
 app.include_router(_files_routes.router)
@@ -810,6 +811,7 @@ app.include_router(_ops_routes.router)
 app.include_router(_skills_routes.hub_router)
 app.include_router(_profiles_routes.router)
 app.include_router(_skills_routes.router)
+app.include_router(_whatsapp_users_routes.router)
 app.include_router(_tools_routes.router)
 app.include_router(_analytics_routes.router)
 app.include_router(_chat_ws_routes.router)

@@ -33,6 +33,7 @@ PATHS = [
     ("GET", "/api/fs/list"), ("GET", "/api/files"), ("GET", "/api/git/status"),
     ("POST", "/api/dashboard/agent-plugins/install"), ("POST", "/api/hermes/update"),
     ("POST", "/api/gateway/drain"), ("POST", "/api/ops/backup"), ("GET", "/api/local-models/catalog"),
+    ("GET", "/api/whatsapp/users"), ("POST", "/api/whatsapp/users"), ("DELETE", "/api/whatsapp/users/alpha"),
     ("GET", "/api/brand-new-route"),
 ]
 
@@ -113,6 +114,7 @@ def test_an_admin_group_reaches_everything():
     ("POST", "/api/dashboard/agent-plugins/install"), ("POST", "/api/hermes/update"),
     ("POST", "/api/gateway/drain"), ("POST", "/api/ops/backup"), ("GET", "/api/local-models/catalog"),
     ("POST", "/api/profiles"), ("DELETE", "/api/profiles/alpha"), ("POST", "/api/profiles/alpha/open-terminal"),
+    ("GET", "/api/whatsapp/users"), ("POST", "/api/whatsapp/users"), ("DELETE", "/api/whatsapp/users/alpha"),
     ("GET", "/api/brand-new-route"),
     ("GET", "/api/delegation/routing"), ("PUT", "/api/delegation/backends/profile_routes"),
 ])
