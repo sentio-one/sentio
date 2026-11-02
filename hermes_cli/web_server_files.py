@@ -303,6 +303,15 @@ def restricted_files_root(request: Optional[Request], *, create_root: bool = Tru
     return _ensure_managed_root(root) if create_root else root
 
 
+
+def refuse_outside_restricted_root(request: Optional[Request], target: Path) -> Path | None:
+    """Authorize canonical local paths before write or bounded Git discovery."""
+    root = restricted_files_root(request, create_root=False)
+    if root is not None and not _hosted_fs_path_allowed(root, target):
+        raise HTTPException(status_code=403, detail="Path is outside your workspace")
+    return root
+
+
 def _managed_files_policy(request: Optional[Request], *, create_root: bool = True) -> ManagedFilesPolicy:
     scoped = restricted_files_root(request, create_root=create_root)
     if scoped is not None:

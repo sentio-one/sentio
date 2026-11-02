@@ -110,7 +110,7 @@ def test_an_admin_group_reaches_everything():
 
 
 @pytest.mark.parametrize("method,path", [
-    ("GET", "/api/fs/list"), ("GET", "/api/git/status"),
+    ("GET", "/api/git/status"),
     ("POST", "/api/dashboard/agent-plugins/install"), ("POST", "/api/hermes/update"),
     ("POST", "/api/gateway/drain"), ("POST", "/api/ops/backup"), ("GET", "/api/local-models/catalog"),
     ("POST", "/api/profiles"), ("DELETE", "/api/profiles/alpha"), ("POST", "/api/profiles/alpha/open-terminal"),
@@ -218,7 +218,7 @@ def test_classification_is_default_deny_and_covers_the_real_app():
             for method in sorted(getattr(route, "methods", None) or {"GET"}):
                 seen[classify(method, path)] += 1
     assert all(seen.values()), seen
-    for prefix in ("/api/fs/list", "/api/git/status", "/api/ops/backup", "/api/gateway/start",
+    for prefix in ("/api/git/status", "/api/ops/backup", "/api/gateway/start",
                    "/api/local-models/catalog", "/api/hermes/update", "/api/dashboard/agent-plugins/install"):
         assert classify("POST", prefix) == "admin" and classify("GET", prefix) == "admin", prefix
 
@@ -279,6 +279,16 @@ def test_registered_files_routes_enforce_real_grants(tmp_path, monkeypatch):
             assert denied.status_code == 403 and denied.json()['detail'] == 'profile_scope_mismatch'
         denied = _call(client, [], 'GET', '/api/files?profile=alpha')
         assert denied.status_code == 403 and denied.json()['detail'] == 'profile_scope_mismatch'
-        for path in ('/api/fs/list', '/api/git/status', '/api/media'):
+        for path in ('/api/git/status', '/api/media'):
             denied = _call(client, ALICE, 'GET', path + '?profile=alpha')
             assert denied.status_code == 403 and denied.json()['detail'] == 'admin_required'
+
+        good = _call(client, ALICE, 'GET', '/api/fs/list', params={'profile': 'alpha', 'path': str(ws)})
+        assert good.status_code == 200
+        for params in ({'path': str(ws)}, {'profile': 'beta', 'path': str(ws)}, {'profile': '', 'path': str(ws)}):
+            assert _call(client, ALICE, 'GET', '/api/fs/list', params=params).status_code == 403
+        assert _call(client, [], 'GET', '/api/fs/list', params={'profile': 'alpha', 'path': str(ws)}).status_code == 403
+
+        admin = _call(client, ['hermes-admins'], 'GET', '/api/fs/list', params={'path': str(ws.parent)})
+        assert admin.status_code == 200
+        assert 'workspace' in {row['name'] for row in admin.json()['entries']}

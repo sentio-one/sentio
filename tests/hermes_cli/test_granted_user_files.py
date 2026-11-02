@@ -133,3 +133,87 @@ def test_missing_profile_is_not_recreated_from_a_stale_grant(env):
     response = client(frozenset({'gone'})).get('/api/files?profile=gone')
     assert response.status_code in (403, 404)
     assert not missing.exists()
+
+
+FS_READ_ROUTES = ('list', 'read-text', 'read-data-url', 'download', 'git-root')
+
+
+def fs(c, route, path=None):
+    params = {'profile': 'alpha'}
+    if path is not None:
+        params['path'] = str(path)
+    return c.get('/api/fs/' + route, params=params)
+
+
+def fs_write(c, path):
+    return c.post('/api/fs/write-text?profile=alpha', json={'path': str(path), 'content': 'changed'})
+
+
+@pytest.mark.parametrize('route', FS_READ_ROUTES)
+def test_fs_outside_workspace_refused(env, route):
+    assert fs(client(), route, env.profile / 'config.yaml').status_code == 403
+
+
+@pytest.mark.parametrize('route', (*FS_READ_ROUTES, 'write-text', 'default-cwd'))
+def test_fs_restricted_never_consults_ssh(env, monkeypatch, route):
+    def forbidden(profile=None):
+        raise AssertionError('Restricted request consulted SSH')
+    monkeypatch.setattr('hermes_cli.web_routers.files._fs_backend', forbidden)
+    c = client()
+    path = env.ws if route in ('list', 'git-root') else env.ws / 'notes.txt'
+    response = fs_write(c, path) if route == 'write-text' else fs(c, route, path)
+    assert response.status_code == 200
+
+
+def test_fs_write_and_default_workspace(env):
+    c = client()
+    assert fs_write(c, env.ws / 'notes.txt').status_code == 200
+    assert (env.ws / 'notes.txt').read_text() == 'changed'
+    assert fs_write(c, env.profile / 'config.yaml').status_code == 403
+    assert (env.profile / 'config.yaml').read_text() == 'secret: 1'
+    assert fs(c, 'default-cwd').json() == {'cwd': str(env.ws.resolve()), 'branch': ''}
+
+
+def test_fs_git_discovery_stops_at_workspace(env, monkeypatch):
+    (env.profile / '.git').mkdir()
+    c = client()
+    assert fs(c, 'git-root', env.ws).json() == {'root': None}
+    nested = env.ws / 'repo'
+    (nested / '.git').mkdir(parents=True)
+    assert fs(c, 'git-root', nested).json() == {'root': str(nested.resolve())}
+
+
+@pytest.mark.platforms('posix')
+def test_fs_symlink_reads_and_writes_remain_inside_workspace(env, tmp_path):
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    target = outside / 'secret.txt'
+    target.write_text('untouched')
+    (env.ws / 'leaf').symlink_to(target)
+    (env.ws / 'parent').symlink_to(outside, target_is_directory=True)
+    (env.ws / 'dangling').symlink_to(outside / 'missing.txt')
+    c = client()
+    for route in FS_READ_ROUTES:
+        assert fs(c, route, env.ws / 'leaf').status_code == 403
+    for path in ('leaf', 'parent/missing.txt', 'dangling'):
+        assert fs_write(c, env.ws / path).status_code == 403
+    assert target.read_text() == 'untouched'
+    assert not (outside / 'missing.txt').exists()
+    (env.ws / 'safe').symlink_to(env.ws / 'notes.txt')
+    assert fs(c, 'read-text', env.ws / 'safe').json()['text'] == 'hello'
+    assert fs_write(c, env.ws / 'safe').status_code == 200
+    assert (env.ws / 'notes.txt').read_text() == 'changed'
+
+
+@pytest.mark.platforms('posix')
+@pytest.mark.parametrize('route', (*FS_READ_ROUTES, 'write-text', 'default-cwd'))
+def test_fs_escaped_workspace_root_refused(env, tmp_path, route):
+    import shutil
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    shutil.rmtree(env.ws)
+    env.ws.symlink_to(outside, target_is_directory=True)
+    c = client()
+    response = fs_write(c, env.ws / 'new.txt') if route == 'write-text' else fs(c, route, env.ws)
+    assert response.status_code == 403
+    assert list(outside.iterdir()) == []
