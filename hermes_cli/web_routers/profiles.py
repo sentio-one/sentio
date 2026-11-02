@@ -888,9 +888,17 @@ async def create_profile_endpoint(body: ProfileCreate):
 
 
 @router.get("/api/profiles/active")
-async def get_active_profile_endpoint():
+async def get_active_profile_endpoint(request: Request, profile: Optional[str] = None):
     """``active`` is the sticky default written by ``hermes profile use`` (what new CLI
-    invocations pick up); ``current`` is the profile this running dashboard is scoped to."""
+    invocations pick up); ``current`` is the profile this running dashboard is scoped to.
+
+    Restricted callers discover a granted profile so clients adopt their own scope."""
+    granted = getattr(request.state, "access_allowed_profiles", None)
+    if granted is not None:
+        if not granted:
+            raise HTTPException(status_code=403, detail="profile_scope_mismatch")
+        chosen = profile if profile in granted else sorted(granted)[0]
+        return {"active": chosen, "current": chosen}
     from hermes_cli import profiles as profiles_mod
 
     def _run():
