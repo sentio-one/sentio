@@ -179,7 +179,7 @@ from hermes_cli.whatsapp_users import add_user
 add_user('support', '27820000003')
 '''
     result = subprocess.run([sys.executable, '-c', script, str(home.parent)],
-                            env=inherited, capture_output=True, text=True, timeout=60)
+                            env=inherited, capture_output=True, text=True, timeout=60, check=False)
     assert result.returncode == 0, result.stderr
     assert set(load_env()[wu.ALLOWLIST_ENV].split(',')) == {OWNER, NUMBER, '27820000003'}
 
