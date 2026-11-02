@@ -1,6 +1,6 @@
 # Shared WhatsApp number and the granted-user experience
 
-Status: implementation and source review complete through `61b34c8ed2`; PR #36 is open at pushed head `38bc40eee56efa4493bcb20d91743138c9d8996e`, and all PR checks pass. Linux lint passed; the final broad run exited 1 with 12 failures, all reproduced on clean current main. Live acceptance remains pending. Private fork (`sentio-one/sentio`). See the [Task 12 verification and acceptance handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-task12-verification.md) for portable receipts and the user checklist. No deployment, merge or live acceptance is claimed.
+Status: implementation and source review complete through `61b34c8ed2`; PR #36 is open at pushed branch head, and all PR checks pass. Linux lint passed; the final broad run exited 1 with 12 failures, all reproduced on clean current main. Live acceptance remains pending. Private fork (`sentio-one/sentio`). See the [Task 12 verification and acceptance handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-task12-verification.md) for portable receipts and the user checklist. No deployment, merge or live acceptance is claimed.
 
 ### Delivery verification status (2026-11-02)
 
@@ -9,7 +9,7 @@ Status: implementation and source review complete through `61b34c8ed2`; PR #36 i
 - Native Windows focused batch: 15 files, 228 passed, 0 failed, 20 POSIX skips, exit 0. Windows `scripts/check`: 12 checks OK, zero health findings against current main.
 - Linux `scripts/check` passed with exit 0 at `e89baeb2b418f0f4bc8fe545c43c65d8306180fc` versus current main `315e8949ee91a2f4308ae2be848c7970e9d8468a`. The Linux broad run completed: 3,396 files, 30,161 passed, 12 failed, 471 skipped, exit 1, 8 workers, 2,131.8s. Each final failure group was reproduced on current main: client-env 2; gateway service 1; update recovery closure 8; update post-commit safety 1. The initial interrupted 16-worker timing-threshold failures did not recur in the complete run.
 - Host-local receipts on `thuto-lms`: `/home/deploy/sentio-tests/20261102-shared-whatsapp/receipts/task12/broad-final`, `/home/deploy/sentio-tests/20261102-shared-whatsapp/receipts/task12/baseline-final`, and the `scripts/check` receipt under `/home/deploy/sentio-tests/20261102-shared-whatsapp/receipts/task12/`.
-- PR #36 is open at pushed head `38bc40eee56efa4493bcb20d91743138c9d8996e`; all checks pass (TypeScript, Python, Dokploy validation, sandbox, Aikido checks, deep review). Live desktop and phone acceptance remains pending. Use the portable checklist linked above and record each outcome below when actually performed.
+- PR #36 is open at pushed branch head; all checks pass (TypeScript, Python, Dokploy validation, sandbox, Aikido checks, deep review). Live desktop and phone acceptance remains pending. Use the portable checklist linked above and record each outcome below when actually performed.
 
 Two workstreams with one theme: a person sees and uses only their own profile.
 

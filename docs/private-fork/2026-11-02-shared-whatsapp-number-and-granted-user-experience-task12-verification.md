@@ -1,13 +1,13 @@
 # Task 12 verification and acceptance
 
-Recorded 2026-11-02. This report separates code review and automated evidence from live acceptance. PR #36 is open at pushed head `38bc40eee56efa4493bcb20d91743138c9d8996e`; all PR checks pass (TypeScript, Python, Dokploy validation, sandbox, Aikido checks, and deep review). No deployment, merge, or user acceptance is claimed.
+Recorded 2026-11-02. This report separates code review and automated evidence from live acceptance. PR #36 is open at pushed branch head; all PR checks pass (TypeScript, Python, Dokploy validation, sandbox, Aikido checks, and deep review). No deployment, merge, or user acceptance is claimed.
 
 ## Revision and review
 
 - Branch: `feat/shared-whatsapp-granted-user`
 - Current main base: `315e8949ee91a2f4308ae2be848c7970e9d8468a`
 - Runtime/test head: `e89baeb2b418f0f4bc8fe545c43c65d8306180fc`
-- Latest reviewed source head: `61b34c8ed23b3732a224d8926cdd723748e4e314`; the only change after the runtime/test head corrects a pre-existing test fixture shebang for lint portability. Current pushed docs head: `38bc40eee56efa4493bcb20d91743138c9d8996e`.
+- Latest reviewed source head: `61b34c8ed23b3732a224d8926cdd723748e4e314`; the only change after the runtime/test head corrects a pre-existing test fixture shebang for lint portability. Latest docs are included in the pushed branch.
 - Whole-branch source review through `61b34c8ed2`: no Critical, Important or Minor findings. Review did not run tests or establish live behavior. Full review notes are in the local ignored Task 12 scratch directory, not a portable artifact.
 - Fork decisions D18-D20 are recorded in `FORK_DECISIONS.md`.
 
@@ -21,7 +21,7 @@ Recorded 2026-11-02. This report separates code review and automated evidence fr
 | Linux current-main comparison | **All broad-run failures reproduced on base** | At current main `315e8949ee91a2f4308ae2be848c7970e9d8468a`, `test_session_client_env.py` had 2 failed/11 passed; `test_gateway_service.py` had 1 failure; `test_update_recovery_closure.py` had 8 failures; `test_update_post_commit_safety.py` had 1 failure. The three-file comparison reported 10 failures, with client-env independently compared. Host-local receipt on `thuto-lms`: `/home/deploy/sentio-tests/20261102-shared-whatsapp/receipts/task12/baseline-final`. The feature's final 12 failures are therefore all reproduced on main. |
 | Linux broad suite at `e89baeb2b4` | **Complete; 12 failures all reproduced on current main** | `scripts/run_tests.sh tests/gateway/ tests/hermes_cli/`: 3,396 files, 30,161 passed, 12 failed, 471 skipped; exit 1; 8 workers; 2,131.8s. Host-local receipt on `thuto-lms`: `/home/deploy/sentio-tests/20261102-shared-whatsapp/receipts/task12/broad-final`. Failure groups are listed above. The earlier interrupted 16-worker run's timing-threshold failures did not recur in this complete 8-worker run and are not final failures. |
 | Linux `scripts/check` | **Passed; exit 0** | At `e89baeb2b418f0f4bc8fe545c43c65d8306180fc` compared with current main `315e8949ee91a2f4308ae2be848c7970e9d8468a`. Host-local Linux lint receipt is in `/home/deploy/sentio-tests/20261102-shared-whatsapp/receipts/task12/` on `thuto-lms`. |
-| Push / PR / CI | **PR #36 open; all checks pass** | Pushed head `38bc40eee56efa4493bcb20d91743138c9d8996e`. Passing checks include TypeScript, Python, Dokploy validation, sandbox, Aikido checks, and deep review. No merge requested. |
+| Push / PR / CI | **PR #36 open; all checks pass** | The latest branch head is pushed. Passing checks include TypeScript, Python, Dokploy validation, sandbox, Aikido checks, and deep review. No merge requested. |
 
 The full broad run is not all-green: it exits 1, but every reported failure is reproduced on clean current main. The initial interrupted 16-worker run's timing failures did not recur in the complete 8-worker run. Windows and Linux automated checks do not establish live readiness.
 
