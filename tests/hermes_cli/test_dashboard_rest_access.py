@@ -110,7 +110,7 @@ def test_an_admin_group_reaches_everything():
 
 
 @pytest.mark.parametrize("method,path", [
-    ("GET", "/api/fs/list"), ("GET", "/api/files"), ("GET", "/api/git/status"),
+    ("GET", "/api/fs/list"), ("GET", "/api/git/status"),
     ("POST", "/api/dashboard/agent-plugins/install"), ("POST", "/api/hermes/update"),
     ("POST", "/api/gateway/drain"), ("POST", "/api/ops/backup"), ("GET", "/api/local-models/catalog"),
     ("POST", "/api/profiles"), ("DELETE", "/api/profiles/alpha"), ("POST", "/api/profiles/alpha/open-terminal"),
@@ -218,7 +218,7 @@ def test_classification_is_default_deny_and_covers_the_real_app():
             for method in sorted(getattr(route, "methods", None) or {"GET"}):
                 seen[classify(method, path)] += 1
     assert all(seen.values()), seen
-    for prefix in ("/api/fs/list", "/api/files", "/api/git/status", "/api/ops/backup", "/api/gateway/start",
+    for prefix in ("/api/fs/list", "/api/git/status", "/api/ops/backup", "/api/gateway/start",
                    "/api/local-models/catalog", "/api/hermes/update", "/api/dashboard/agent-plugins/install"):
         assert classify("POST", prefix) == "admin" and classify("GET", prefix) == "admin", prefix
 
@@ -246,3 +246,39 @@ def test_a_profile_class_route_reads_its_profile_only_where_the_gate_looks():
                 for field in (fields or {}):
                     if "profile" in field:
                         assert field == "profile", (method, path, annotation.__name__, field)
+
+
+def test_registered_files_routes_enforce_real_grants(tmp_path, monkeypatch):
+    """Use production-registered handlers behind the real session middleware."""
+    from types import SimpleNamespace
+    from pathlib import Path
+    from fastapi import FastAPI
+    from hermes_cli import web_server
+    from hermes_cli.dashboard_auth.middleware import gated_auth_middleware
+
+    home = tmp_path / '.hermes'
+    ws = home / 'profiles' / 'alpha' / 'workspace'
+    ws.mkdir(parents=True)
+    (ws / 'visible.txt').write_text('visible')
+    (ws.parent / 'config.yaml').write_text('model: test')
+    monkeypatch.setattr(Path, 'home', lambda: tmp_path)
+    monkeypatch.setenv('HERMES_HOME', str(home))
+    app = FastAPI()
+    app.router.routes.extend(route for route in web_server.app.routes
+                             if getattr(route, 'path', '').startswith(('/api/files', '/api/fs', '/api/git', '/api/media')))
+    app.middleware('http')(gated_auth_middleware)
+    app.state.auth_required = True
+    app.state.bound_host, app.state.bound_port = 'gw.example', 443
+    app.state.gateway_runner = SimpleNamespace(config=SimpleNamespace(access=POLICY))
+    with TestClient(app, base_url='https://gw.example') as client:
+        good = _call(client, ALICE, 'GET', '/api/files?profile=alpha')
+        assert good.status_code == 200
+        assert [row['name'] for row in good.json()['entries']] == ['visible.txt']
+        for suffix in ('', '?profile=beta', '?profile=current', '?profile='):
+            denied = _call(client, ALICE, 'GET', '/api/files' + suffix)
+            assert denied.status_code == 403 and denied.json()['detail'] == 'profile_scope_mismatch'
+        denied = _call(client, [], 'GET', '/api/files?profile=alpha')
+        assert denied.status_code == 403 and denied.json()['detail'] == 'profile_scope_mismatch'
+        for path in ('/api/fs/list', '/api/git/status', '/api/media'):
+            denied = _call(client, ALICE, 'GET', path + '?profile=alpha')
+            assert denied.status_code == 403 and denied.json()['detail'] == 'admin_required'

@@ -22,9 +22,10 @@ from starlette.responses import JSONResponse, Response
 
 _log = logging.getLogger(__name__)
 
-# Host-level even where the handler also takes a ``profile`` (``/api/fs`` reads any path on the host).
+# /api/files is scoped by web_server_files.restricted_files_root; /api/fs stays admin-only until Task 10.
+# Other host-level routes stay admin-only even when they take a profile selector.
 _ADMIN_PREFIXES = (
-    "/api/fs", "/api/files", "/api/media", "/api/git", "/api/gateway", "/api/hermes", "/api/ops",
+    "/api/fs", "/api/media", "/api/git", "/api/gateway", "/api/hermes", "/api/ops",
     "/api/local-models", "/api/logs", "/api/actions", "/api/host", "/api/system", "/api/ssh",
     "/api/dashboard/agent-plugins", "/api/dashboard/plugins/catalog", "/api/dashboard/plugins/rescan",
     "/api/providers/validate", "/api/providers/custom-endpoints/validate",
@@ -40,9 +41,9 @@ _PROFILE_PREFIXES = (
     "/api/config", "/api/env", "/api/sessions", "/api/skills", "/api/tools", "/api/mcp", "/api/model",
     "/api/memory", "/api/curator", "/api/learning", "/api/cron", "/api/analytics", "/api/credentials",
     "/api/providers", "/api/chat", "/api/status", "/api/egress", "/api/portal", "/api/webhooks",
-    "/api/messaging", "/api/dashboard", "/api/shared-metrics", "/api/audio", "/api/pairing")
+    "/api/messaging", "/api/dashboard", "/api/shared-metrics", "/api/audio", "/api/pairing", "/api/files")
 # These read an absent / empty / ``current`` selector as "every profile": a grant-scoped caller must name one.
-_EXPLICIT_PREFIXES = ("/api/sessions", "/api/cron/jobs", "/api/profiles/")
+_EXPLICIT_PREFIXES = ("/api/sessions", "/api/cron/jobs", "/api/profiles/", "/api/files")
 # ``/api/profiles/<aggregate>``: the selector keys the handler reads, all required.
 _AGGREGATES = {
     "/api/profiles/sessions": ("profile",), "/api/profiles/projects/tree": ("profile",),
