@@ -286,8 +286,9 @@ Upstream merges: keep the `owner_gate` call before ordinary admission in
 
 `web_server_files.restricted_files_root` treats `access_allowed_profiles is None` as unrestricted and an empty
 grant set as denied. A restricted request must explicitly select one granted profile, and its `/api/files` and
-`/api/fs` paths resolve inside that profile's `workspace/`; reads pass through `_hosted_fs_read_guard`, while writes
-and Git-root discovery use `refuse_outside_restricted_root`. These routes do not use SSH adapters. `/api/git` and
+`/api/fs` paths resolve inside that profile's `workspace/`; reads are confined by the managed-file policy (with
+`/api/fs` reads using `_hosted_fs_read_guard`), while writes and Git-root discovery use
+`refuse_outside_restricted_root`. These routes do not use SSH adapters. `/api/git` and
 `/api/media` remain admin-only; admins retain host-wide file access. After each upstream merge, review every new
 `/api/fs/*` route for the same confinement.
 
