@@ -10,6 +10,27 @@
 
 **Spec:** `docs/private-fork/2026-11-02-shared-whatsapp-number-and-granted-user-experience.md` (read it first; the "Spec corrections" section at its end overrides earlier text where they differ).
 
+## Execution status ? 2026-11-02 handoff
+
+Branch: `feat/shared-whatsapp-granted-user`. Tasks 1-11 implementation and scoped reviews are complete, with Task 7 limited to dashboard diagnosis. **Task 12 broad regression, whole-branch review, deployment and live acceptance are deferred to the next machine.** This is not release approval. The [portable handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-handoff.md) carries commit mapping, test receipts, limitations and exact next commands; local ignored `.superpowers/` evidence will not follow a clone.
+
+| Task | Recorded status | Remaining verification |
+|---|---|---|
+| 1 | Routing baseline: 3 passed; reviewed | Real phones/bridge |
+| 2 | Owners gate: 31 passed; defaults extraction reviewed | Real unrouted refusal |
+| 3 | Shared user service: 28 passed after review fixes | Broad regression; optional deletion cannot reconstruct deleted data |
+| 4 | CLI: 34 passed with service; reviewed | Live setup/restart |
+| 5 | REST: 35 passed; reviewed | Live authenticated deployment |
+| 6 | WhatsApp guide and D17 complete; reviewed | None for documentation |
+| 7 | Dashboard baseline recorded; scoped review passed | Native desktop/logs/model answer remain pending (provider 401) |
+| 8 | Granted active profile: 41 passed; reviewed | Live post-deployment discovery |
+| 9 | Granted managed files: Windows 81 passed/8 skipped; Linux 37 passed, final focused 13 passed; reviewed | Broad `tests/hermes_cli/ -k "files or managed"`; native Windows reparse |
+| 10 | Granted fs + secure staging review fix: Linux 37 passed; Windows 139 passed/20 skipped; re-reviewed | Broad `tests/hermes_cli/ -k "fs or files or managed or hosted"`; live desktop |
+| 11 | SOUL and real prompt build complete; review approved. Fresh native Linux 177 passed/4 skipped, exit 0 | Successful model identity answer; upstream Hermes helper conflict remains intentional |
+| 12 | Full `python scripts/check`: **12 checks OK**, exit 0 after explicit subprocess-check lint fix | Fork decisions D18+; broad suites; whole-branch review; deployment; real phones and desktop |
+
+Checkboxes below record performed work, not endorsement of every illustrative snippet. The spec corrections and reviewed final implementation supersede snippets. Partial verification steps stay unchecked with completed/deferred subparts. No broad suite or live acceptance is implied.
+
 ## Global Constraints
 
 - Tests run through `scripts/run_tests.sh <path> [-k name]`, never bare `pytest`. Never write to `~/.hermes`; the `_isolate_hermes_home` fixture redirects `HERMES_HOME`.
@@ -63,7 +84,7 @@
 
 This task changes no production code. It answers the open question from the spec: does a shared WhatsApp bot already route by sender to a satellite profile, in the identity shapes the bridge sends (`chatId` is a JID, a LID sender matches only through the bridge's `lid-mapping-*.json` files)?
 
-- [ ] **Step 1: Write the probe**
+- [x] **Step 1: Write the probe**
 
 ```python
 """One shared WhatsApp number: the owner runs on the default profile, routed people on their own.
@@ -158,16 +179,16 @@ def test_routed_number_is_found_when_the_sender_arrives_as_a_lid(rig):
     assert identity.runtime_profile == "sentio-sales"
 ```
 
-- [ ] **Step 2: Run the probe**
+- [x] **Step 2: Run the probe**
 
 Run: `scripts/run_tests.sh tests/gateway/test_whatsapp_shared_number_routing.py -v`
 Expected: 3 PASS. This is the one task whose tests are expected to pass on the base: they verify existing behaviour.
 
-- [ ] **Step 3: If any probe fails, stop**
+- [x] **Step 3: If any probe fails, stop**
 
 A failure means the shared-bot to satellite path has a gap for WhatsApp (the spec's top risk). Do not continue. Record the failing test, its traceback and your diagnosis under "Risks" in the spec, commit that, and report to the user before building anything else. If all pass, continue.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git switch -c feat/shared-whatsapp-granted-user
@@ -193,7 +214,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `gateway.session_identity.identity_of(source)` returning an object with `transport_profile` and `runtime_profile` (or `None`); `gateway.whatsapp_identity.expand_whatsapp_aliases(identifier) -> set[str]`.
 - Produces: `parse_owners(raw) -> list[str]`; `is_owner(owners: list[str], user_id: str | None) -> bool`; `owner_gate(owners, *, platform: str, user_id, identity, primary_profile: str) -> bool | None` (`False` = refuse, `None` = no opinion); `GatewayConfig.owners: list[str]`.
 
-- [ ] **Step 1: Write the failing unit tests** in `tests/gateway/test_whatsapp_owners.py`
+- [x] **Step 1: Write the failing unit tests** in `tests/gateway/test_whatsapp_owners.py`
 
 ```python
 """The owner gate: an unrouted WhatsApp sender may run on the primary profile only if listed in gateway.owners."""
@@ -239,7 +260,7 @@ def test_gate_has_no_opinion_when_it_does_not_apply():
     assert _gate(identity=_identity(transport="team_b", runtime="team_b")) is None  # a secondary's own bot
 ```
 
-- [ ] **Step 2: Extend the probe file with the admission tests** (append to `tests/gateway/test_whatsapp_shared_number_routing.py`)
+- [x] **Step 2: Extend the probe file with the admission tests** (append to `tests/gateway/test_whatsapp_shared_number_routing.py`)
 
 ```python
 def _authorized(rig, jid):
@@ -272,12 +293,12 @@ def test_owners_reach_the_runtime_config(tmp_path, monkeypatch):
 
 If `_is_user_authorized` raises `AttributeError` on the bare runner, add the missing attribute in the `rig` fixture (mirror `tests/gateway/test_buzz_authz.py::_make_runner`); do not change production code for it.
 
-- [ ] **Step 3: Run to confirm they fail**
+- [x] **Step 3: Run to confirm they fail**
 
 Run: `scripts/run_tests.sh tests/gateway/test_whatsapp_owners.py tests/gateway/test_whatsapp_shared_number_routing.py -v`
 Expected: `test_whatsapp_owners.py` fails at import (`ModuleNotFoundError: gateway.whatsapp_owners`); in the probe file `test_unrouted_number_is_refused_when_owners_are_set` and `test_owners_reach_the_runtime_config` FAIL (the first asserts `False`, gets `True`; the second has no `owners` attribute).
 
-- [ ] **Step 4: Implement the module** `gateway/whatsapp_owners.py`
+- [x] **Step 4: Implement the module** `gateway/whatsapp_owners.py`
 
 ```python
 """Owner gate for a WhatsApp number shared by several people.
@@ -327,7 +348,7 @@ def owner_gate(
     return None if is_owner(owners, user_id) else False
 ```
 
-- [ ] **Step 5: Wire the config key**
+- [x] **Step 5: Wire the config key**
 
 In `gateway/config.py`, after the `profile_routes` field (line 652):
 
@@ -370,7 +391,7 @@ In `hermes_cli/config_defaults.py`, after `"profile_routes": [],` (line 2108):
         "owners": [],
 ```
 
-- [ ] **Step 6: Call the gate from `_principal_authorized`**
+- [x] **Step 6: Call the gate from `_principal_authorized`**
 
 In `gateway/authz_mixin.py`, between the `trusted_inbound` return and `adapter_profile = ...` (lines 653-658):
 
@@ -395,12 +416,12 @@ In `gateway/authz_mixin.py`, between the `trusted_inbound` return and `adapter_p
         adapter_profile = self._adapter_profile_for_source(source)
 ```
 
-- [ ] **Step 7: Run to confirm everything passes**
+- [x] **Step 7: Run to confirm everything passes**
 
 Run: `scripts/run_tests.sh tests/gateway/test_whatsapp_owners.py tests/gateway/test_whatsapp_shared_number_routing.py tests/gateway/test_multiplex_transport_matrix.py -v`
 Expected: all PASS (the matrix file proves existing routing is untouched).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add gateway/whatsapp_owners.py gateway/config.py gateway/config_loader.py gateway/authz_mixin.py hermes_cli/config_defaults.py tests/gateway/test_whatsapp_owners.py tests/gateway/test_whatsapp_shared_number_routing.py
@@ -428,7 +449,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 Design notes: routes use `chat_id: <bare number>` (not `user_id`): WhatsApp DM routes must match number/JID/LID, and only `chat_id` matching is alias-aware (Task 1 proves it). The allowlist is the existing `WHATSAPP_ALLOWED_USERS` in the default profile's `.env`. All of it runs against the default profile only.
 
-- [ ] **Step 1: Write the failing tests** `tests/hermes_cli/test_whatsapp_users.py`
+- [x] **Step 1: Write the failing tests** `tests/hermes_cli/test_whatsapp_users.py`
 
 ```python
 """add/list/remove for people on the shared WhatsApp number (default profile owns routes + allowlist)."""
@@ -541,12 +562,12 @@ def test_list_users_reports_owners_live_and_missing(home):
     assert wu.WhatsAppUser(SALES, "sentio-sales", "missing") in users
 ```
 
-- [ ] **Step 2: Run to confirm they fail**
+- [x] **Step 2: Run to confirm they fail**
 
 Run: `scripts/run_tests.sh tests/hermes_cli/test_whatsapp_users.py -v`
 Expected: collection error `ModuleNotFoundError: hermes_cli.whatsapp_users` (every test red).
 
-- [ ] **Step 3: Implement** `hermes_cli/whatsapp_users.py`
+- [x] **Step 3: Implement** `hermes_cli/whatsapp_users.py`
 
 ```python
 """People on the shared WhatsApp number: one profile each, routed by number (private fork).
@@ -741,12 +762,12 @@ def remove_user(target: str, *, delete_profile: bool = False) -> WhatsAppUser:
     return WhatsAppUser(number, profile, "missing" if delete_profile else _status(profile))
 ```
 
-- [ ] **Step 4: Run to confirm they pass**
+- [x] **Step 4: Run to confirm they pass**
 
 Run: `scripts/run_tests.sh tests/hermes_cli/test_whatsapp_users.py -v`
 Expected: all PASS. If `create_profile` in the temp home needs more fixture setup, copy the `profile_env` pattern from `tests/hermes_cli/test_profiles.py`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add hermes_cli/whatsapp_users.py tests/hermes_cli/test_whatsapp_users.py
@@ -769,7 +790,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: Task 3's `add_user`, `list_users`, `remove_user`, `WhatsAppUsersError`.
 - Produces: `run(args) -> int` in `hermes_cli/whatsapp_users_cli.py` (exit code); argparse attribute `whatsapp_action` in `{"add-user","list-users","remove-user"}` with `name`/`number`, `target`/`delete_profile`.
 
-- [ ] **Step 1: Write the failing tests** `tests/hermes_cli/test_whatsapp_users_cli.py`
+- [x] **Step 1: Write the failing tests** `tests/hermes_cli/test_whatsapp_users_cli.py`
 
 ```python
 """``hermes whatsapp add-user|list-users|remove-user`` parse and print."""
@@ -827,12 +848,12 @@ def test_refusals_exit_non_zero_with_the_reason(home, capsys):
     assert "phone number" in capsys.readouterr().err
 ```
 
-- [ ] **Step 2: Run to confirm they fail**
+- [x] **Step 2: Run to confirm they fail**
 
 Run: `scripts/run_tests.sh tests/hermes_cli/test_whatsapp_users_cli.py -v`
 Expected: FAIL (`ModuleNotFoundError: hermes_cli.whatsapp_users_cli`).
 
-- [ ] **Step 3: Implement** `hermes_cli/whatsapp_users_cli.py`
+- [x] **Step 3: Implement** `hermes_cli/whatsapp_users_cli.py`
 
 ```python
 """``hermes whatsapp add-user | list-users | remove-user`` (logic: hermes_cli/whatsapp_users.py)."""
@@ -877,7 +898,7 @@ def run(args) -> int:
     return 0
 ```
 
-- [ ] **Step 4: Add the sub-subcommands** in `hermes_cli/subcommands/whatsapp.py` (replace `build_whatsapp_parser`)
+- [x] **Step 4: Add the sub-subcommands** in `hermes_cli/subcommands/whatsapp.py` (replace `build_whatsapp_parser`)
 
 ```python
 def build_whatsapp_parser(subparsers, *, cmd_whatsapp: Callable) -> None:
@@ -900,7 +921,7 @@ def build_whatsapp_parser(subparsers, *, cmd_whatsapp: Callable) -> None:
     remove.add_argument("--delete-profile", action="store_true", help="Also delete the profile and its data")
 ```
 
-- [ ] **Step 5: Dispatch in `cmd_whatsapp`** (`hermes_cli/main_platform_setup.py`)
+- [x] **Step 5: Dispatch in `cmd_whatsapp`** (`hermes_cli/main_platform_setup.py`)
 
 ```python
 def cmd_whatsapp(args):
@@ -914,12 +935,12 @@ def cmd_whatsapp(args):
 
 (The dispatch sits before `_require_tty` so the user commands work in a non-interactive shell.)
 
-- [ ] **Step 6: Run to confirm they pass**
+- [x] **Step 6: Run to confirm they pass**
 
 Run: `scripts/run_tests.sh tests/hermes_cli/test_whatsapp_users_cli.py tests/hermes_cli/test_whatsapp_users.py -v`
 Expected: all PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add hermes_cli/whatsapp_users_cli.py hermes_cli/subcommands/whatsapp.py hermes_cli/main_platform_setup.py tests/hermes_cli/test_whatsapp_users_cli.py
@@ -942,7 +963,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: Task 3 module.
 - Produces: `GET /api/whatsapp/users`, `POST /api/whatsapp/users` (`{"name","number"}`), `DELETE /api/whatsapp/users/{target}?delete_profile=false`. Not under any listed prefix in `access_http.py`, so they are admin-only by default-deny; the test asserts it.
 
-- [ ] **Step 1: Write the failing tests** `tests/hermes_cli/test_whatsapp_users_api.py`
+- [x] **Step 1: Write the failing tests** `tests/hermes_cli/test_whatsapp_users_api.py`
 
 ```python
 """Dashboard endpoints for the shared WhatsApp number: thin over hermes_cli.whatsapp_users."""
@@ -994,12 +1015,12 @@ And in `tests/hermes_cli/test_dashboard_rest_access.py`, add to `PATHS` (so the 
 ```
 Check how that file's non-admin test lists admin-only paths and add these three to the same expected-403 set.
 
-- [ ] **Step 2: Run to confirm they fail**
+- [x] **Step 2: Run to confirm they fail**
 
 Run: `scripts/run_tests.sh tests/hermes_cli/test_whatsapp_users_api.py -v`
 Expected: FAIL (`ModuleNotFoundError: hermes_cli.web_routers.whatsapp_users`).
 
-- [ ] **Step 3: Implement** `hermes_cli/web_routers/whatsapp_users.py`
+- [x] **Step 3: Implement** `hermes_cli/web_routers/whatsapp_users.py`
 
 ```python
 """Admin-only REST over hermes_cli.whatsapp_users (the CLI's twin). Unlisted in access_http => admin only."""
@@ -1044,14 +1065,14 @@ async def remove_whatsapp_user(target: str, delete_profile: bool = False):
         raise HTTPException(status_code=404, detail=str(exc))
 ```
 
-- [ ] **Step 4: Register the router** in `hermes_cli/web_server.py`: add `whatsapp_users as _whatsapp_users_routes,` after `delegation as _delegation_routes,` in the import list (line ~785) and `app.include_router(_whatsapp_users_routes.router)` after `app.include_router(_skills_routes.router)` (line ~812).
+- [x] **Step 4: Register the router** in `hermes_cli/web_server.py`: add `whatsapp_users as _whatsapp_users_routes,` after `delegation as _delegation_routes,` in the import list (line ~785) and `app.include_router(_whatsapp_users_routes.router)` after `app.include_router(_skills_routes.router)` (line ~812).
 
-- [ ] **Step 5: Run to confirm they pass**
+- [x] **Step 5: Run to confirm they pass**
 
 Run: `scripts/run_tests.sh tests/hermes_cli/test_whatsapp_users_api.py tests/hermes_cli/test_dashboard_rest_access.py -v`
 Expected: all PASS, including the default-deny matrix for the three new paths.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add hermes_cli/web_routers/whatsapp_users.py hermes_cli/web_server.py tests/hermes_cli/test_whatsapp_users_api.py tests/hermes_cli/test_dashboard_rest_access.py
@@ -1070,7 +1091,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Interfaces:** none (docs).
 
-- [ ] **Step 1: Add the user guide section** after the "Multiple profiles" section in `whatsapp.md`
+- [x] **Step 1: Add the user guide section** after the "Multiple profiles" section in `whatsapp.md`
 
 ````markdown
 ## One number, many people
@@ -1096,7 +1117,7 @@ default profile. A new profile has no model key yet; grant one before the person
 `add-user` runs against the default profile only and refuses to run until `gateway.owners` is set.
 ````
 
-- [ ] **Step 2: Add the fork decision** to `docs/private-fork/FORK_DECISIONS.md` (next free number after the last `D`/`O` entry)
+- [x] **Step 2: Add the fork decision** to `docs/private-fork/FORK_DECISIONS.md` (next free number after the last `D`/`O` entry)
 
 ```markdown
 - **Dxx. A shared WhatsApp number gates unrouted senders on an explicit `gateway.owners` list.** The shared bot belongs to the
@@ -1106,7 +1127,7 @@ default profile. A new profile has no model key yet; grant one before the person
   `authz_mixin.py::_principal_authorized`.
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add website/docs/user-guide/messaging/whatsapp.md docs/private-fork/FORK_DECISIONS.md
@@ -1128,11 +1149,11 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 The spec's unconfirmed question: which profile did the non-admin session actually run under? Answer it before writing code.
 
-- [ ] **Step 1: Reproduce**
+- [ ] **Step 1: Reproduce** ? partial: existing dashboard session diagnosed; native desktop, gateway logs and successful model answer pending.
 
 On the company gateway (or a local gateway with an `access:` policy configured), sign in to the desktop app with the OIDC account granted only `sentio-sales`. In the app, note: the active-profile pill, the agent's answer to "who are you?", and the file browser. In the gateway log (`hermes logs gateway`), search for `rest access denied:` lines and for which profile the new session was created under (`agent:<profile>:` in the session key).
 
-- [ ] **Step 2: Record the finding**
+- [x] **Step 2: Record the finding**
 
 Under "Risks" in the spec, add one line: "Reproduced <date>: the session ran under `<profile>`; the identity text came from `<SOUL.md of that profile | DEFAULT_AGENT_IDENTITY>`."
 - If the session ran under `default`: Task 8 (active profile) is the root cause of the label and probably the identity symptom; Task 11 still applies to profiles with no Sentio `SOUL.md`.
@@ -1158,7 +1179,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `request.state.access_allowed_profiles` (`None` = unrestricted, else a `frozenset[str]` of granted profile names; stamped by `access_http.enforce`).
 - Produces: for a restricted caller, `{"active": <p>, "current": <p>}` where `<p>` is the `?profile=` value when granted, else the alphabetically first granted profile; admins and ungated callers unchanged.
 
-- [ ] **Step 1: Write the failing test** `tests/hermes_cli/test_granted_user_active_profile.py`
+- [x] **Step 1: Write the failing test** `tests/hermes_cli/test_granted_user_active_profile.py`
 
 ```python
 """A grant-scoped caller is told its own profile as the active one, never the machine's ``default``."""
@@ -1199,12 +1220,12 @@ def test_an_unrestricted_caller_still_gets_the_machine_profile(monkeypatch):
     assert _client(None).get("/api/profiles/active").json() == {"active": "work", "current": "default"}
 ```
 
-- [ ] **Step 2: Run to confirm they fail**
+- [x] **Step 2: Run to confirm they fail**
 
 Run: `scripts/run_tests.sh tests/hermes_cli/test_granted_user_active_profile.py -v`
 Expected: the first two FAIL (`current` is the server's profile, not `sentio-sales`); the third passes.
 
-- [ ] **Step 3: Implement** — in `hermes_cli/web_routers/profiles.py`
+- [x] **Step 3: Implement** — in `hermes_cli/web_routers/profiles.py`
 
 ```python
 @router.get("/api/profiles/active")
@@ -1225,12 +1246,12 @@ async def get_active_profile_endpoint(request: Request, profile: Optional[str] =
 ```
 (the rest of the function body is unchanged). A caller with an empty grant set falls through to the existing behaviour; its other routes are already refused by `access_http`.
 
-- [ ] **Step 4: Run to confirm they pass**
+- [x] **Step 4: Run to confirm they pass**
 
 Run: `scripts/run_tests.sh tests/hermes_cli/test_granted_user_active_profile.py tests/hermes_cli/test_dashboard_rest_access.py -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add hermes_cli/web_routers/profiles.py tests/hermes_cli/test_granted_user_active_profile.py
@@ -1254,7 +1275,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 Why this seam: every `/api/files*` handler resolves paths through `_resolve_managed_path`, which already enforces a locked root (`..` refused, resolved target must stay under the root, symlinks resolved first). Scoping the policy scopes all of them at once.
 
-- [ ] **Step 1: Write the failing tests** `tests/hermes_cli/test_granted_user_files.py`
+- [x] **Step 1: Write the failing tests** `tests/hermes_cli/test_granted_user_files.py`
 
 ```python
 """A user granted a profile browses, edits and uploads only inside that profile's workspace/ directory."""
@@ -1341,12 +1362,12 @@ def test_a_symlink_out_of_the_workspace_is_refused(env):
 
 Extend `tests/hermes_cli/test_dashboard_rest_access.py` (same file as Task 5): a user granted `alpha` gets 200 on `GET /api/files?profile=alpha`, 403 `profile_scope_mismatch` on `?profile=beta` and with no selector, and still 403 `admin_required` on `/api/git/status` and `/api/media`.
 
-- [ ] **Step 2: Run to confirm they fail**
+- [x] **Step 2: Run to confirm they fail**
 
 Run: `scripts/run_tests.sh tests/hermes_cli/test_granted_user_files.py -v`
 Expected: collection error (`cannot import name 'restricted_files_root'`).
 
-- [ ] **Step 3: Implement the root** in `hermes_cli/web_server_files.py`; replace `_managed_files_policy`
+- [x] **Step 3: Implement the root** in `hermes_cli/web_server_files.py`; replace `_managed_files_policy`
 
 ```python
 def restricted_files_root(request: Optional[Request]) -> Path | None:
@@ -1372,7 +1393,7 @@ def _managed_files_policy(request: Optional[Request], *, create_root: bool = Tru
 ```
 (the remainder of the function is unchanged.)
 
-- [ ] **Step 4: Open `/api/files` to grant-scoped callers** in `hermes_cli/dashboard_auth/access_http.py`
+- [x] **Step 4: Open `/api/files` to grant-scoped callers** in `hermes_cli/dashboard_auth/access_http.py`
 
 Remove `"/api/files"` from `_ADMIN_PREFIXES`, and add it to the profile-scoped lists:
 
@@ -1391,10 +1412,13 @@ Update the module docstring comment above `_ADMIN_PREFIXES` so it no longer list
 
 - [ ] **Step 5: Run to confirm they pass**
 
+- [x] Focused suites and reviewed fixes passed as recorded in the execution table.
+- [ ] Broad hermes_cli `-k` command below is deferred to Task 12.
+
 Run: `scripts/run_tests.sh tests/hermes_cli/test_granted_user_files.py tests/hermes_cli/test_dashboard_rest_access.py tests/hermes_cli/test_dashboard_document_access.py -v`
 Expected: all PASS. Then run `scripts/run_tests.sh tests/hermes_cli/ -k "files or managed"` to confirm admin behaviour on `/api/files` is unchanged.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add hermes_cli/web_server_files.py hermes_cli/dashboard_auth/access_http.py tests/hermes_cli/test_granted_user_files.py tests/hermes_cli/test_dashboard_rest_access.py
@@ -1418,7 +1442,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 Gaps to close (each found in the current handlers): (1) the SSH `backend` branch returns before `_hosted_fs_read_guard` runs; (2) `fs_write_text` has no request and no guard; (3) `fs_git_root` has no guard; (4) `fs_default_cwd` returns the host's cwd.
 
-- [ ] **Step 1: Extend the failing tests** (append to `tests/hermes_cli/test_granted_user_files.py`)
+- [x] **Step 1: Extend the failing tests** (append to `tests/hermes_cli/test_granted_user_files.py`)
 
 ```python
 def _fs(client, route, **params):
@@ -1467,12 +1491,12 @@ def test_an_ssh_workspace_adapter_is_never_used_for_a_restricted_caller(env, mon
 
 Add to `test_dashboard_rest_access.py`: a user granted `alpha` gets 200 on `GET /api/fs/list?profile=alpha`, 403 on `?profile=beta` and with no selector; an admin still reaches `/api/fs/list`.
 
-- [ ] **Step 2: Run to confirm they fail**
+- [x] **Step 2: Run to confirm they fail**
 
 Run: `scripts/run_tests.sh tests/hermes_cli/test_granted_user_files.py -v -k "fs"`
 Expected: FAIL (the routes are admin-only in the classifier, so the test app is not at fault; with the middleware stub the handlers run unrestricted: reads outside return 200, write-text escapes, default-cwd returns the host cwd).
 
-- [ ] **Step 3: Add the restricted-scope helper** to `hermes_cli/web_server_files.py`
+- [x] **Step 3: Add the restricted-scope helper** to `hermes_cli/web_server_files.py`
 
 ```python
 def refuse_outside_restricted_root(request: Optional[Request], target: Path) -> Path | None:
@@ -1485,7 +1509,7 @@ def refuse_outside_restricted_root(request: Optional[Request], target: Path) -> 
     return root
 ```
 
-- [ ] **Step 4: Patch the seven handlers** in `hermes_cli/web_routers/files.py` (import `refuse_outside_restricted_root` and `restricted_files_root` beside the other `web_server_files` imports at line 32)
+- [x] **Step 4: Patch the seven handlers** in `hermes_cli/web_routers/files.py` (import `refuse_outside_restricted_root` and `restricted_files_root` beside the other `web_server_files` imports at line 32)
 
 For `fs_list`, `fs_read_text`, `fs_read_data_url`, `fs_download` (they already call `_hosted_fs_read_guard` on the local path), skip the SSH adapter for a restricted caller:
 
@@ -1524,7 +1548,7 @@ For `fs_default_cwd` (add `request: Request`):
     backend = await asyncio.to_thread(_fs_backend, profile)
 ```
 
-- [ ] **Step 5: Move `/api/fs` to profile-scoped** in `access_http.py`
+- [x] **Step 5: Move `/api/fs` to profile-scoped** in `access_http.py`
 
 Remove `"/api/fs"` from `_ADMIN_PREFIXES`, add it to `_PROFILE_PREFIXES` and `_EXPLICIT_PREFIXES`:
 
@@ -1536,10 +1560,13 @@ Update the comment above `_ADMIN_PREFIXES`: files routes are scoped per grant by
 
 - [ ] **Step 6: Run to confirm they pass**
 
+- [x] Focused suites and reviewed fixes passed as recorded in the execution table.
+- [ ] Broad hermes_cli `-k` command below is deferred to Task 12.
+
 Run: `scripts/run_tests.sh tests/hermes_cli/test_granted_user_files.py tests/hermes_cli/test_dashboard_rest_access.py tests/hermes_cli/test_dashboard_document_access.py -v`
 Expected: all PASS. Then run `scripts/run_tests.sh tests/hermes_cli/ -k "fs or files or managed or hosted"` to prove the admin and local paths did not change.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add hermes_cli/web_routers/files.py hermes_cli/web_server_files.py hermes_cli/dashboard_auth/access_http.py tests/hermes_cli/test_granted_user_files.py tests/hermes_cli/test_dashboard_rest_access.py
@@ -1560,7 +1587,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: existing `_ensure_default_soul_md(home)` (runs at `initialize_home`, upgrades a file whose content matches `_LEGACY_TEMPLATE_SOULS` in place), `finish_profile_layout` (seeds `DEFAULT_SOUL_MD` into every new profile).
 - Produces: `DEFAULT_SOUL_MD` naming Sentio; the previous Hermes text kept as `_HERMES_DEFAULT_SOUL_MD` inside `_LEGACY_TEMPLATE_SOULS` so existing auto-seeded profiles upgrade and a hand-edited `SOUL.md` is never touched.
 
-- [ ] **Step 1: Write the failing tests** `tests/hermes_cli/test_default_soul_identity.py`
+- [x] **Step 1: Write the failing tests** `tests/hermes_cli/test_default_soul_identity.py`
 
 ```python
 """Every profile introduces itself as Sentio; an auto-seeded Hermes SOUL.md upgrades, a customised one never does."""
@@ -1605,12 +1632,12 @@ def test_a_new_profile_is_seeded_with_the_sentio_identity(tmp_path, monkeypatch)
     assert (path / "SOUL.md").read_text(encoding="utf-8") == DEFAULT_SOUL_MD
 ```
 
-- [ ] **Step 2: Run to confirm they fail**
+- [x] **Step 2: Run to confirm they fail**
 
 Run: `scripts/run_tests.sh tests/hermes_cli/test_default_soul_identity.py -v`
 Expected: collection error (`cannot import name '_HERMES_DEFAULT_SOUL_MD'`).
 
-- [ ] **Step 3: Implement** in `hermes_cli/default_soul.py`
+- [x] **Step 3: Implement** in `hermes_cli/default_soul.py`
 
 Replace the header comment and `DEFAULT_SOUL_MD` definition:
 
@@ -1647,12 +1674,12 @@ In `_LEGACY_TEMPLATE_SOULS`, add the Hermes default and its ASCII-dashed variant
 ```
 (remove the old `DEFAULT_SOUL_MD.replace("—", "--")` entry that this replaces; keep the two older generations above it.)
 
-- [ ] **Step 4: Run to confirm they pass**
+- [x] **Step 4: Run to confirm they pass**
 
 Run: `scripts/run_tests.sh tests/hermes_cli/test_default_soul_identity.py tests/hermes_cli/test_config.py tests/hermes_cli/test_home_init_soul_symlink.py -v`
 Expected: all PASS. If `test_config.py` has a test asserting the old text literally, update its fixture to import `_HERMES_DEFAULT_SOUL_MD` instead of changing the production behaviour.
 
-- [ ] **Step 5: Check the system prompt on a real build**
+- [x] **Step 5: Check the system prompt on a real build**
 
 Run (from the repo root, with a temp home):
 
@@ -1665,7 +1692,7 @@ print((p / 'SOUL.md').read_text()[:80])
 ```
 Expected: the line starts `You are Sentio, an AI agent powered by Sentio One`. Then open `agent/prompt_builder.py` around `HERMES_AGENT_HELP_GUIDANCE` (lines 170-188): that text says "You run on Hermes Agent (by Nous Research)" and is injected when the `hermes-agent` skill is installed. Check (with the real prompt builder, `skip_context_files=False`, for a profile that has that skill) whether it appears in the assembled system prompt. If it does, do NOT change it in this task: add a line under "Risks" in the spec ("identity can still leak via HERMES_AGENT_HELP_GUIDANCE when the hermes-agent skill is installed") and tell the user.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add hermes_cli/default_soul.py tests/hermes_cli/test_default_soul_identity.py
@@ -1697,6 +1724,9 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
 
 - [ ] **Step 2: Run the full lint and the touched suites**
+
+- [x] Full Python `scripts/check`: 12 checks OK, exit 0 on 2026-11-02 after commit `6de7cf5bc3`.
+- [ ] Broad touched suites deferred by user to the next machine.
 
 Run: `python scripts/check`
 Expected: no findings. Fix any ratchet finding by moving code into a sibling (never `# noqa`).
