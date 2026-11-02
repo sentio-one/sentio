@@ -217,3 +217,23 @@ def test_fs_escaped_workspace_root_refused(env, tmp_path, route):
     response = fs_write(c, env.ws / 'new.txt') if route == 'write-text' else fs(c, route, env.ws)
     assert response.status_code == 403
     assert list(outside.iterdir()) == []
+
+
+@pytest.mark.platforms('posix')
+@pytest.mark.parametrize('existing', [True, False])
+def test_fs_preplanted_staging_symlink_cannot_write_outside(env, tmp_path, existing):
+    import os
+    outside = tmp_path / 'outside.txt'
+    if existing:
+        outside.write_text('untouched')
+    target = env.ws / 'notes.txt'
+    staging = target.with_name(f'.{target.name}.hermes-tmp-{os.getpid()}')
+    staging.symlink_to(outside)
+    response = fs_write(client(), target)
+    if existing:
+        assert outside.read_text() == 'untouched'
+    else:
+        assert not outside.exists()
+    assert response.status_code == 200
+    assert not target.is_symlink()
+    assert target.read_text() == 'changed'
