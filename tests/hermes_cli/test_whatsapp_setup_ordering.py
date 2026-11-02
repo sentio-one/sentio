@@ -13,6 +13,7 @@ succeeds (creds.json exists).  Aborted setup leaves no enabled state.
 
 from __future__ import annotations
 
+from argparse import Namespace
 import io
 import os
 from contextlib import redirect_stdout
@@ -74,7 +75,7 @@ def test_aborted_setup_does_not_enable_whatsapp(isolated_home, monkeypatch):
     buf = io.StringIO()
     with redirect_stdout(buf):
         try:
-            cmd_whatsapp(MagicMock())
+            cmd_whatsapp(Namespace(whatsapp_action=None))
         except KeyboardInterrupt:
             pass
 
@@ -134,7 +135,7 @@ def test_existing_pairing_skip_branch_enables_whatsapp(isolated_home, monkeypatc
 
     buf = io.StringIO()
     with redirect_stdout(buf):
-        cmd_whatsapp(MagicMock())
+        cmd_whatsapp(Namespace(whatsapp_action=None))
 
     # The skip-rebar branch should have set the env var on its way out.
     assert _env_value(isolated_home, "WHATSAPP_ENABLED") == "true"
