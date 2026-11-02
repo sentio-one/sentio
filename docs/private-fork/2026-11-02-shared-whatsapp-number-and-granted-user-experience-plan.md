@@ -12,7 +12,7 @@
 
 ## Execution status - 2026-11-02 Task 12 verification
 
-Branch: `feat/shared-whatsapp-granted-user`, rebased onto current `origin/main` at `315e8949ee91a2f4308ae2be848c7970e9d8468a`. The rebased runtime/test head is `e89baeb2b418f0f4bc8fe545c43c65d8306180fc`; `61b34c8ed23b3732a224d8926cdd723748e4e314` only corrects a pre-existing test fixture shebang for lint portability. Tasks 1-11 implementation and scoped reviews are complete; Task 7 remains a partial dashboard diagnosis. Task 12 whole-branch review and native Windows focused/lint checks are complete. Linux `scripts/check` passed; current-main comparison reproduced both observed initial broad failure groups. A replacement Linux broad run remains active, so final totals are pending. PR #36 is open at pushed head `4ee1c1c74e60f7499b3399c00e365cc8c2098b6e`; CI remains partial/in progress. Live desktop/phone acceptance is still for the user. No deployment, merge, or live acceptance is claimed. See the [portable handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-handoff.md) and [Task 12 verification and acceptance](2026-11-02-shared-whatsapp-number-and-granted-user-experience-task12-verification.md).
+Branch: `feat/shared-whatsapp-granted-user`, rebased onto current `origin/main` at `315e8949ee91a2f4308ae2be848c7970e9d8468a`. The rebased runtime/test head is `e89baeb2b418f0f4bc8fe545c43c65d8306180fc`; `61b34c8ed23b3732a224d8926cdd723748e4e314` only corrects a pre-existing test fixture shebang for lint portability. Tasks 1-11 implementation and scoped reviews are complete; Task 7 remains a partial dashboard diagnosis. Task 12 whole-branch review, Windows focused/lint checks, Linux lint, and final Linux broad verification are complete. The broad suite exited 1 with 12 failures, all reproduced on clean current main. PR #36 is open at pushed head `38bc40eee56efa4493bcb20d91743138c9d8996e`; all PR checks pass. Live desktop/phone acceptance remains for the user. No deployment, merge, or live acceptance is claimed. See the [portable handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-handoff.md) and [Task 12 verification and acceptance](2026-11-02-shared-whatsapp-number-and-granted-user-experience-task12-verification.md).
 
 | Task | Recorded status | Remaining verification |
 |---|---|---|
@@ -27,7 +27,7 @@ Branch: `feat/shared-whatsapp-granted-user`, rebased onto current `origin/main` 
 | 9 | Granted managed files: Windows 81 passed/8 skipped; Linux 37 passed, final focused 13 passed; reviewed | Broad `tests/hermes_cli/ -k "files or managed"`; native Windows reparse |
 | 10 | Granted fs + secure staging review fix: Linux 37 passed; Windows 139 passed/20 skipped; re-reviewed | Broad `tests/hermes_cli/ -k "fs or files or managed or hosted"`; live desktop |
 | 11 | SOUL and real prompt build complete; review approved. Fresh native Linux 177 passed/4 skipped, exit 0 | Successful model identity answer; upstream Hermes helper conflict remains intentional |
-| 12 | D18-D20 recorded; whole-branch review clean; Windows focused feature batch 228 passed/0 failed/20 POSIX skips; Windows and Linux `scripts/check` passed; initial broad failures reproduced on current main | Replacement Linux broad totals and final PR CI pending; live desktop/phone acceptance pending |
+| 12 | D18-D20 recorded; whole-branch review clean; Windows focused feature batch 228 passed/0 failed/20 POSIX skips; Windows and Linux `scripts/check` passed; Linux broad 30,161 passed/12 failed/471 skipped, all failure groups reproduced on main; PR #36 CI green | Live desktop/phone acceptance pending |
 
 Checkboxes below record performed work, not endorsement of every illustrative snippet. The spec corrections and reviewed final implementation supersede snippets. Partial verification steps stay unchecked with completed/deferred subparts. No broad suite or live acceptance is implied.
 
@@ -1729,13 +1729,13 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - [x] Whole-branch review through `61b34c8ed2`: no Critical, Important or Minor findings (`.superpowers/.../whole-branch-review.md`). This is source review, not test evidence.
 - [x] Post-rebase Windows focused feature batch: 15 files, 228 passed, 0 failed, 20 POSIX skips, exit 0. Receipt: `D:/Projects/sentio-task12-verification/focused-rebased.log` and `.exit`.
 - [x] Linux `scripts/check` passed, exit 0 at `e89baeb2b418f0f4bc8fe545c43c65d8306180fc` compared with current main `315e8949ee91a2f4308ae2be848c7970e9d8468a`. Host-local evidence is on `thuto-lms` under `/home/deploy/sentio-tests/20261102-shared-whatsapp/receipts/task12/`.
-- [x] Current-main comparison reproduced the initial broad failure groups: `test_api_admission_off_loop` 0.60s vs 0.50s on main (feature initial run: 0.54s); both `test_session_client_env` PATH-ordering tests fail on main as well (2 failed, 11 passed in that file; same 2 failures in feature broad run).
-- [ ] Replacement full Linux broad run is active at `e89baeb2b4`; final totals/exit pending. Do not claim broad verification complete until its final receipt is recorded.
+- [x] Current-main comparison reproduced all final broad failure groups at `e89baeb2b4`: `test_session_client_env.py` 2 failed/11 passed; `test_gateway_service.py` 1 failure; `test_update_recovery_closure.py` 8 failures; `test_update_post_commit_safety.py` 1 failure. The latter three-file comparison yielded 10 failures, with client-env independently compared. Receipt on `thuto-lms`: `/home/deploy/sentio-tests/20261102-shared-whatsapp/receipts/task12/baseline-final`.
+- [x] Linux broad suite completed at `e89baeb2b418f0f4bc8fe545c43c65d8306180fc`: `scripts/run_tests.sh tests/gateway/ tests/hermes_cli/`, 3,396 files, 30,161 passed, 12 failed, 471 skipped; exit 1; 8 workers; 2,131.8s. All failures reproduced on current main; this is not an all-green broad run. Receipt on `thuto-lms`: `/home/deploy/sentio-tests/20261102-shared-whatsapp/receipts/task12/broad-final`.
 
 Run: `python scripts/check`
 Expected: no findings. Fix any ratchet finding by moving code into a sibling (never `# noqa`).
 
-The initial Linux broad receipt and current-main comparison are recorded in the portable handoff. The replacement full run remains pending; focused passes and reproduced baseline failures do not replace its final totals.
+The final Linux broad receipt is non-green (exit 1), but all reported failures reproduce on clean current main. The earlier interrupted 16-worker run's timing-threshold failures did not recur in the complete 8-worker run and are not final failures. This evidence is not a claim of all-green broad regression.
 
 - [ ] **Step 3: Manual end-to-end on a real gateway** (the spec's acceptance check)
 
