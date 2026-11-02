@@ -655,6 +655,18 @@ class GatewayAuthorizationMixin:
         if source.platform == Platform.WEBHOOK or getattr(_registry_entry(source.platform), "trusted_inbound", False) is True:
             return True
 
+        from gateway.session_identity import identity_of
+        from gateway.whatsapp_owners import owner_gate
+
+        # Apply before any allow-all or allowlist grant on the shared primary bot.
+        if owner_gate(
+            getattr(getattr(self, "config", None), "owners", None),
+            platform=getattr(source.platform, "value", source.platform),
+            user_id=source.user_id, identity=identity_of(source),
+            primary_profile=getattr(self, "_primary_profile_name", None) or "default",
+        ) is False:
+            return False
+
         adapter_profile = self._adapter_profile_for_source(source)
         is_group = source.chat_type in _GROUP_CHAT_TYPES
         is_group_or_forum = source.chat_type in _GROUP_FORUM_TYPES
