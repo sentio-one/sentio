@@ -89,7 +89,7 @@ the assembled prompt and resulting model response were not verified.
 Native desktop and gateway logs were unavailable through the native pipe. No new
 prompts were sent during this inspection. This does not establish native desktop
 runtime behaviour, log evidence, successful provider access, or an identity answer.
-Tasks 8?11 remain in scope, with those verification limits retained.
+Tasks 8-11 remain in scope, with those verification limits retained.
 
 ## Out of scope
 
@@ -103,6 +103,7 @@ Per-sender permission tiers inside one profile; pairing-code self-service; dashb
 - Owner on the default profile means a hijacked owner number reaches host-level access. Mitigation is the explicit `owners` list; it is the user's chosen trade-off.
 - `prompt_builder.py` and `/api/profiles/active` are touched or depended on near upstream code; each gets a `FORK_DECISIONS.md` entry for upstream merges.
 - Routes are read when the gateway starts; `add-user` and `remove-user` tell the operator to restart the gateway. Hot reload is out of scope.
+- Verified 2026-11-02 with the real prompt builder, isolated profile and installed bundled `hermes-agent` skill: identity can still leak via `HERMES_AGENT_HELP_GUIDANCE` when the `hermes-agent` skill is installed. Both the Sentio SOUL identity and Hermes helper guidance appear in the assembled prompt. A second real build without skill tools also includes `HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS`, which names Hermes; the conflict extends beyond the installed-skill case. Both helper variants and `DEFAULT_AGENT_IDENTITY` remain upstream. No model API call was made, and the earlier provider HTTP 401 still prevents any claim about the resulting identity answer.
 - `HERMES_AGENT_HELP_GUIDANCE` says "You run on Hermes Agent (by Nous Research)" when the `hermes-agent` skill is installed; the identity change does not touch it. The plan checks whether it reaches a Sentio profile's prompt.
 - A sandboxed profile's `/workspace` inside Docker is ephemeral (tmpfs, no bind mounts), so files in `<profile home>/workspace` that a user uploads are not visible to the sandboxed agent. Making them visible is a separate decision (it needs a sandbox mount) and is out of scope here.
 
