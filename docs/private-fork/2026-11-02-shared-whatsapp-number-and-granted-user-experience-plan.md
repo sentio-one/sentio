@@ -10,7 +10,7 @@
 
 **Spec:** `docs/private-fork/2026-11-02-shared-whatsapp-number-and-granted-user-experience.md` (read it first; the "Spec corrections" section at its end overrides earlier text where they differ).
 
-## Execution status ? 2026-11-02 handoff
+## Execution status - 2026-11-02 handoff
 
 Branch: `feat/shared-whatsapp-granted-user`. Tasks 1-11 implementation and scoped reviews are complete, with Task 7 limited to dashboard diagnosis. **Task 12 broad regression, whole-branch review, deployment and live acceptance are deferred to the next machine.** This is not release approval. The [portable handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-handoff.md) carries commit mapping, test receipts, limitations and exact next commands; local ignored `.superpowers/` evidence will not follow a clone.
 
