@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import threading
 
 from hermes_cli.config import (
-    atomic_config_replace, atomic_config_write, get_env_value, read_user_config_raw,
+    atomic_config_replace, atomic_config_write, load_env, read_user_config_raw,
     remove_env_value, require_env_writable, save_env_value,
 )
 
@@ -77,23 +77,33 @@ def _candidate_routes(gateway):
             continue
         if str(row.get('bot_profile') or '').strip() not in ('', 'default'):
             continue
-        try:
-            _normalize_number(row.get('chat_id'))
-        except WhatsAppUsersError:
+        chat = str(row.get('chat_id') or '').lower()
+        if chat.endswith(('@g.us', '@broadcast', '@newsletter')):
             continue
         rows.append(row)
     return rows
 
 
 def _managed(row):
+    try:
+        _normalize_number(row.get('chat_id'))
+    except WhatsAppUsersError:
+        return False
     return bool(row.get('enabled', True)) and not any(
         key in row for key in ('user_id', 'guild_id', 'thread_id')
     ) and bool(row.get('profile'))
 
 
+def _overlaps(row, number):
+    # A selector outside the managed chat-only shape can outrank the generated route.
+    # Conservatively refuse unresolved overlaps, including broad default-bot routes.
+    selectors = [row[key] for key in ('chat_id', 'user_id') if row.get(key)]
+    return not selectors or any(_same_person(value, number) for value in selectors)
+
+
 def _matches(gateway, *, number=None, profile=None):
     rows = [r for r in _candidate_routes(gateway)
-            if (number and _same_person(r['chat_id'], number)) or (profile and r.get('profile') == profile)]
+            if (number and _overlaps(r, number)) or (profile and r.get('profile') == profile)]
     if len(rows) > 1 or any(not _managed(r) for r in rows):
         raise WhatsAppUsersError('Ambiguous, disabled or restricted WhatsApp routes; resolve them in config first.')
     return rows
@@ -107,7 +117,7 @@ def _status(profile):
 
 
 def _allowed():
-    return [x.strip() for x in (get_env_value(ALLOWLIST_ENV) or '').split(',') if x.strip()]
+    return [x.strip() for x in (load_env().get(ALLOWLIST_ENV) or '').split(',') if x.strip()]
 
 
 def _allow_number(number):
@@ -128,7 +138,7 @@ def _write_routes(data, gateway, routes):
 @contextmanager
 def _transaction(data, created_profile=None):
     original = deepcopy(data)
-    allowlist = get_env_value(ALLOWLIST_ENV)
+    allowlist = load_env().get(ALLOWLIST_ENV)
     require_env_writable(ALLOWLIST_ENV, 'set')
     try:
         yield
@@ -142,7 +152,7 @@ def _transaction(data, created_profile=None):
         for action in actions:
             try:
                 action()
-            except BaseException as cleanup_error:
+            except BaseException as cleanup_error:  # health: allow BLE001 -- attempt every rollback writer and keep the initiating failure primary
                 error.add_note(f'Rollback failed: {cleanup_error}')
         raise
 
@@ -171,7 +181,8 @@ def add_user(name: str, number: str) -> WhatsAppUser:
             if rows[0].get('profile') != canon:
                 raise WhatsAppUsersError('This number is already routed to another profile.')
             return WhatsAppUser(digits, canon, _status(canon))
-        _matches(gateway, profile=canon)
+        if _matches(gateway, profile=canon):
+            raise WhatsAppUsersError('This profile is already mapped to another number.')
         created = not get_profile_dir(canon).exists()
         needs_profile = not profile_exists(canon)
         with _transaction(data, canon if created else None):
@@ -191,6 +202,9 @@ def list_users() -> list[WhatsAppUser]:
         users = [WhatsAppUser(_normalize_number(x), 'default', 'owner')
                  for x in parse_owners(gateway.get('owners'))]
         for row in _candidate_routes(gateway):
+            if not _managed(row):
+                raise WhatsAppUsersError('Restricted or malformed WhatsApp route; resolve it in config first.')
+            _matches(gateway, profile=row.get('profile'))
             _matches(gateway, number=row['chat_id'])
             users.append(WhatsAppUser(_normalize_number(row['chat_id']), row['profile'], _status(row['profile'])))
         return users

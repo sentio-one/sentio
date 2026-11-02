@@ -127,3 +127,92 @@ def test_remove_write_then_raise_restores_routes_and_allowlist(home, monkeypatch
     with pytest.raises(RuntimeError, match='after removal'):
         wu.remove_user('sales')
     assert (config(home), get_env_value('WHATSAPP_ALLOWED_USERS')) == before
+
+@pytest.mark.parametrize('selector', ['user_id', 'lid'])
+def test_production_route_collision_refused(home, selector):
+    import json
+    from gateway.profile_routing import parse_profile_routes, match_profile_route
+    jid = NUMBER + '@s.whatsapp.net'
+    row = dict(name='existing', platform='whatsapp', profile='other')
+    if selector == 'user_id':
+        row['user_id'] = jid
+    else:
+        session = home / 'whatsapp/session'
+        session.mkdir(parents=True)
+        (session / ('lid-mapping-' + NUMBER + '.json')).write_text(json.dumps('555666777'))
+        row['chat_id'] = '555666777@lid'
+    data = config(home)
+    data['gateway']['profile_routes'] = [row]
+    atomic_config_write(home / 'config.yaml', data)
+    resolved = match_profile_route(parse_profile_routes([row]), 'whatsapp', chat_id=jid, user_id=jid)
+    assert resolved.profile == 'other'
+    before = config(home)
+    with pytest.raises(wu.WhatsAppUsersError):
+        wu.add_user('sales', NUMBER)
+    assert config(home) == before
+    assert not (home / 'profiles/sales').exists()
+
+
+def test_second_number_for_same_profile_refused_without_changes(home):
+    wu.add_user('sales', NUMBER)
+    before = config(home), (home / '.env').read_bytes()
+    with pytest.raises(wu.WhatsAppUsersError):
+        wu.add_user('sales', '27820000003')
+    assert (config(home), (home / '.env').read_bytes()) == before
+    assert wu.remove_user('sales').number == NUMBER
+
+
+def test_inherited_stale_environment_does_not_overwrite_persisted_allowlist(home):
+    import os
+    import subprocess
+    import sys
+    from hermes_cli.config import load_env
+    save_env_value(wu.ALLOWLIST_ENV, OWNER)
+    inherited = dict(os.environ)
+    inherited[wu.ALLOWLIST_ENV] = OWNER
+    wu.add_user('sales', NUMBER)
+    script = '''
+from pathlib import Path
+import sys
+Path.home = lambda: Path(sys.argv[1])
+from hermes_cli.whatsapp_users import add_user
+add_user('support', '27820000003')
+'''
+    result = subprocess.run([sys.executable, '-c', script, str(home.parent)],
+                            env=inherited, capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stderr
+    assert set(load_env()[wu.ALLOWLIST_ENV].split(',')) == {OWNER, NUMBER, '27820000003'}
+
+
+@pytest.mark.parametrize('persisted', [None, '', OWNER])
+def test_rollback_uses_persisted_presence_not_environment(home, monkeypatch, persisted):
+    from hermes_cli.config import load_env
+    if persisted is not None:
+        save_env_value(wu.ALLOWLIST_ENV, persisted)
+    monkeypatch.setenv(wu.ALLOWLIST_ENV, '27829999999')
+    original = wu._allow_number
+    def fail(number):
+        original(number)
+        raise RuntimeError('after write')
+    monkeypatch.setattr(wu, '_allow_number', fail)
+    with pytest.raises(RuntimeError, match='after write'):
+        wu.add_user('sales', NUMBER)
+    assert load_env().get(wu.ALLOWLIST_ENV) == persisted
+    assert (wu.ALLOWLIST_ENV in load_env()) == (persisted is not None)
+
+
+def test_cleanup_failure_preserves_original_and_attempts_remaining_cleanup(home, monkeypatch):
+    from hermes_cli.config import load_env
+    original = wu._allow_number
+    def fail(number):
+        original(number)
+        raise RuntimeError('initiating failure')
+    def cleanup_fail(*args):
+        raise LookupError('config cleanup failure')
+    monkeypatch.setattr(wu, '_allow_number', fail)
+    monkeypatch.setattr(wu, 'atomic_config_replace', cleanup_fail)
+    with pytest.raises(RuntimeError, match='initiating failure') as caught:
+        wu.add_user('sales', NUMBER)
+    assert any('config cleanup failure' in note for note in caught.value.__notes__)
+    assert wu.ALLOWLIST_ENV not in load_env()
+    assert not (home / 'profiles/sales').exists()
