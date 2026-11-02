@@ -12,7 +12,7 @@
 
 ## Execution status - 2026-11-02 Task 12 verification
 
-Branch: `feat/shared-whatsapp-granted-user`, rebased onto current `origin/main` at `315e8949ee91a2f4308ae2be848c7970e9d8468a`. The rebased runtime/test head is `e89baeb2b418f0f4bc8fe545c43c65d8306180fc`; `61b34c8ed23b3732a224d8926cdd723748e4e314` only corrects a pre-existing test fixture shebang for lint portability. Tasks 1-11 implementation and scoped reviews are complete; Task 7 remains a partial dashboard diagnosis. Task 12 whole-branch review and native Windows focused/lint checks are complete. Linux broad verification and the current-main comparison for one timing-threshold failure remain pending. Live desktop/phone acceptance is still for the user after the branch is pushed and a PR is ready. No deployment, merge, or live acceptance is claimed. See the [portable handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-handoff.md) and [Task 12 verification and acceptance](2026-11-02-shared-whatsapp-number-and-granted-user-experience-task12-verification.md).
+Branch: `feat/shared-whatsapp-granted-user`, rebased onto current `origin/main` at `315e8949ee91a2f4308ae2be848c7970e9d8468a`. The rebased runtime/test head is `e89baeb2b418f0f4bc8fe545c43c65d8306180fc`; `61b34c8ed23b3732a224d8926cdd723748e4e314` only corrects a pre-existing test fixture shebang for lint portability. Tasks 1-11 implementation and scoped reviews are complete; Task 7 remains a partial dashboard diagnosis. Task 12 whole-branch review and native Windows focused/lint checks are complete. Linux `scripts/check` passed; current-main comparison reproduced both observed initial broad failure groups. A replacement Linux broad run remains active, so final totals are pending. PR #36 is open at pushed head `4ee1c1c74e60f7499b3399c00e365cc8c2098b6e`; CI remains partial/in progress. Live desktop/phone acceptance is still for the user. No deployment, merge, or live acceptance is claimed. See the [portable handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-handoff.md) and [Task 12 verification and acceptance](2026-11-02-shared-whatsapp-number-and-granted-user-experience-task12-verification.md).
 
 | Task | Recorded status | Remaining verification |
 |---|---|---|
@@ -27,7 +27,7 @@ Branch: `feat/shared-whatsapp-granted-user`, rebased onto current `origin/main` 
 | 9 | Granted managed files: Windows 81 passed/8 skipped; Linux 37 passed, final focused 13 passed; reviewed | Broad `tests/hermes_cli/ -k "files or managed"`; native Windows reparse |
 | 10 | Granted fs + secure staging review fix: Linux 37 passed; Windows 139 passed/20 skipped; re-reviewed | Broad `tests/hermes_cli/ -k "fs or files or managed or hosted"`; live desktop |
 | 11 | SOUL and real prompt build complete; review approved. Fresh native Linux 177 passed/4 skipped, exit 0 | Successful model identity answer; upstream Hermes helper conflict remains intentional |
-| 12 | D18-D20 recorded; whole-branch review clean; Windows focused feature batch 228 passed/0 failed/20 POSIX skips; Windows full `scripts/check` 12 checks OK | Linux broad suite and current-main timing comparison pending; live desktop/phone acceptance pending |
+| 12 | D18-D20 recorded; whole-branch review clean; Windows focused feature batch 228 passed/0 failed/20 POSIX skips; Windows and Linux `scripts/check` passed; initial broad failures reproduced on current main | Replacement Linux broad totals and final PR CI pending; live desktop/phone acceptance pending |
 
 Checkboxes below record performed work, not endorsement of every illustrative snippet. The spec corrections and reviewed final implementation supersede snippets. Partial verification steps stay unchecked with completed/deferred subparts. No broad suite or live acceptance is implied.
 
@@ -1728,12 +1728,14 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - [x] Full Python `scripts/check`: Windows 12 checks OK, exit 0 at `61b34c8ed2`; health compared 29 changed files with current main `315e8949ee91`, zero blocking and advisory findings. Receipt: `D:/Projects/sentio-task12-verification/lint-final.log` and `.exit`.
 - [x] Whole-branch review through `61b34c8ed2`: no Critical, Important or Minor findings (`.superpowers/.../whole-branch-review.md`). This is source review, not test evidence.
 - [x] Post-rebase Windows focused feature batch: 15 files, 228 passed, 0 failed, 20 POSIX skips, exit 0. Receipt: `D:/Projects/sentio-task12-verification/focused-rebased.log` and `.exit`.
-- [ ] Linux broad run at `e89baeb2b4` and the same current-main timing comparison are pending. An initial run reported `test_api_admission_off_loop` at 0.54s against a 0.5s threshold; classify only after the isolated rerun and current-main comparison. Do not count this as a confirmed regression or as a green broad result.
+- [x] Linux `scripts/check` passed, exit 0 at `e89baeb2b418f0f4bc8fe545c43c65d8306180fc` compared with current main `315e8949ee91a2f4308ae2be848c7970e9d8468a`. Host-local evidence is on `thuto-lms` under `/home/deploy/sentio-tests/20261102-shared-whatsapp/receipts/task12/`.
+- [x] Current-main comparison reproduced the initial broad failure groups: `test_api_admission_off_loop` 0.60s vs 0.50s on main (feature initial run: 0.54s); both `test_session_client_env` PATH-ordering tests fail on main as well (2 failed, 11 passed in that file; same 2 failures in feature broad run).
+- [ ] Replacement full Linux broad run is active at `e89baeb2b4`; final totals/exit pending. Do not claim broad verification complete until its final receipt is recorded.
 
 Run: `python scripts/check`
 Expected: no findings. Fix any ratchet finding by moving code into a sibling (never `# noqa`).
 
-The initial Linux broad receipt and known main/base failures are historical context in the portable handoff. The refreshed full run and its current-main comparison must be reported separately; focused passes do not replace this gate.
+The initial Linux broad receipt and current-main comparison are recorded in the portable handoff. The replacement full run remains pending; focused passes and reproduced baseline failures do not replace its final totals.
 
 - [ ] **Step 3: Manual end-to-end on a real gateway** (the spec's acceptance check)
 

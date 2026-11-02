@@ -1,14 +1,14 @@
 # Shared WhatsApp number and the granted-user experience
 
-Status: implementation and source review complete through `61b34c8ed2`; Linux broad verification and live acceptance are pending. Private fork (`sentio-one/sentio`). See the [Task 12 verification and acceptance handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-task12-verification.md) for portable receipts and the user checklist. No deployment, merge or live acceptance is claimed.
+Status: implementation and source review complete through `61b34c8ed2`; PR #36 is open at pushed head `4ee1c1c74e60f7499b3399c00e365cc8c2098b6e`, with CI partial/in progress. Linux lint passed and observed initial broad failures were reproduced on current main; replacement Linux broad totals and live acceptance remain pending. Private fork (`sentio-one/sentio`). See the [Task 12 verification and acceptance handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-task12-verification.md) for portable receipts and the user checklist. No deployment, merge or live acceptance is claimed.
 
 ### Delivery verification status (2026-11-02)
 
 - Rebased on current `main` `315e8949ee91a2f4308ae2be848c7970e9d8468a`; runtime/test head `e89baeb2b418f0f4bc8fe545c43c65d8306180fc`.
 - Whole-branch source review through `61b34c8ed23b3732a224d8926cdd723748e4e314`: no Critical, Important or Minor findings.
 - Native Windows focused batch: 15 files, 228 passed, 0 failed, 20 POSIX skips, exit 0. Windows `scripts/check`: 12 checks OK, zero health findings against current main.
-- Linux broad run and current-main comparison for an initial 0.54s/0.5s timing-threshold report are pending coordinator receipts. Do not treat historical broad results as a current green result.
-- User-requested push and PR into `main` remain coordinator-owned; record them only after completion. Live desktop and phone acceptance remains pending after the PR is ready. Use the portable checklist linked above and record each outcome below when actually performed.
+- Linux `scripts/check` passed with exit 0 at `e89baeb2b418f0f4bc8fe545c43c65d8306180fc` versus current main `315e8949ee91a2f4308ae2be848c7970e9d8468a`. Current main reproduces `test_api_admission_off_loop` timing (0.60s vs 0.50s; feature initial 0.54s) and both `test_session_client_env` PATH-ordering failures (2 failed, 11 passed in that file; same two failures in feature broad run).
+- Replacement Linux broad run is active and final totals remain pending. PR #36 is open at pushed head `4ee1c1c74e60f7499b3399c00e365cc8c2098b6e`; CI is partial/in progress with no final conclusion. Live desktop and phone acceptance remains pending after the PR is ready. Use the portable checklist linked above and record each outcome below when actually performed.
 
 Two workstreams with one theme: a person sees and uses only their own profile.
 
