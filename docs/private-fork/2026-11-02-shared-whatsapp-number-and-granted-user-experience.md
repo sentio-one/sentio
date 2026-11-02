@@ -56,7 +56,7 @@ Docs: `whatsapp.md` gains a "One number, many people" section; `FORK_DECISIONS.m
 - `agent/prompt_builder.py:159` `DEFAULT_AGENT_IDENTITY` is "You are Hermes Agent, built by Nous Research". Only a profile's `SOUL.md` overrides it. `create_profile` copies `SOUL.md` only when cloning, so a fresh profile has none.
 - `GET /api/profiles/active` (`hermes_cli/web_routers/profiles.py:890`) returns the server's own profile (`default`) regardless of the caller's grant. The desktop store (`apps/desktop/src/store/profile.ts:258`) adopts its `current` field.
 
-Unconfirmed: which profile the reported session actually ran under. First plan task: reproduce with a non-admin login to decide whether the active-profile fix also resolves the identity symptom or only the label.
+The 2026-11-02 dashboard diagnosis below found a `sentio-sales` runtime behind a `default` transport and active-profile label. Native desktop behaviour and the identity model response remain unverified.
 
 ### Components
 
@@ -68,11 +68,36 @@ Unconfirmed: which profile the reported session actually ran under. First plan t
 
 Non-admin A lists, reads and writes profile A's workspace and gets 403 for profile B's; `../` and symlink escapes fail; `/api/fs` still returns `admin_required` for non-admins; `/api/profiles/active` returns the granted profile for non-admins and the server profile for admins; a new profile has a `SOUL.md` and a pre-existing one is untouched; the migration skips profiles that already have one.
 
+### Manual diagnosis: 2026-11-02 (Task 7)
+
+Read-only inspection of `one-agent.sentiolangley.com` used an OIDC session with
+`admin=false` and only the `sentio-sales` grant. `GET /api/profiles/active` returned
+`default` with `current: default`. The file browser showed the same `admin_required`
+denial returned by `/api/files?profile=sentio-sales`.
+
+Reading the existing probe session `local-88b59369` through
+`/api/sessions?profile=sentio-sales` showed a session key beginning
+`agent:sentio-sales:local:dm:`, `profile_name: sentio-sales`, and
+`transport_profile: default`. This is evidence that the observed dashboard TUI session
+ran under `sentio-sales` despite the default label; Task 8 addresses the label, not a
+proven runtime misroute. The messages endpoint showed `failed_turn`: HTTP 401
+`Invalid Authorization` from CommandCode. There was no successful model identity
+answer. The profile SOUL endpoint returned the untouched Hermes default template,
+which is a source of the available Hermes identity text and motivates Task 11;
+the assembled prompt and resulting model response were not verified.
+
+Native desktop and gateway logs were unavailable through the native pipe. No new
+prompts were sent during this inspection. This does not establish native desktop
+runtime behaviour, log evidence, successful provider access, or an identity answer.
+Tasks 8?11 remain in scope, with those verification limits retained.
+
 ## Out of scope
 
 Per-sender permission tiers inside one profile; pairing-code self-service; dashboard UI screens for WhatsApp users; granting model keys; changes to `/api/fs` access rules.
 
 ## Risks
+
+- Reproduced 2026-11-02 in the dashboard: the observed TUI session ran under `sentio-sales` (session metadata), while active-profile and file-access symptoms persisted. Its SOUL endpoint exposed the untouched Hermes default identity text; the model identity answer failed with provider HTTP 401, so its identity response and assembled prompt are unverified. Native desktop and gateway logs remain unverified; see the manual diagnosis above.
 
 - The shared-bot to satellite path for WhatsApp is untested; the first task may surface fixes (Baileys number vs LID identity, session keys).
 - Owner on the default profile means a hijacked owner number reaches host-level access. Mitigation is the explicit `owners` list; it is the user's chosen trade-off.
