@@ -80,6 +80,52 @@ override `session_path`, keep it distinct per profile, or the profiles share one
 WhatsApp login. Bridges started by an older Hermes report no session directory
 and are restarted once, as after a bridge update.
 
+## One number, many people
+
+A company can pair one WhatsApp number on the default profile and route each person's
+DMs to a dedicated profile. The owner's number stays on the default profile, which has
+host-level access. Profiles created under the company access policy are sandboxed.
+
+```yaml
+# default profile's config.yaml
+gateway:
+  owners: ["+27820000001"]
+```
+
+Keep the owner's number in the bot's ordinary allowlist too. `gateway.owners` only
+refuses unrouted non-owners; it does not grant admission or bypass the receiving bot's
+allowlist, pairing or DM policy. With no owners policy configured, existing behaviour
+is unchanged.
+
+```bash
+hermes whatsapp add-user sentio-sales +27820000002  # profile + route + allowlist entry
+hermes whatsapp list-users
+hermes whatsapp remove-user sentio-sales            # keeps the profile and its data
+hermes gateway restart                              # routes load at gateway start
+```
+
+Run these commands against the default profile. `add-user` requires `gateway.owners`
+and writes a default-bot DM route with `chat_id: 27820000002`: bare-number matching is
+aware of number/JID/LID aliases. `user_id` routes use exact matching instead.
+`remove-user` deletes the route and allowlist entry; add `--delete-profile` only when
+you also want to delete the profile.
+
+`list-users` includes owners and reports routed profiles as `live`, `parked` or
+`missing`. These describe profile directories, not proof that the running gateway
+serves them. Restart after route changes; a missing or parked target is not a fallback
+to the default profile.
+
+`add-user` does not grant model keys. Configure the profile's own provider credentials,
+or have an admin use the shared-company-model-keys flow:
+
+```bash
+hermes profile share-keys sentio-sales
+```
+
+Company keys are an explicit opt-in and share company spend. Use
+`hermes profile show sentio-sales` to inspect the choice, or
+`hermes profile share-keys sentio-sales --off` to disable it.
+
 ## Two Modes
 
 | Mode | How it works | Best for |

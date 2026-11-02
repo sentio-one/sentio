@@ -269,6 +269,19 @@ bundled skill into every profile, which suits a developer, not an employee of a 
 - The default baseline is a starting guess for office work, not a decision about any customer's job: tune it per company.
 
 
+### D17. A shared WhatsApp number gates unrouted senders on explicit `gateway.owners`
+
+The default (launch) profile owns the shared bot and has host-level access.
+`gateway/whatsapp_owners.py` refuses an unrouted primary-bot non-owner when an owners
+policy is configured. Owners and routed senders still need ordinary bot admission;
+without the policy, behaviour is unchanged. WhatsApp DM mappings use alias-aware
+`chat_id` (bare number/JID/LID), not exact-match `user_id`, and apply to the default bot.
+Missing or parked targets never fall back to default. CLI directory status is not
+proof of a running gateway. Restart after route changes. Model keys remain a separate
+admin choice through D15, never an automatic consequence of adding a user.
+Upstream merges: keep the `owner_gate` call before ordinary admission in
+`authz_mixin.py::_principal_authorized`.
+
 ## 2. Upstream files the fork modifies (merge conflict map)
 
 Highest risk first. "Keep" is what must survive a conflict resolution.
