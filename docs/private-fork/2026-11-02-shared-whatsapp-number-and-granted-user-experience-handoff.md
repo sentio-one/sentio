@@ -1,6 +1,6 @@
 # Shared WhatsApp number and granted-user experience: portable handoff
 
-Recorded 2026-11-02. Continue on branch `feat/shared-whatsapp-granted-user`. Tasks 1-11 implementation and scoped reviews are complete; Task 7 remains a partial dashboard diagnosis. Task 12 broad regression, whole-branch review, deployment and live acceptance are deferred by the user. The coordinator owns publishing the branch; this handoff does not assert it is already pushed or deployed. Rebase onto `main` before merging and revalidate afterward.
+Recorded 2026-11-02. Branch `feat/shared-whatsapp-granted-user` is rebased onto current `origin/main` `315e8949ee91a2f4308ae2be848c7970e9d8468a`. Runtime/test head `e89baeb2b418f0f4bc8fe545c43c65d8306180fc`; lint-only fixture correction at `61b34c8ed23b3732a224d8926cdd723748e4e314`. Tasks 1-11 implementation and scoped reviews are complete; Task 7 remains a partial dashboard diagnosis. Task 12 whole-branch review and native Windows focused/lint verification are complete. Linux broad verification and current-main comparison for one timing-threshold failure remain pending. The coordinator owns final commit/push and PR creation; this handoff does not claim they have happened. No deployment, merge or live acceptance is claimed. See the [Task 12 verification and acceptance handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-task12-verification.md) for the current status and user checklist.
 
 Read the [spec](2026-11-02-shared-whatsapp-number-and-granted-user-experience.md), especially its corrections, and [tracked plan](2026-11-02-shared-whatsapp-number-and-granted-user-experience-plan.md). The spec/preflight corrections override illustrative plan code. The local `.superpowers/sdd/2026-11-02-shared-whatsapp-number-and-granted-user-experience-plan/` directory contains ignored briefs, reports and raw logs; it will **not** follow a clone. Material results and limits are carried here instead. No raw scratch artifacts should be force-added.
 
@@ -22,7 +22,7 @@ Read the [spec](2026-11-02-shared-whatsapp-number-and-granted-user-experience.md
 | 11 SOUL | `7dd9d45ebf` | Exact Sentio template, preserved old Hermes + ASCII legacy seeds, existing upgrade path; review approved |
 | Test lint | `6de7cf5bc3` | Explicit `check=False` on existing child-process regression, preserving captured return-code assertion |
 
-All these task commits use the requested Claude coauthor trailer. The handoff/plan status commit follows them. Scoped review approval is not a completed whole-branch review; that remains Task 12.
+All these task commits use the requested Claude coauthor trailer. The original handoff/plan status commit follows them. Subsequent rebase and Task 12 verification are documented separately below and in the Task 12 report.
 
 ## Focused test receipts
 
@@ -51,7 +51,7 @@ Task 11's fresh native receipt supersedes the earlier mounted-Windows-worktree w
 
 Focused health checks passed for the final task deltas. After the narrow `check=False` test lint fix, the full **`python scripts/check` passed all 12 checks, exit 0** on Windows at source commit `6de7cf5bc3`: health compared 26 files against `31c51eb36776`, zero blocking and zero advisory findings. The reviewed narrow BLE001 allowance in shared-user rollback remains: attempt every recovery writer and preserve the initiating failure. Commit hooks reported `Can't find lefthook in PATH`; explicit checks above supply evidence, not hooks. A lint pass is not full regression or release evidence.
 
-The two known Windows config failures are `TestEnvWriteDenylist::test_non_exec_near_misses_still_writable[git_config_parameters]` and `[ld_preload]`. They were reproduced on the Task 2 pre-extraction base. Linux Task 11 config passed; unrelated Windows failures were not changed. Native Windows junction/reparse behavior is still unverified; POSIX symlink tests do not establish it.
+The two known Windows config failures are `TestEnvWriteDenylist::test_non_exec_near_misses_still_writable[git_config_parameters]` and `[ld_preload]`. They were reproduced on the Task 2 pre-extraction base. Linux Task 11 config passed; unrelated Windows failures were not changed. The later native Windows junction tests and post-rebase focused result are recorded in the Task 12 status below; POSIX symlink tests alone do not establish Windows reparse behavior.
 
 ## Identity and live baseline
 
@@ -69,27 +69,44 @@ Read-only live dashboard baseline at `one-agent.sentiolangley.com`: the non-admi
 - Existing shared-bot/satellite path, sandbox execution, actual phone delivery, runtime restart and model response still need live acceptance. Do not expose provider credentials or copy production secrets into test environments.
 - The Task 7 literal `Tasks 8?11` typo was corrected in Task 11. D17 is recorded; the next available fork decisions for active discovery, file confinement and SOUL remain Task 12 work.
 
-## Resume on the next machine
+## Task 12 status and next actions
 
-1. Fetch/checkout `feat/shared-whatsapp-granted-user` after the coordinator confirms push. Verify branch/HEAD, clean tree and remote ancestry. Read root and relevant area `AGENTS.md` before edits. Use a native clone on the host being tested; do not treat a mounted Windows worktree `.git` pointer as a native Linux clone.
-2. Prepare Python 3.14 through the [PM developer workflow](../../website/docs/reference/package-management.md#developer-workflow), with a disposable development `HERMES_HOME` and runtime directory. Using that prepared interpreter, build a **fresh, nonexistent** test output:
+The earlier “Resume on the next machine” procedure above is historical guidance and is superseded by this current status. D18-D20 are already recorded in `FORK_DECISIONS.md`; no additional decision numbering is required.
 
-   ```bash
-   python -m pm.build_env --source . --out .venv --group dev --group test
-   ```
+- **Rebase:** complete, from current main `315e8949ee91a2f4308ae2be848c7970e9d8468a`.
+- **Source review:** complete through `61b34c8ed23b3732a224d8926cdd723748e4e314`; whole-branch Luna review found no Critical, Important or Minor findings. Review does not substitute for execution evidence.
+- **Windows focused feature batch:** complete at runtime/test head `e89baeb2b418f0f4bc8fe545c43c65d8306180fc`: 15 files, 228 passed, 0 failed, 20 POSIX skips, exit 0. Native junction coverage is included.
+- **Windows full lint:** complete at `61b34c8ed2`: 12 checks OK, zero health findings against `315e8949ee91`. The only post-runtime-head source change is a test fixture shebang correction; no runtime behavior changed.
+- **Linux broad verification:** pending. Fresh run uses the independent PM test environment with `dev`, `test`, and `all`/`messaging`/`audio-io` extras. One timing test initially reported 0.54s against a 0.5s threshold. The isolated rerun and identical current-main comparison must determine whether this is a base/timing failure. Do not report broad green until coordinator supplies the final receipt/counts and comparison.
+- **Push and PR:** coordinator-owned and pending. The user requested a pushed branch and PR into `main`, not a merge or deployment. Record the actual pushed head, PR URL, and CI status only after receipts exist.
+- **Live acceptance:** pending user work after the PR is ready. Automated coverage, source review and old production observations do not complete it.
 
-   Do not mutate PM environments with raw pip/uv. On Windows initialize the native C++ build environment first. See [CONTRIBUTING](../../CONTRIBUTING.md#manual-development-and-test-environment). If the disposable output already exists, stop its own processes and intentionally remove only that output before regeneration. Never use a test home as staging/production.
-3. Set `HERMES_PYTHON` to this new test interpreter (`.venv/bin/python` on POSIX, `.venv/Scripts/python.exe` on Windows). Use Git Bash on Windows. Run the deferred commands below, saving permanent receipts and distinguishing new regressions from base/host failures:
+Historical Linux baseline and known main/base failures remain recorded in `D:/Projects/sentio-linux-verification-20261102.md`; that file is historical evidence, not the refreshed broad result. Raw scratch logs are not committed.
 
-   ```bash
-   python scripts/check
-   scripts/run_tests.sh tests/hermes_cli/ -k "files or managed"
-   scripts/run_tests.sh tests/hermes_cli/ -k "fs or files or managed or hosted"
-   scripts/run_tests.sh tests/gateway/ tests/hermes_cli/
-   ```
+## User desktop and phone acceptance checklist
 
-   Invoke `scripts/check` with the test interpreter explicitly if `python` is the application interpreter. Run host-specific tests on that host; do not fake `sys.platform`. Native Windows reparse testing remains separate. Broad tests and a full branch review have not been performed for this delivery.
-4. Complete Task 12 fork decisions using the next available D numbers; record the grant-only discovery contract, explicit file workspace boundary and Sentio SOUL upgrade seam, including intentionally unchanged core Hermes guidance. Review the whole branch after the focused fixes and broad receipts. Rebase onto current `main` before merge and rerun appropriate checks. Do not infer production readiness from focused passes.
-5. Arrange deployment with the operator, confirm the intended target/revision and preserve environment separation. Do not deploy merely because source checks pass. Restart the real gateway after provisioning changes; route hot reload is out of scope.
-6. Perform Task 12 acceptance with actual owner, second routed phone and third ordinarily allowlisted-but-unrouted phone: owner answers on default, routed person answers on its own sandboxed profile, third is refused. Verify no missing/parked fallback. Use actual phones, not fake-transport test success, for this receipt.
-7. Sign into native desktop and dashboard as the sales-only OIDC account. Confirm profile pill/active discovery, workspace listing/edit/upload/delete and refusal of host Git APIs. Inspect native/gateway logs and actual runtime profile. Resolve provider authorization and obtain a real identity answer; record it separately from the assembled prompt and preserve the known Hermes helper conflict. Record pass/fail per acceptance line in the spec. Broad, native, phone and deployment checks remain pending until these receipts exist.
+Run against the explicitly intended revision and environment after the PR is ready. Record pass/fail and evidence for each line in the spec's Verification section. Do not include phone numbers, account emails, tokens or credentials.
+
+### Desktop / granted profile
+
+- [ ] Install or launch the intended revision and confirm its revision in the running desktop/backend.
+- [ ] Sign in with the sales-only OIDC account; active profile and profile pill show `sentio-sales`.
+- [ ] Workspace listing, read, edit, upload and delete work within the explicitly granted profile's `workspace/` only. Confirm another profile and paths outside the workspace remain inaccessible.
+- [ ] Host Git and media APIs remain denied for this non-admin account; verify `/api/git/status` and `/api/media` return the expected authorization denial.
+- [ ] Confirm the existing customized `SOUL.md` is untouched. In a fresh profile/session, confirm the seeded Sentio SOUL text is present and record the actual model identity answer separately from prompt inspection.
+- [ ] Inspect native desktop and gateway logs/session metadata to confirm the actual runtime profile. Provider authorization and a successful model response are still required to claim a model identity result.
+
+### Shared WhatsApp number
+
+- [ ] Configure the owner number in `gateway.owners`, provision the second phone through `hermes whatsapp add-user`, and restart the gateway after route changes.
+- [ ] From the owner phone, confirm the shared number responds on `default`.
+- [ ] From the routed second phone, confirm the response runs on its own sandboxed profile.
+- [ ] From a third phone that is ordinarily allowlisted but has no route, confirm there is no response and no fallthrough to `default`.
+- [ ] Confirm a missing or parked route target fails closed rather than falling back to `default`.
+- [ ] Confirm actual sandbox execution and inspect gateway/session logs; fake transports and route metadata alone do not prove delivery or execution.
+
+### Known limits to keep visible
+
+- Prompt assembly intentionally still contains upstream Hermes helper guidance (`HERMES_AGENT_HELP_GUIDANCE` and/or `HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS`) and the upstream `DEFAULT_AGENT_IDENTITY`. The earlier provider probe failed with HTTP 401. Do not promise the model's spoken identity until a successful live answer is observed; record any conflict.
+- Docker sandbox `/workspace` is ephemeral and has no bind mount, so uploaded host workspace files are not visible inside that sandbox runtime. This is an existing scope boundary, not a verified file-transfer capability.
+- Historical dashboard metadata showed the session runtime as `sentio-sales` behind `default` transport/label; native desktop and gateway logs were unavailable in that earlier inspection. Preserve this as historical baseline, not proof about the current build.

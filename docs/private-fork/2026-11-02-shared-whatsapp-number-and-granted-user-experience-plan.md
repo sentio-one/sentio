@@ -10,9 +10,9 @@
 
 **Spec:** `docs/private-fork/2026-11-02-shared-whatsapp-number-and-granted-user-experience.md` (read it first; the "Spec corrections" section at its end overrides earlier text where they differ).
 
-## Execution status - 2026-11-02 handoff
+## Execution status - 2026-11-02 Task 12 verification
 
-Branch: `feat/shared-whatsapp-granted-user`. Tasks 1-11 implementation and scoped reviews are complete, with Task 7 limited to dashboard diagnosis. **Task 12 broad regression, whole-branch review, deployment and live acceptance are deferred to the next machine.** This is not release approval. The [portable handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-handoff.md) carries commit mapping, test receipts, limitations and exact next commands; local ignored `.superpowers/` evidence will not follow a clone.
+Branch: `feat/shared-whatsapp-granted-user`, rebased onto current `origin/main` at `315e8949ee91a2f4308ae2be848c7970e9d8468a`. The rebased runtime/test head is `e89baeb2b418f0f4bc8fe545c43c65d8306180fc`; `61b34c8ed23b3732a224d8926cdd723748e4e314` only corrects a pre-existing test fixture shebang for lint portability. Tasks 1-11 implementation and scoped reviews are complete; Task 7 remains a partial dashboard diagnosis. Task 12 whole-branch review and native Windows focused/lint checks are complete. Linux broad verification and the current-main comparison for one timing-threshold failure remain pending. Live desktop/phone acceptance is still for the user after the branch is pushed and a PR is ready. No deployment, merge, or live acceptance is claimed. See the [portable handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-handoff.md) and [Task 12 verification and acceptance](2026-11-02-shared-whatsapp-number-and-granted-user-experience-task12-verification.md).
 
 | Task | Recorded status | Remaining verification |
 |---|---|---|
@@ -27,7 +27,7 @@ Branch: `feat/shared-whatsapp-granted-user`. Tasks 1-11 implementation and scope
 | 9 | Granted managed files: Windows 81 passed/8 skipped; Linux 37 passed, final focused 13 passed; reviewed | Broad `tests/hermes_cli/ -k "files or managed"`; native Windows reparse |
 | 10 | Granted fs + secure staging review fix: Linux 37 passed; Windows 139 passed/20 skipped; re-reviewed | Broad `tests/hermes_cli/ -k "fs or files or managed or hosted"`; live desktop |
 | 11 | SOUL and real prompt build complete; review approved. Fresh native Linux 177 passed/4 skipped, exit 0 | Successful model identity answer; upstream Hermes helper conflict remains intentional |
-| 12 | Full `python scripts/check`: **12 checks OK**, exit 0 after explicit subprocess-check lint fix | Fork decisions D18+; broad suites; whole-branch review; deployment; real phones and desktop |
+| 12 | D18-D20 recorded; whole-branch review clean; Windows focused feature batch 228 passed/0 failed/20 POSIX skips; Windows full `scripts/check` 12 checks OK | Linux broad suite and current-main timing comparison pending; live desktop/phone acceptance pending |
 
 Checkboxes below record performed work, not endorsement of every illustrative snippet. The spec corrections and reviewed final implementation supersede snippets. Partial verification steps stay unchecked with completed/deferred subparts. No broad suite or live acceptance is implied.
 
@@ -1710,7 +1710,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Interfaces:** none.
 
-- [ ] **Step 1: Record the decisions** (append next free entries)
+- [x] **Step 1: Record the decisions** (D18-D20 are already recorded in `FORK_DECISIONS.md`; no new numbering needed).
 
 ```markdown
 - **Dxx. A grant-scoped caller's files are the granted profile's `workspace/` directory.** `/api/files` and the `/api/fs`
@@ -1725,21 +1725,19 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 2: Run the full lint and the touched suites**
 
-- [x] Full Python `scripts/check`: 12 checks OK, exit 0 on 2026-11-02 after commit `6de7cf5bc3`.
-- [ ] Broad touched suites deferred by user to the next machine.
+- [x] Full Python `scripts/check`: Windows 12 checks OK, exit 0 at `61b34c8ed2`; health compared 29 changed files with current main `315e8949ee91`, zero blocking and advisory findings. Receipt: `D:/Projects/sentio-task12-verification/lint-final.log` and `.exit`.
+- [x] Whole-branch review through `61b34c8ed2`: no Critical, Important or Minor findings (`.superpowers/.../whole-branch-review.md`). This is source review, not test evidence.
+- [x] Post-rebase Windows focused feature batch: 15 files, 228 passed, 0 failed, 20 POSIX skips, exit 0. Receipt: `D:/Projects/sentio-task12-verification/focused-rebased.log` and `.exit`.
+- [ ] Linux broad run at `e89baeb2b4` and the same current-main timing comparison are pending. An initial run reported `test_api_admission_off_loop` at 0.54s against a 0.5s threshold; classify only after the isolated rerun and current-main comparison. Do not count this as a confirmed regression or as a green broad result.
 
 Run: `python scripts/check`
 Expected: no findings. Fix any ratchet finding by moving code into a sibling (never `# noqa`).
 
-Run: `scripts/run_tests.sh tests/gateway/ tests/hermes_cli/`
-Expected: all PASS (this proves `/api/fs`, `/api/files`, `authz_mixin` and `default_soul` changes broke nothing existing).
+The initial Linux broad receipt and known main/base failures are historical context in the portable handoff. The refreshed full run and its current-main comparison must be reported separately; focused passes do not replace this gate.
 
 - [ ] **Step 3: Manual end-to-end on a real gateway** (the spec's acceptance check)
 
-1. Default profile `config.yaml`: `gateway.owners: ["+<your number>"]`. Pair the shared number (`hermes whatsapp`). `hermes whatsapp add-user sentio-sales +<second phone>`; `hermes gateway restart`.
-2. From your number: the default profile answers. From the second phone: `sentio-sales` answers. From a third, allowlisted-but-unrouted phone (add its number to `WHATSAPP_ALLOWED_USERS` by hand): no answer.
-3. Desktop, signed in as the OIDC account granted only `sentio-sales`: the profile pill shows `sentio-sales`, the file browser lists that profile's `workspace/` (edit and upload work), the agent says it is Sentio, and `/api/git/status` still returns `admin_required`.
-Record the outcome (pass/fail per line) in the spec under "Verification".
+Live acceptance is intentionally not performed by this implementation pass. After the coordinator has pushed the branch and opened a PR, the user installs the intended revision on the desktop/gateway environment, completes each item in the [Task 12 verification and acceptance handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-task12-verification.md), and records pass/fail plus evidence in the spec's Verification section. Do not mark any live item complete based on automated tests.
 
 - [ ] **Step 4: Commit**
 
