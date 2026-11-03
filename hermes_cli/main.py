@@ -466,12 +466,6 @@ def _exit_invalid_profile_name(value: str) -> None:
     sys.exit(2)
 
 
-def _looks_like_option_value(value: str) -> bool:
-    """A ``-p`` value that clearly belongs to some other tool (pytest's ``-p no:xdist``, a
-    third-party ``-p --flag``), never a mistyped profile name."""
-    return value.startswith("-") or ":" in value
-
-
 def _scan_profile_flag(argv: list) -> tuple:
     """Find -p/--profile/--profile= in argv -> (name, tokens_consumed, index).
 
@@ -500,7 +494,7 @@ def _scan_profile_flag(argv: list) -> tuple:
             value = raw.strip().casefold()
             if re.match(_PROFILE_NAME_RE, value):
                 return value, 2, i
-            if not saw_subcommand and not _looks_like_option_value(raw) and _looks_like_hermes_invocation():
+            if not saw_subcommand and not _startup_fast.looks_like_option_value(raw) and _looks_like_hermes_invocation():
                 _exit_invalid_profile_name(raw)
             break
         if arg.startswith("--profile="):
@@ -596,6 +590,8 @@ def _apply_profile_override() -> None:
     _explicit_cli_profile = None
     argv = sys.argv[1:]
     profile_name, consume, profile_index = _scan_profile_flag(argv)
+    if profile_name is None and _startup_fast.is_shared_whatsapp_user_command(argv):
+        profile_name = 'default'
     from_sticky_profile = False
 
     # HERMES_HOME already set with no explicit flag: trust it only when it

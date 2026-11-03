@@ -104,11 +104,25 @@ hermes whatsapp remove-user sentio-sales            # keeps the profile and its 
 hermes gateway restart                              # routes load at gateway start
 ```
 
-Run these commands against the default profile. `add-user` requires `gateway.owners`
+These commands use the default profile even when a named profile is selected with
+`hermes profile use`. An explicit named `-p` is rejected; `hermes -p default whatsapp ...`
+also works. `add-user` requires `gateway.owners`
 and writes a default-bot DM route with `chat_id: 27820000002`: bare-number matching is
 aware of number/JID/LID aliases. `user_id` routes use exact matching instead.
 `remove-user` deletes the route and allowlist entry; add `--delete-profile` only when
 you also want to delete the profile.
+
+Repeating `add-user` for the same number and profile restores a missing persisted
+allowlist entry without recreating the profile. Top-level `owners` and `profile_routes`
+are also supported: management follows the gateway's precedence and writes routes to
+the authoritative location. An explicit enabled route to `default` still requires
+ordinary admission, but is exempt from the unrouted-non-owner gate.
+
+Generic profile deletion removes routes targeting that profile or using its bot;
+renaming migrates those references. These lifecycle operations update a running
+gateway before the old name can be reused. If the gateway cannot acknowledge the
+route change, restart it before retrying the operation. A failed directory deletion
+keeps routes revoked; a failed directory rename restores the original mapping.
 
 `list-users` includes owners and reports routed profiles as `live`, `parked` or
 `missing`. These describe profile directories, not proof that the running gateway

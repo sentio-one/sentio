@@ -82,3 +82,23 @@ def test_bare_whatsapp_still_enters_setup_wizard(home, monkeypatch, capsys):
     monkeypatch.setattr(main_platform_setup, "_whatsapp_choose_mode", lambda *args: None)
     args.func(args)
     assert "WhatsApp Setup" in capsys.readouterr().out
+
+
+def test_user_commands_ignore_sticky_profile_but_preserve_explicit_guard(home, monkeypatch):
+    from hermes_cli import main, profiles
+    from hermes_cli.whatsapp_users_cli import run
+    profiles.create_profile('selected', no_alias=True)
+    profiles.set_active_profile('selected')
+    monkeypatch.setattr(main.sys, 'argv', ['hermes', 'whatsapp', 'add-user', 'sales', '27820000002'])
+    main._apply_profile_override()
+    assert run(_parse('add-user', 'sales', '27820000002')) == 0
+    assert (home / 'profiles/sales').is_dir()
+    assert not (home / 'profiles/selected/.env').read_text().count('27820000002')
+    for action in ('list-users', 'remove-user'):
+        argv = [action] if action == 'list-users' else [action, 'sales']
+        monkeypatch.setattr(main.sys, 'argv', ['hermes', 'whatsapp', *argv])
+        main._apply_profile_override()
+        assert run(_parse(*argv)) == 0
+    monkeypatch.setattr(main.sys, 'argv', ['hermes', '-p', 'selected', 'whatsapp', 'list-users'])
+    main._apply_profile_override()
+    assert run(_parse('list-users')) == 1

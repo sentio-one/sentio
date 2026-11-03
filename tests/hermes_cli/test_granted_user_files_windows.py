@@ -138,3 +138,24 @@ def test_granted_files_block_junction_escape_for_reads_and_writes(
     assert fs_write.status_code == 403
     assert target.read_text(encoding="utf-8") == "private"
     assert not (outside / "new.txt").exists()
+
+
+@pytest.mark.platforms("windows")
+@pytest.mark.parametrize("destination", ["home", "private"])
+def test_workspace_anchor_cannot_be_a_junction_to_private_profile_state(
+    profile_env, granted_client, junction_factory, destination,
+):
+    workspace = profile_env.workspace
+    workspace.rmdir()
+    target = profile_env.profile if destination == "home" else profile_env.profile / "private"
+    target.mkdir(exist_ok=True)
+    secret = target / "secret.txt"
+    secret.write_text("private", encoding="utf-8")
+    junction_factory(workspace, target)
+    assert granted_client.get("/api/files?profile=alpha").status_code == 403
+    assert _files_read(granted_client, "secret.txt").status_code == 403
+    assert _files_upload(granted_client, "new.txt").status_code == 403
+    assert _fs_read(granted_client, workspace / "secret.txt").status_code == 403
+    assert _fs_write(granted_client, workspace / "secret.txt").status_code == 403
+    assert secret.read_text(encoding="utf-8") == "private"
+    assert not (target / "new.txt").exists()

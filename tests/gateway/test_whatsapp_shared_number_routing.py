@@ -142,6 +142,33 @@ def test_owner_still_requires_ordinary_admission(rig, monkeypatch):
     assert _authorized(rig, f"{OWNER}@s.whatsapp.net") is False
 
 
+def test_explicit_default_route_defers_to_ordinary_admission(rig, monkeypatch):
+    rig.runner.config.owners = [OWNER]
+    rig.runner.config.profile_routes = parse_profile_routes([
+        {"platform": "whatsapp", "profile": "default", "chat_id": SALES},
+    ])
+    monkeypatch.setenv("GATEWAY_ALLOWED_USERS", SALES)
+    assert _authorized(rig, f"{SALES}@s.whatsapp.net") is True
+    assert _authorized(rig, "27820000009@s.whatsapp.net") is False
+    monkeypatch.setenv("GATEWAY_ALLOWED_USERS", "27820000009")
+    assert _authorized(rig, f"{SALES}@s.whatsapp.net") is False
+
+
+def test_inactive_or_wrong_bot_route_cannot_bypass_owner_gate(rig, monkeypatch):
+    rig.runner.config.owners = [OWNER]
+    monkeypatch.setenv("GATEWAY_ALLOW_ALL_USERS", "true")
+    rig.runner.config.profile_routes = parse_profile_routes([
+        {"platform": "whatsapp", "profile": "default", "chat_id": SALES},
+    ])
+    rig.runner.config.multiplex_profiles = False
+    assert _authorized(rig, f"{SALES}@s.whatsapp.net") is False
+    rig.runner.config.multiplex_profiles = True
+    rig.runner.config.profile_routes = parse_profile_routes([
+        {"platform": "whatsapp", "profile": "default", "chat_id": SALES, "bot_profile": "other"},
+    ])
+    assert _authorized(rig, f"{SALES}@s.whatsapp.net") is False
+
+
 @pytest.mark.parametrize("target", ["missing", "parked"])
 def test_unserved_route_is_dropped_before_owner_admission(rig, target):
     from gateway.session_identity import identity_of

@@ -664,6 +664,7 @@ class GatewayAuthorizationMixin:
             platform=getattr(source.platform, "value", source.platform),
             user_id=source.user_id, identity=identity_of(source),
             primary_profile=getattr(self, "_primary_profile_name", None) or "default",
+            routes=getattr(getattr(self, "config", None), "profile_routes", ()) or (), source=source,
         ) is False:
             return False
 

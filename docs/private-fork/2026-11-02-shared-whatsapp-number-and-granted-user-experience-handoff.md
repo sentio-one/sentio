@@ -1,5 +1,10 @@
 # Shared WhatsApp number and granted-user experience: portable handoff
 
+**2026-11-03 follow-up:** the six Aikido findings on PR #36 required another fix pass.
+The [Aikido fix-pass record](2026-11-03-aikido-fix-pass.md) supersedes the source-review
+readiness assessment below and records the fixes and fresh verification. Live
+desktop/phone acceptance remains pending.
+
 Recorded 2026-11-02. Branch `feat/shared-whatsapp-granted-user` is rebased onto current `origin/main` `315e8949ee91a2f4308ae2be848c7970e9d8468a`. Runtime/test head `e89baeb2b418f0f4bc8fe545c43c65d8306180fc`; lint-only fixture correction at `61b34c8ed23b3732a224d8926cdd723748e4e314`. Tasks 1-11 implementation and scoped reviews are complete; Task 7 remains a partial dashboard diagnosis. Task 12 whole-branch review, native Windows checks, Linux lint, and final Linux broad run are complete. The final broad run had 12 failures; all were reproduced on clean current main. PR #36 is open at pushed branch head; all PR checks pass. No deployment, merge or live acceptance is claimed. See the [Task 12 verification and acceptance handoff](2026-11-02-shared-whatsapp-number-and-granted-user-experience-task12-verification.md) for receipts and the user checklist.
 
 Read the [spec](2026-11-02-shared-whatsapp-number-and-granted-user-experience.md), especially its corrections, and [tracked plan](2026-11-02-shared-whatsapp-number-and-granted-user-experience-plan.md). The spec/preflight corrections override illustrative plan code. The local `.superpowers/sdd/2026-11-02-shared-whatsapp-number-and-granted-user-experience-plan/` directory contains ignored briefs, reports and raw logs; it will **not** follow a clone. Material results and limits are carried here instead. No raw scratch artifacts should be force-added.

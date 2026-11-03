@@ -298,8 +298,8 @@ def restricted_files_root(request: Optional[Request], *, create_root: bool = Tru
     workspace = profile_home / "workspace"
     root = _canonical_path(workspace)
     # Check before mkdir: resolving an escaped workspace must never authorize its destination.
-    if not _path_is_under(profile_home, root):
-        raise HTTPException(status_code=403, detail="Workspace outside profile home")
+    if root != workspace:
+        raise HTTPException(status_code=403, detail="Workspace must be a real profile directory")
     return _ensure_managed_root(root) if create_root else root
 
 

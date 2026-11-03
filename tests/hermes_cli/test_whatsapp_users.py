@@ -25,7 +25,6 @@ def route(**extra):
 def test_lifecycle_and_exact_repeat(home):
     user = wu.add_user('sales', '+' + NUMBER)
     assert user == wu.WhatsAppUser(NUMBER, 'sales', 'live')
-    save_env_value('WHATSAPP_ALLOWED_USERS', '')
     before = config(home), (home / '.env').read_bytes()
     assert wu.add_user('sales', NUMBER + '@s.whatsapp.net') == user
     assert (config(home), (home / '.env').read_bytes()) == before

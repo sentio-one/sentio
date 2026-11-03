@@ -285,6 +285,7 @@ async def _start_gateway_start_control_socket(runner):
             migrate_profile_identity_verb, purge_profile_identity_verb,
             unserve_profile_verb, serve_profile_verb,
         )
+        from gateway.profile_route_lifecycle import reload_profile_routes_verb
         from gateway.run_plugin_rewire import reload_plugins_verb
         from gateway.run_active_work_verb import active_work_verb
         from gateway.drain_control import RESTART_WAIT_REASON
@@ -354,6 +355,7 @@ async def _start_gateway_start_control_socket(runner):
         _control_server = GatewayControlServer(
             verb_handlers={"pause-for-update": _pause_for_update_handler, "identify": _identify_runtime,
                            "rescan-profiles": _rescan_profiles_handler,
+                           "reload-profile-routes": reload_profile_routes_verb(runner),
                            "migrate-profile-identity": migrate_profile_identity_verb(runner),
                            "unserve-profile": unserve_profile_verb(runner),
                            "serve-profile": serve_profile_verb(runner),

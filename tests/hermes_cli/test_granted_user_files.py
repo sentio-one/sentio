@@ -113,6 +113,24 @@ def test_escaped_workspace_anchor_is_refused_before_creation(env, tmp_path):
 
 
 @pytest.mark.platforms('posix')
+@pytest.mark.parametrize('destination', ['home', 'private'])
+def test_workspace_anchor_cannot_link_to_private_profile_state(env, destination):
+    (env.ws / 'notes.txt').unlink()
+    env.ws.rmdir()
+    target = env.profile if destination == 'home' else env.profile / 'private'
+    target.mkdir(exist_ok=True)
+    secret = target / 'secret.txt'
+    secret.write_text('private')
+    env.ws.symlink_to(target, target_is_directory=True)
+    with client() as c:
+        assert c.get('/api/files?profile=alpha').status_code == 403
+        assert c.get('/api/files/read?profile=alpha&path=secret.txt').status_code == 403
+        assert upload(c, 'new.txt').status_code == 403
+    assert secret.read_text() == 'private'
+    assert not (target / 'new.txt').exists()
+
+
+@pytest.mark.platforms('posix')
 def test_safe_workspace_symlinks_still_work(env):
     (env.ws / 'alias').symlink_to(env.ws / 'notes.txt')
     c = client()

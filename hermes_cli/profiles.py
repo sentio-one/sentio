@@ -19,6 +19,7 @@ from typing import Dict, List, Optional, Tuple
 from agent.file_safety import HOME_CREDENTIAL_DIRS
 from hermes_cli.archive_safe import archive_root_dirs, make_targz, normalize_archive_parts, safe_extract_targz
 from hermes_cli.home_data_layout import PM_RUNTIME_ROOT_DIRS
+from hermes_cli.profile_routes import profile_routes_locked
 from hermes_cli.profiles_remove import _rmtree_make_writable, _rmtree_with_retry, wait_profile_unowned
 from hermes_constants import (
     LOCAL_RUNTIME_ROOT_DIRS, PROFILE_ID_RE, clear_named_profile_deleted, mark_named_profile_deleted,
@@ -1439,7 +1440,8 @@ def create_profile(
     # on every create and every 30 s, and ``_iter_named_profile_dirs`` only lists valid ids (no leading
     # dot), so it can never adopt the half-copied tree and start adapters on credentials the strip
     # below has not removed yet.
-    staging = _clone_staging_dir(profile_dir)
+    from hermes_cli.profile_clone import clone_staging_dir
+    staging = clone_staging_dir(profile_dir)
     try:
         if clone_all and source_dir:
             _clone_all_into(source_dir, staging, canon)
@@ -1465,18 +1467,6 @@ def create_profile(
     # rescans periodically, so a missed signal only delays serving).
     _notify_multiplexer(canon)
     return profile_dir
-
-
-def _clone_staging_dir(profile_dir: Path) -> Path:
-    """Fresh ``profiles/.<name>.staging-<pid>`` beside the final dir (same filesystem, so the publish
-    rename is atomic). A leftover from a crashed create is discarded."""
-    staging = profile_dir.parent / f".{profile_dir.name}.staging-{os.getpid()}"
-    profile_dir.parent.mkdir(parents=True, exist_ok=True)
-    if staging.is_symlink() or staging.is_file():
-        staging.unlink()
-    elif staging.is_dir():
-        shutil.rmtree(staging, ignore_errors=True)
-    return staging
 
 
 def _notify_multiplexer(canon: str) -> None:
@@ -1756,6 +1746,7 @@ class ProfileIdentitySettlementPending(RuntimeError):
             f"still pending — run: {self.retry_command}")
 
 
+@profile_routes_locked
 def delete_profile(name: str, yes: bool = False) -> Path:
     """Delete a profile, its wrapper script, and its gateway service (service disabled first
     to prevent auto-restart, gateway stopped if running)."""
@@ -1777,6 +1768,8 @@ def delete_profile(name: str, yes: bool = False) -> Path:
             print("Cancelled.")
             return profile_dir
 
+    from hermes_cli.profile_routes import revoke_profile_routes
+    revoke_profile_routes(canon)
     # 1. Disable service (prevents auto-restart); drop the s6 slot on container (host no-op).
     _cleanup_gateway_service(canon, profile_dir)
     _maybe_unregister_gateway_service(canon)
@@ -2320,6 +2313,7 @@ def _record_profile_rename(new_dir: Path, old_canon: str) -> None:
         logger.debug("profile rename: could not record previous name %r in %s: %s", old_canon, new_dir, exc)
 
 
+@profile_routes_locked
 def rename_profile(old_name: str, new_name: str) -> Path:
     """Rename a profile: directory, wrapper script, service, active_profile. The default
     profile's home IS the installation root, so "renaming" it sets a presentation-only
@@ -2375,7 +2369,8 @@ def rename_profile(old_name: str, new_name: str) -> Path:
     try:
         if live_mux and not wait_profile_unowned(old_dir):  # same owner wait as delete_profile
             raise RuntimeError("a running gateway still owns this profile; retry the rename once it settles")
-        old_dir.rename(new_dir)
+        from hermes_cli.profile_routes import rename_profile_directory
+        rename_profile_directory(old_dir, new_dir)
     except Exception:
         if live_mux:
             clear_named_profile_deleted(old_dir)

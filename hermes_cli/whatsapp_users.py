@@ -4,7 +4,6 @@ from __future__ import annotations
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
-import threading
 
 from hermes_cli.config import (
     atomic_config_replace, atomic_config_write, load_env, read_user_config_raw,
@@ -12,7 +11,6 @@ from hermes_cli.config import (
 )
 
 ALLOWLIST_ENV = 'WHATSAPP_ALLOWED_USERS'
-_THREAD_LOCK = threading.Lock()
 
 
 class WhatsAppUsersError(ValueError):
@@ -34,16 +32,15 @@ def _config_path():
 def _require_default_profile():
     from hermes_cli.profiles import get_active_profile_name
     if get_active_profile_name() != 'default':
-        raise WhatsAppUsersError('Run against the default profile (omit -p); it owns the shared number.')
+        raise WhatsAppUsersError('Run with -p default; the default profile owns the shared number.')
 
 
 @contextmanager
 def _locked():
-    from hermes_cli.active_sessions import _FileLock
+    from hermes_cli.profile_routes import routes_lock
     _require_default_profile()
-    with _THREAD_LOCK:
-        with _FileLock(_config_path().with_name('.whatsapp_users.lock')):
-            yield
+    with routes_lock(_config_path().parent):
+        yield
 
 
 def _normalize_number(raw):
@@ -63,10 +60,13 @@ def _same_person(left, right):
 
 
 def _read():
+    from hermes_cli.config_effective import load_user_config_effective
+    from hermes_cli.profile_routes import effective_route_settings
     data = read_user_config_raw(_config_path())
-    gateway = data.get('gateway', {})
-    if not isinstance(gateway, dict) or not isinstance(gateway.get('profile_routes', []), list):
-        raise WhatsAppUsersError('gateway must be a mapping and profile_routes a list.')
+    try:
+        gateway = effective_route_settings(load_user_config_effective(_config_path(), fail_closed=True))
+    except ValueError as error:
+        raise WhatsAppUsersError(str(error)) from error
     return data, gateway
 
 
@@ -131,7 +131,12 @@ def _disallow_number(number):
 
 
 def _write_routes(data, gateway, routes):
-    data.setdefault('gateway', gateway)['profile_routes'] = routes
+    from hermes_cli.profile_routes import require_routes_writable, set_profile_routes
+    try:
+        require_routes_writable()
+    except ValueError as error:
+        raise WhatsAppUsersError(str(error)) from error
+    set_profile_routes(data, routes)
     atomic_config_write(_config_path(), data)
 
 
@@ -158,7 +163,7 @@ def _transaction(data, created_profile=None):
 
 
 def add_user(name: str, number: str) -> WhatsAppUser:
-    """Create a dedicated profile and admit its number; exact repeats change nothing."""
+    """Create a dedicated profile and reconcile its persisted WhatsApp admission."""
     from gateway.whatsapp_owners import is_owner, parse_owners
     from hermes_cli.profiles import create_profile, get_profile_dir, normalize_profile_name, profile_exists, validate_profile_name
     with _locked():
@@ -180,6 +185,9 @@ def add_user(name: str, number: str) -> WhatsAppUser:
         if rows:
             if rows[0].get('profile') != canon:
                 raise WhatsAppUsersError('This number is already routed to another profile.')
+            if not any(_same_person(digits, item) for item in _allowed()):
+                with _transaction(data):
+                    _allow_number(digits)
             return WhatsAppUser(digits, canon, _status(canon))
         if _matches(gateway, profile=canon):
             raise WhatsAppUsersError('This profile is already mapped to another number.')
@@ -227,6 +235,7 @@ def remove_user(target: str, *, delete_profile: bool = False) -> WhatsAppUser:
         with _transaction(data):
             _write_routes(data, gateway, [r for r in gateway.get('profile_routes', []) if r is not row])
             _disallow_number(number)
-            if delete_profile:
-                delete(profile, yes=True)
+        # A destructive delete cannot be rolled back by restoring the route to a reusable name.
+        if delete_profile:
+            delete(profile, yes=True)
         return WhatsAppUser(number, profile, _status(profile))
