@@ -650,6 +650,7 @@ class GatewayConfig:
     # Prune SessionEntry records older than this (a resumed chat gets a fresh session). 0 = off.
     session_store_max_age_days: int = 90
     profile_routes: list = field(default_factory=list)  # gateway/profile_routing.py
+    owners: list[str] = field(default_factory=list)  # gateway/whatsapp_owners.py
     access: AccessPolicy = field(default_factory=AccessPolicy)  # per-user profile grants; unconfigured = off
 
     # Scalar fields serialized verbatim by ``to_dict`` (in output order).
@@ -707,6 +708,7 @@ class GatewayConfig:
                 if is_dataclass(r) and not isinstance(r, type) else r
                 for r in self.profile_routes
             ],
+            "owners": list(self.owners),
         }
 
     @classmethod
@@ -779,6 +781,7 @@ class GatewayConfig:
             session_store_max_age_days = 90
 
         from gateway.profile_routing import parse_profile_routes
+        from gateway.whatsapp_owners import parse_owners
 
         return cls(
             platforms=by_platform("platforms", PlatformConfig.from_dict, dicts_only=True),
@@ -802,6 +805,7 @@ class GatewayConfig:
             streaming=StreamingConfig.from_dict(data.get("streaming", {})),
             session_store_max_age_days=session_store_max_age_days,
             profile_routes=parse_profile_routes(data.get("profile_routes") or []),
+            owners=parse_owners(data.get("owners")),
             access=parse_access_policy(data.get("access") or nested_gateway.get("access")),
         )
 

@@ -31,6 +31,7 @@ from hermes_cli.web_deps import late
 from hermes_cli.web_server_files import (
     SANDBOX_NOT_FOUND, _agent_fs_path, _fs_path, _hosted_fs_read_guard, _is_unmapped_container_path,
     _managed_file_entry, _managed_response_meta, _resolve_managed_path,
+    refuse_outside_restricted_root, restricted_files_root,
 )
 from hermes_cli.web_models import (
     ChatImageUpload, FsWriteText, ManagedDirectoryCreate, ManagedFileDelete, ManagedFileUpload,
@@ -224,7 +225,7 @@ def _fs_read_bytes(target: Path, limit: Optional[int] = None) -> bytes:
         raise HTTPException(status_code=400, detail=str(exc) or "File read failed")
 
 
-def _fs_find_git_root(start: Path) -> str | None:
+def _fs_find_git_root(start: Path, *, boundary: Path | None = None) -> str | None:
     directory = start
     for _ in range(50):
         try:
@@ -233,7 +234,7 @@ def _fs_find_git_root(start: Path) -> str | None:
         except OSError:
             return None
         parent = directory.parent
-        if parent == directory:
+        if parent == directory or directory == boundary:
             return None
         directory = parent
     return None
@@ -769,7 +770,8 @@ _FS_LIST_ERRNO = (
 
 @router.get("/api/fs/list")
 async def fs_list(path: str, request: Request, profile: Optional[str] = None):
-    backend = await asyncio.to_thread(_fs_backend, profile)
+    restricted = restricted_files_root(request, create_root=False)
+    backend = None if restricted is not None else await asyncio.to_thread(_fs_backend, profile)
     if backend is not None:
         try:
             return await asyncio.to_thread(backend.list_dir, path, _FS_READDIR_HIDDEN)
@@ -799,7 +801,8 @@ async def fs_list(path: str, request: Request, profile: Optional[str] = None):
 
 @router.get("/api/fs/read-text")
 async def fs_read_text(path: str, request: Request = None, profile: Optional[str] = None):
-    backend = await asyncio.to_thread(_fs_backend, profile)
+    restricted = restricted_files_root(request, create_root=False)
+    backend = None if restricted is not None else await asyncio.to_thread(_fs_backend, profile)
     if backend is not None:
         try:
             data, size, target = await asyncio.to_thread(
@@ -841,7 +844,7 @@ async def fs_read_text(path: str, request: Request = None, profile: Optional[str
 
 
 @router.post("/api/fs/write-text")
-async def fs_write_text(payload: FsWriteText, profile: Optional[str] = None):
+async def fs_write_text(payload: FsWriteText, request: Request = None, profile: Optional[str] = None):
     """Overwrite (or create) a UTF-8 text file for the in-app spot editor.
 
     Mirrors the Electron ``hermes:fs:writeText`` hardening: path validated by
@@ -851,7 +854,8 @@ async def fs_write_text(payload: FsWriteText, profile: Optional[str] = None):
     Stale-on-disk detection is the client's job (re-read before save).
     """
     text = payload.content or ""
-    backend = await asyncio.to_thread(_fs_backend, profile)
+    restricted = restricted_files_root(request, create_root=False)
+    backend = None if restricted is not None else await asyncio.to_thread(_fs_backend, profile)
     if backend is not None:
         try:
             target, byte_size = await asyncio.to_thread(
@@ -865,6 +869,7 @@ async def fs_write_text(payload: FsWriteText, profile: Optional[str] = None):
         return {"ok": True, "path": target, "byteSize": byte_size}
 
     target = _fs_path(payload.path, decode_fallback=False)
+    refuse_outside_restricted_root(request, target)
     if len(text.encode("utf-8")) > _FS_TEXT_WRITE_MAX_BYTES:
         raise HTTPException(status_code=413, detail="Content too large")
 
@@ -884,16 +889,20 @@ async def fs_write_text(payload: FsWriteText, profile: Optional[str] = None):
     if not target.parent.is_dir():
         raise HTTPException(status_code=400, detail="Parent directory does not exist")
 
-    tmp = target.with_name(f".{target.name}.hermes-tmp-{os.getpid()}")
+    tmp = None
     try:
-        tmp.write_text(text, encoding="utf-8")
+        tmp_fd, tmp_name = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".write", dir=target.parent)
+        tmp = Path(tmp_name)
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as out:
+            out.write(text)
         os.replace(tmp, target)
     except PermissionError:
-        tmp.unlink(missing_ok=True)
         raise HTTPException(status_code=403, detail="File is not writable")
     except OSError as exc:
-        tmp.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Could not write file: {exc}")
+    finally:
+        if tmp is not None:
+            tmp.unlink(missing_ok=True)
     return {"ok": True, "path": str(target), "byteSize": len(text.encode("utf-8"))}
 
 
@@ -928,7 +937,8 @@ async def fs_read_data_url(
     path: str, request: Request, profile: Optional[str] = None, session_id: Optional[str] = None,
 ):
     from hermes_cli.web_server import _FS_DATA_URL_MAX_BYTES
-    backend = await asyncio.to_thread(_fs_backend, profile)
+    restricted = restricted_files_root(request, create_root=False)
+    backend = None if restricted is not None else await asyncio.to_thread(_fs_backend, profile)
     if backend is not None:
         try:
             data, _size, target = await asyncio.to_thread(
@@ -953,7 +963,8 @@ async def fs_read_data_url(
 async def fs_download(
     path: str, request: Request = None, profile: Optional[str] = None, session_id: Optional[str] = None,
 ):
-    backend = await asyncio.to_thread(_fs_backend, profile)
+    restricted = restricted_files_root(request, create_root=False)
+    backend = None if restricted is not None else await asyncio.to_thread(_fs_backend, profile)
     if backend is not None:
         try:
             target, _size = await asyncio.to_thread(backend.inspect_file, path)
@@ -981,24 +992,29 @@ async def fs_download(
 
 
 @router.get("/api/fs/git-root")
-async def fs_git_root(path: str, profile: Optional[str] = None):
-    backend = await asyncio.to_thread(_fs_backend, profile)
+async def fs_git_root(path: str, request: Request = None, profile: Optional[str] = None):
+    restricted = restricted_files_root(request, create_root=False)
+    backend = None if restricted is not None else await asyncio.to_thread(_fs_backend, profile)
     if backend is not None:
         try:
             return {"root": await asyncio.to_thread(backend.git_root, path)}
         except Exception as exc:
             _raise_fs_backend_error(exc)
     target = _fs_path(path)
+    refuse_outside_restricted_root(request, target)
     try:
         st = target.stat()
         start = target if stat.S_ISDIR(st.st_mode) else target.parent
     except OSError:
         start = target
-    return {"root": _fs_find_git_root(start)}
+    return {"root": _fs_find_git_root(start, boundary=restricted)}
 
 
 @router.get("/api/fs/default-cwd")
-async def fs_default_cwd(profile: Optional[str] = None):
+async def fs_default_cwd(request: Request = None, profile: Optional[str] = None):
+    restricted = restricted_files_root(request, create_root=False)
+    if restricted is not None:
+        return {"cwd": str(restricted), "branch": ""}
     backend = await asyncio.to_thread(_fs_backend, profile)
     if backend is not None:
         cwd = backend.cwd

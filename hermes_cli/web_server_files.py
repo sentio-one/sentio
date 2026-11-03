@@ -282,7 +282,41 @@ def _dashboard_local_update_managed_externally() -> bool:
     return True
 
 
+def restricted_files_root(request: Optional[Request], *, create_root: bool = True) -> Path | None:
+    """Confine a grant-scoped caller to an explicitly selected profile's workspace."""
+    granted = getattr(getattr(request, "state", None), "access_allowed_profiles", None)
+    if granted is None:
+        return None
+    name = str(request.query_params.get("profile") or "").strip().lower()
+    if not granted or not name or name in {"current", "all"} or name not in granted:
+        raise HTTPException(status_code=403, detail="profile_scope_mismatch")
+    from hermes_cli.profiles import get_profile_dir, profile_exists
+
+    if not profile_exists(name):
+        raise HTTPException(status_code=404, detail="Profile not found")
+    profile_home = _canonical_path(get_profile_dir(name), require_exists=True)
+    workspace = profile_home / "workspace"
+    root = _canonical_path(workspace)
+    # Check before mkdir: resolving an escaped workspace must never authorize its destination.
+    if root != workspace:
+        raise HTTPException(status_code=403, detail="Workspace must be a real profile directory")
+    return _ensure_managed_root(root) if create_root else root
+
+
+
+def refuse_outside_restricted_root(request: Optional[Request], target: Path) -> Path | None:
+    """Authorize canonical local paths before write or bounded Git discovery."""
+    root = restricted_files_root(request, create_root=False)
+    if root is not None and not _hosted_fs_path_allowed(root, target):
+        raise HTTPException(status_code=403, detail="Path is outside your workspace")
+    return root
+
+
 def _managed_files_policy(request: Optional[Request], *, create_root: bool = True) -> ManagedFilesPolicy:
+    scoped = restricted_files_root(request, create_root=create_root)
+    if scoped is not None:
+        return ManagedFilesPolicy(default_path=scoped, locked_root=scoped, can_change_path=False)
+
     raw_forced_root = os.environ.get(_MANAGED_FILES_ROOT_ENV, "").strip()
     if raw_forced_root:
         root = _ensure_managed_root(raw_forced_root) if create_root else _canonical_path(Path(raw_forced_root))
@@ -332,11 +366,7 @@ def _resolve_managed_path(
     if ".." in candidate.parts:
         raise HTTPException(status_code=400, detail="Path cannot contain '..'")
 
-    if for_write and not candidate.exists():
-        parent = _canonical_path(candidate.parent)
-        resolved = parent / candidate.name
-    else:
-        resolved = _canonical_path(candidate, require_exists=not for_write)
+    resolved = _canonical_path(candidate, require_exists=not for_write)
 
     if root is not None and not _path_is_under(root, resolved):
         raise HTTPException(status_code=403, detail="Path outside managed files root")
@@ -360,8 +390,8 @@ def _hosted_fs_path_allowed(root: Path, target: Path) -> bool:
 def _hosted_fs_read_guard(target: Path, request: Optional[Request] = None) -> Path | None:
     """Preview and Git reads share managed-file restrictions on locked deployments.
 
-    ``request`` is unused (the policy is env/home driven) and optional so the
-    route functions stay callable directly, e.g. from agent-side tests.
+    ``request`` carries grant scope when present and stays optional for local
+    callers, e.g. agent-side tests. Read guards never create a workspace.
     """
     root = _managed_files_policy(request, create_root=False).locked_root
     if root is not None and not _hosted_fs_path_allowed(root, target):

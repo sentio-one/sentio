@@ -27,6 +27,19 @@ from __future__ import annotations
 import os
 import sys
 
+
+def is_shared_whatsapp_user_command(argv: list[str]) -> bool:
+    """Shared-number management always belongs to the default home unless -p was explicit."""
+    return len(argv) >= 2 and argv[0] == 'whatsapp' and argv[1] in {
+        'add-user', 'list-users', 'remove-user',
+    }
+
+
+def looks_like_option_value(value: str) -> bool:
+    """A -p value belonging to another tool (pytest's no:xdist or a child --flag)."""
+    return value.startswith('-') or ':' in value
+
+
 __all__ = [
     "active_profile_may_override_home",
     "container_mode_may_be_active",
@@ -34,6 +47,7 @@ __all__ = [
     "is_container_startup_environment",
     "is_desktop_ssh_backend_argv",
     "is_global_fast_version_argv",
+    "is_shared_whatsapp_user_command",
     "normalize_hermes_home_env",
     "print_fast_version_info",
     "project_root_str",

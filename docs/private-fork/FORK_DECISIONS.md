@@ -269,6 +269,41 @@ bundled skill into every profile, which suits a developer, not an employee of a 
 - The default baseline is a starting guess for office work, not a decision about any customer's job: tune it per company.
 
 
+### D17. A shared WhatsApp number gates unrouted senders on explicit `gateway.owners`
+
+The default (launch) profile owns the shared bot and has host-level access.
+`gateway/whatsapp_owners.py` refuses an unrouted primary-bot non-owner when an owners
+policy is configured. Owners and routed senders still need ordinary bot admission;
+without the policy, behaviour is unchanged. WhatsApp DM mappings use alias-aware
+`chat_id` (bare number/JID/LID), not exact-match `user_id`, and apply to the default bot.
+Missing or parked targets never fall back to default. CLI directory status is not
+proof of a running gateway. Restart after route changes. Model keys remain a separate
+admin choice through D15, never an automatic consequence of adding a user.
+Upstream merges: keep the `owner_gate` call before ordinary admission in
+`authz_mixin.py::_principal_authorized`.
+
+### D18. Grant-scoped file access is confined to the granted profile workspace
+
+`web_server_files.restricted_files_root` treats `access_allowed_profiles is None` as unrestricted and an empty
+grant set as denied. A restricted request must explicitly select one granted profile, and its `/api/files` and
+`/api/fs` paths resolve inside that profile's `workspace/`; reads are confined by the managed-file policy (with
+`/api/fs` reads using `_hosted_fs_read_guard`), while writes and Git-root discovery use
+`refuse_outside_restricted_root`. These routes do not use SSH adapters. `/api/git` and
+`/api/media` remain admin-only; admins retain host-wide file access. After each upstream merge, review every new
+`/api/fs/*` route for the same confinement.
+
+### D19. Active-profile discovery returns the restricted caller's grant
+
+`GET /api/profiles/active` returns the requested granted profile, or the first sorted grant, for a restricted caller;
+an empty grant set is refused. It must not expose the machine's sticky `default` profile to that caller. `None`
+continues to mean unrestricted access.
+
+### D20. The seeded default SOUL identifies Sentio One and upgrades untouched Hermes templates
+
+`hermes_cli.default_soul.DEFAULT_SOUL_MD` names Sentio One. Known untouched Hermes seed text remains listed in
+`_LEGACY_TEMPLATE_SOULS` so profile initialization can upgrade it; customized `SOUL.md` content is preserved.
+`agent/prompt_builder.py::DEFAULT_AGENT_IDENTITY` and the intentionally retained Hermes helper text remain unchanged.
+
 ## 2. Upstream files the fork modifies (merge conflict map)
 
 Highest risk first. "Keep" is what must survive a conflict resolution.
