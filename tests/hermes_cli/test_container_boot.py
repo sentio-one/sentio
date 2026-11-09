@@ -300,6 +300,30 @@ def test_main_skips_reconcile_in_dashboard_container_s6v3(
     assert not (scandir / "gateway-default").exists()
 
 
+@pytest.mark.parametrize("subcommand", ["dashboard", "serve"])
+def test_main_skips_reconcile_in_ui_only_containers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, subcommand: str
+) -> None:
+    """`hermes serve` shares HERMES_HOME with the gateway container exactly like the dashboard
+    does; if it reconciled it would autostart a second gateway-default and the two would evict
+    each other in a `--replace` respawn loop."""
+    from hermes_cli import container_boot
+
+    scandir = tmp_path / "run-service"; scandir.mkdir()
+    _make_profile(tmp_path, "worker", state="running")
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("S6_PROFILE_GATEWAY_SCANDIR", str(scandir))
+    monkeypatch.setattr(
+        container_boot, "_read_container_argv",
+        lambda: ("/bin/sh", "-e", "/run/s6/basedir/scripts/rc.init", "top",
+                 "/opt/hermes/docker/main-wrapper.sh", subcommand, "--host", "0.0.0.0"),
+    )
+
+    assert container_boot.main() == 0
+    assert not (scandir / "gateway-worker").exists()
+    assert not (scandir / "gateway-default").exists()
+
+
 # ---------------------------------------------------------------------------
 # Multiplex-only: the root slot inherits every named slot's autostart intent
 # ---------------------------------------------------------------------------

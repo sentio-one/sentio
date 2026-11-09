@@ -231,10 +231,14 @@ def _is_legacy_gateway_run_request(argv: Sequence[str]) -> bool:
     return len(args) >= 2 and args[0] == "gateway" and args[1] == "run"
 
 
-def _is_dashboard_container(argv: Sequence[str]) -> bool:
-    """True when the container's command is the dashboard (which never supervises gateways)."""
+# Subcommands that serve a UI/API over a shared data dir and never own a gateway.
+_UI_ONLY_SUBCOMMANDS = frozenset({"dashboard", "serve"})
+
+
+def _is_ui_only_container(argv: Sequence[str]) -> bool:
+    """True when the container's command is a UI backend (dashboard/serve), which never supervises gateways."""
     args = _strip_container_argv_prefix(argv)
-    return bool(args) and args[0] == "dashboard"
+    return bool(args) and args[0] in _UI_ONLY_SUBCOMMANDS
 
 
 def _read_desired_state(profile_dir: Path) -> str | None:
@@ -354,11 +358,11 @@ def _write_reconcile_log(hermes_home: Path, actions: list[ReconcileAction]) -> N
 
 def main() -> int:
     """Entry point invoked from /etc/cont-init.d/02-reconcile-profiles."""
-    # A dashboard-only container must not reconcile: with a shared bind-mounted HERMES_HOME both
+    # A UI-only (dashboard/serve) container must not reconcile: with a shared bind-mounted HERMES_HOME both
     # containers race to flock() the same s6-log files → "Resource busy" restart storm. Detected
     # from PID 1 argv, not an operator flag (a flag can be forgotten in a hand-written manifest).
-    if _is_dashboard_container(_read_container_argv()):
-        print("reconcile: skipping (dashboard container — does not need per-profile gateways)")
+    if _is_ui_only_container(_read_container_argv()):
+        print("reconcile: skipping (UI-only container — does not need per-profile gateways)")
         return 0
 
     hermes_home = Path(os.environ.get("HERMES_HOME", "/opt/data"))
