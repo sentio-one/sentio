@@ -28,7 +28,10 @@ _CONTEXT_FIELDS = ('auto_skill', 'channel_prompt', 'channel_context', 'reply_exp
                    'edit_revision')
 # Closed metadata contract: only the keys the Baileys adapter stamps on ordinary inbound
 # (``WhatsAppAdapter._build_message_event``) cross native admission; any other key refuses.
-_WHATSAPP_METADATA = frozenset({'whatsapp_native_type', 'whatsapp_native', 'whatsapp_from_owner'})
+_WHATSAPP_METADATA = frozenset({'whatsapp_native_type', 'whatsapp_native', 'whatsapp_from_owner',
+                                'reaction_target_id', 'reaction_emoji'})
+# Reaction identifiers the business layer binds an operator approval to; bounded text, never free-form.
+_REACTION_MAX_CHARS = 256
 # Top-level ``nativeMetadata`` keys the bridge emits (scripts/whatsapp-bridge/bridge_helpers.js).
 _WHATSAPP_NATIVE_KEYS = frozenset({'video', 'audio', 'sticker', 'location', 'contact', 'contacts',
                                    'reaction', 'poll', 'pollUpdate'})
@@ -50,7 +53,11 @@ def _native_metadata(event):
             or metadata.get('whatsapp_from_owner') not in (None, True)
             or native is not None and not (isinstance(native, dict) and set(native) <= _WHATSAPP_NATIVE_KEYS)):
         return None
-    projected = {key: metadata[key] for key in ('whatsapp_native_type', 'whatsapp_from_owner') if key in metadata}
+    reaction = [metadata.get(key) for key in ('reaction_target_id', 'reaction_emoji')]
+    if any(value is not None and not (isinstance(value, str) and len(value) <= _REACTION_MAX_CHARS) for value in reaction):
+        return None
+    projected = {key: metadata[key] for key in ('whatsapp_native_type', 'whatsapp_from_owner',
+                                                 'reaction_target_id', 'reaction_emoji') if key in metadata}
     if native is not None:
         try:
             encoded = json.dumps(native, ensure_ascii=False, allow_nan=False)
