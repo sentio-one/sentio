@@ -1,12 +1,21 @@
 # Native WhatsApp training wheels implementation review
 
+> **Current status (2026-11-06, `main` at `5f4d3af3f8`):** the review findings R1–R8 were
+> repaired (see "Repair status" below) and the
+> business test suite passes (128 passed, 1 skipped). **Nothing has been run end to end against a
+> real WhatsApp account**, and no pilot is certified. Supervised mode also requires the agent's tools
+> to run off the gateway host (see [SANDBOX_PLAN.md](SANDBOX_PLAN.md)); a single-host deploy reports `agent_tools_not_sandboxed`.
+> The skipped test, `test_native_adapter_bridge_and_authenticated_consumption`, needs PM-managed Node.
+
+## History: the 2026-10-25 review
+
 Reviewed on 2026-10-25 at fork commit `49bea851ade3a07a4f2bc7c70f3885effb7f9658`
 against base `8a75a6168e6f47a64e4308bf9454d1f8658b0b1d`, the
 [design](WHATSAPP_TRAINING_WHEELS_DESIGN.md), and all three linked implementation
 plans. The external plugin checkout was reviewed at `ba177a5` on
 `native-training-wheels`.
 
-**Verdict: not ready to merge or pilot.** There is substantial component code,
+**Verdict at the time of review (2026-10-25): not ready to merge or pilot.** There is substantial component code,
 including scoped SQLite records, revision checks, rendering, and lesson storage.
 The production paths connecting these components are incomplete. Checked plan
 steps and green component suites do not establish the claimed complete workflow.

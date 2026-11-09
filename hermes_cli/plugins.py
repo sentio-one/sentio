@@ -14,6 +14,7 @@ import asyncio
 import importlib.metadata
 import json
 import logging
+from hermes_cli.log_once import first_report
 import os
 import queue
 import re
@@ -750,7 +751,9 @@ class PluginContext:
             return
         launch_scope = hermes_home_key(get_process_hermes_home())
         if self._manager.scope_key != launch_scope:
-            logger.warning(
+            logger.log(
+                logging.WARNING if first_report((self.manifest.name, provider.name, self._manager.scope_key))
+                else logging.DEBUG,
                 "Plugin '%s' tried to register dashboard-auth provider %r "
                 "from profile scope %s; ignoring it because dashboard auth "
                 "is owned by launch scope %s.",

@@ -105,7 +105,8 @@ def _apply_live_compression_config(agent: Any, cfg: dict | None) -> None:
         if isinstance(native_threshold_raw, bool) or (native_threshold := int(native_threshold_raw)) <= 0:
             raise ValueError
     except (TypeError, ValueError):
-        logger.warning("Invalid compression.codex_responses_compact_threshold=%r; using 200000.", native_threshold_raw)
+        if native_threshold_raw is not None:  # None is the shipped default: unset, not invalid
+            logger.warning("Invalid compression.codex_responses_compact_threshold=%r; using 200000.", native_threshold_raw)
         native_threshold = 200_000
     agent.codex_responses_compact_threshold = native_threshold
     # Absence restores the agent_init/config default (0 = disabled).

@@ -1,6 +1,13 @@
 # Native WhatsApp Business Operations: Shadow Mode (Plan 01)
 
-> **Implementation warning — 2026-10-25:** The native workflow is incomplete.
+> **Current status (2026-11-06, `main` at `5f4d3af3f8`):** the review findings R1–R8 were
+> repaired (see "Repair status" in the [review](WHATSAPP_TRAINING_WHEELS_REVIEW.md)) and the
+> business test suite passes (128 passed, 1 skipped). **Nothing has been run end to end against a
+> real WhatsApp account**, and no pilot is certified. Supervised mode also requires the agent's tools
+> to run off the gateway host (see [SANDBOX_PLAN.md](SANDBOX_PLAN.md)); a single-host deploy reports `agent_tools_not_sandboxed`.
+> The skipped test, `test_native_adapter_bridge_and_authenticated_consumption`, needs PM-managed Node.
+
+> **Historical warning (2026-10-25, superseded by the status above):** The native workflow is incomplete.
 > Operator CLI/control, dispatch, plugin migration, and delivery reconciliation
 > are not connected end to end. The commands and native supervision described
 > below are intended behavior, not working operational instructions. See the
