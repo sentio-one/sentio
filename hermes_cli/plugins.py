@@ -14,7 +14,7 @@ import asyncio
 import importlib.metadata
 import json
 import logging
-from hermes_cli.log_once import first_report
+from hermes_cli.log_once import warn_once
 import os
 import queue
 import re
@@ -751,17 +751,12 @@ class PluginContext:
             return
         launch_scope = hermes_home_key(get_process_hermes_home())
         if self._manager.scope_key != launch_scope:
-            logger.log(
-                logging.WARNING if first_report((self.manifest.name, provider.name, self._manager.scope_key))
-                else logging.DEBUG,
+            warn_once(
+                logger, (self.manifest.name, provider.name, self._manager.scope_key),
                 "Plugin '%s' tried to register dashboard-auth provider %r "
                 "from profile scope %s; ignoring it because dashboard auth "
                 "is owned by launch scope %s.",
-                self.manifest.name,
-                provider.name,
-                self._manager.scope_key,
-                launch_scope,
-            )
+                self.manifest.name, provider.name, self._manager.scope_key, launch_scope)
             return
         registry_name = provider.name
         # The auth registry is process-global (lifetime = web server). Disposing it on a routine
