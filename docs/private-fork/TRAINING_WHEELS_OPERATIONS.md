@@ -39,7 +39,7 @@ platforms:
       business:
         mode: shadow
         required_policies:
-          - sales_ops
+          - whatsapp-sales-ops
         operators:
           - "27600000001@s.whatsapp.net"
         rewrite_attempts: 2
@@ -128,7 +128,7 @@ Offline evaluation (`tests/gateway/business/test_drafting_eval.py`) verifies the
 ### Verification Matrix Before Supervised Activation
 
 Prior to activating `supervised` mode on any account, `check_readiness(service, account)` evaluates seven critical boundaries:
-1. **Required Policy:** Concrete policy implementation (e.g. `sales_ops`) loaded and verified in plugin ledger.
+1. **Required Policy:** Concrete policy implementation loaded and verified in the plugin ledger. `required_policies` entries must equal the owning plugin's name exactly (for the sales plugin: `whatsapp-sales-ops`); any other value matches nothing and every decision reports `policy_version: "unavailable"`.
 2. **Operator Identity:** At least one authorized human operator phone number or JID configured.
 3. **Pacing Governor:** Timezone, sending windows, hourly/daily caps, and hard daily maximum configured.
 4. **Durable Store:** SQLite `state.db` initialized with all business schemas, WAL or delete journal active, and writable.
@@ -177,7 +177,7 @@ platforms:
       business:
         mode: supervised
         required_policies:
-          - sales_ops
+          - whatsapp-sales-ops
         operators:
           - "27600000000@s.whatsapp.net"
         plugin_mode: native
@@ -235,6 +235,7 @@ do not exist.)
 - **The account appears on the first inbound message.** Accounts are created lazily when an inbound episode is
   admitted, so until the profile has received a message `status` shows no accounts and `readiness` answers
   `account_required`. Send a message first, then run readiness.
+- **Quote clock times in YAML.** An unquoted `end: 21:00` loads as the number 1260, which fails window validation (`invalid_windows`), and every native turn then fails with an operator task and no draft. Write `start: "07:00"`.
 - **Sandbox.** The `agent_tools_not_sandboxed` blocker clears when the profile's resolved `TERMINAL_ENV` is not
   `local`. Run the gateway with `docker-compose.sandbox.yml` and set `terminal.backend: docker` for the profile.
 - **Shadow mode keeps the legacy gate sending.** While a profile still has `send-gate/bridge/bridge.js` and a
