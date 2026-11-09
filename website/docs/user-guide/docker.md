@@ -437,6 +437,12 @@ The repo's `docker-compose.yml` runs a `gateway` and a `dashboard` container aga
   at an empty directory on such a container as a workaround.
 - **WhatsApp bridge.** The image ships the bridge without `node_modules`; `hermes -p <profile> whatsapp`
   copies it into the profile and installs its dependencies there.
+- **Desktop app: use "Remote gateway", not "SSH".** SSH mode runs the `hermes` it finds on the host's
+  login-shell `PATH` and expects a native install that writes token files under `~/.hermes/desktop-ssh/`.
+  A `hermes` wrapper that does `docker exec ... hermes` is found first, and its token files are not
+  visible on the host, so the app waits out the 120 s timeout ("Timed out waiting for the remote
+  dashboard to announce its port"). Name the wrapper something else (for example `sentio`) and connect
+  the app to a `hermes serve` container with a URL instead.
 - **Native business sandbox.** Supervised business mode needs the agent's tools to run off the gateway
   host, and the compose file gives the gateway no Docker daemon. See
   `docs/private-fork/SANDBOX_PLAN.md`.
