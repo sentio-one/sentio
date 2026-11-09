@@ -2763,7 +2763,7 @@ _BUILTIN_SUBCOMMANDS = frozenset(
         "gui", "desktop", "kanban", "login", "logout", "logs", "lsp", "mcp", "memory", "migrate", "moa",
         "journey", "memory-graph", "learning",
         "model", "monitoring", "pairing", "pause", "peer", "pets", "plugins", "portal", "profile",
-        "project", "proxy",
+        "project", "projects", "proxy",
         "prompt-size",
         "resume",
         "send", "sessions", "setup",

@@ -395,7 +395,9 @@ def _hosted_fs_read_guard(target: Path, request: Optional[Request] = None) -> Pa
     """
     root = _managed_files_policy(request, create_root=False).locked_root
     if root is not None and not _hosted_fs_path_allowed(root, target):
-        raise HTTPException(status_code=403, detail="Path is outside the managed read boundary")
+        raise HTTPException(
+            status_code=403,
+            detail=f"Path is outside the managed read boundary: this backend only exposes {root}")
     return root
 
 
