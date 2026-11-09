@@ -24,6 +24,22 @@ from gateway.business.store import BusinessStore
 logger = logging.getLogger(__name__)
 
 
+def _loads_object(text: str) -> Any:
+    """Parse *text* as JSON, or as a JSON object that ends it after working prose."""
+    try:
+        return json.loads(text)
+    except Exception as exc:
+        decoder = json.JSONDecoder()
+        for start in (i for i, ch in enumerate(text) if ch == "{"):
+            try:
+                value, end = decoder.raw_decode(text, start)
+            except ValueError:
+                continue
+            if not text[end:].strip():
+                return value
+        raise BusinessProtocolError("invalid_json_response") from exc
+
+
 def _extract_json_payload(raw: Any) -> Any:
     """Extract a JSON object from string, response object, or dict."""
     if isinstance(raw, dict):
@@ -44,10 +60,7 @@ def _extract_json_payload(raw: Any) -> Any:
         text = text.split("```json", 1)[1].split("```", 1)[0].strip()
     elif "```" in text:
         text = text.split("```", 1)[1].split("```", 1)[0].strip()
-    try:
-        data = json.loads(text)
-    except Exception as exc:
-        raise BusinessProtocolError("invalid_json_response") from exc
+    data = _loads_object(text)
     if not isinstance(data, dict):
         raise BusinessProtocolError("json_scalar_response")
     return data
