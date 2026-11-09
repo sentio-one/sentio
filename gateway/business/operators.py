@@ -140,13 +140,17 @@ async def handle_business_operator_message(runner,event) -> str | None:
         notice_text = json.dumps({'review_card':card['public'],'details':result},ensure_ascii=False,default=str)
     notice = await send_operator_notice(service,scope,notice_text)
     if card and notice.get('ok') and (message_id := notice.get('message_id') or notice.get('messageId')):
-        from hermes_cli.sqlite_util import transaction
-        with transaction(service.store._connect(),immediate=True) as db:
-            db.execute('INSERT OR REPLACE INTO business_operator_cards(message_id,runtime_profile,transport_profile,account_id,contact_id,digest_id,revision_id,plan_digest,created_at_ms) VALUES(?,?,?,?,?,?,?,?,?)',
-                       (str(message_id),*asdict(card['scope']).values(),card['digest_id'],card['revision_id'],card['plan_digest'],int(time.time()*1000)))
+        record_operator_card(service,card,message_id)
     if not notice.get('ok'):
         service.store.put_task(scope,dedupe_key=f"operator-notice:{event.message_id or uuid.uuid4()}",reason=str(notice.get('error') or 'operator_notice_unavailable'),refs=(json.dumps(result,ensure_ascii=False),))
     return ''
+
+
+def record_operator_card(service,card,message_id):
+    """Bind a sent card to its exact revision so a 👍 on it can approve."""
+    with transaction(service.store._connect(),immediate=True) as db:
+        db.execute('INSERT OR REPLACE INTO business_operator_cards(message_id,runtime_profile,transport_profile,account_id,contact_id,digest_id,revision_id,plan_digest,created_at_ms) VALUES(?,?,?,?,?,?,?,?,?)',
+                   (str(message_id),*asdict(card['scope']).values(),card['digest_id'],card['revision_id'],card['plan_digest'],int(time.time()*1000)))
 
 
 def _review_card(service,principal,result):

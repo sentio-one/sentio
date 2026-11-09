@@ -137,6 +137,9 @@ class BusinessService:
         if config.mode == "supervised":
             from gateway.business.drafting import promote_draft
             receipt = await promote_draft(self.store, scope, receipt, config)
+            if receipt.state == "held" and receipt.revision_id:
+                from gateway.business.operator_cards import push_review_cards
+                await push_review_cards(self, scope, config, receipt.revision_id)
         from gateway.business.measurements import record_draft_measurement
         record_draft_measurement(self.store, scope, receipt.revision_id, (time.monotonic() - started) * 1000)
         return receipt

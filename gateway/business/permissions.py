@@ -61,6 +61,11 @@ def authorize_operation(principal: Principal, scope: Scope, operation: str) -> N
             raise BusinessDenied("permission_denied")
         return
 
+    if principal.kind == "service":
+        if operation not in principal.operations:
+            raise BusinessDenied("permission_denied")
+        return
+
     # Human / operator principal
     if principal.kind == "human":
         ops = getattr(principal, "operations", None) or getattr(principal, "capabilities", frozenset())
