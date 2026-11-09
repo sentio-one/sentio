@@ -10,8 +10,10 @@ from hermes_constants import get_hermes_home, profile_name_for_home
 
 
 def raw_business(config):
+    from gateway.config import Platform
     platforms = getattr(config, "platforms", {}) or {}
-    whatsapp = platforms.get("whatsapp", {})
+    # A real GatewayConfig keys platforms by Platform; string-keyed dicts are what tests and raw YAML use.
+    whatsapp = platforms.get(Platform.WHATSAPP) or platforms.get("whatsapp", {})
     extra = whatsapp.get("extra", {}) if isinstance(whatsapp, dict) else getattr(whatsapp, "extra", {})
     return (extra or {}).get("business", {})
 
