@@ -195,17 +195,52 @@ platforms:
 
 ### Operator CLI Commands
 
+Every subcommand also takes `--json`, `--runtime-profile`, `--transport-profile`, `--account-id` and
+`--contact-id`. Use the profile flag as `hermes -p <profile> messages ...`. The gateway uses the profile name
+as both the transport profile and the account id, so for a profile `anika` pass
+`--runtime-profile anika --transport-profile anika --account-id anika` when more than one account exists.
+
 | Command | Action | Authority |
 |---|---|---|
-| `hermes messages list` | List pending, held, and scheduled drafts | Read |
-| `hermes messages review <rev_id>` | Inspect draft text, policy checks, and candidate metadata | Reviewer |
-| `hermes messages edit <rev_id> --text "..."` | Edit candidate text and produce new immutable revision | Reviewer |
-| `hermes messages approve <rev_id>` | Approve candidate revision and schedule release | Operator |
-| `hermes messages reject <rev_id> --reason "..."` | Reject draft and release to attention tasks | Operator |
-| `hermes messages digest` | Produce operator digest snapshot | Operator |
-| `hermes messages cutover --plan` | Dry-run migration and verify quiescent writers | Admin |
-| `hermes messages cutover --apply` | Apply paused ownership transfer to native generation | Admin |
-| `hermes messages cutover --rollback` | Roll back to legacy ownership and export unresolved state | Admin |
+| `hermes messages queue` | List durable outbox records (pending, held, scheduled) | Read |
+| `hermes messages show <outbox_id>` | Show an outbox item and its exact plan | Read |
+| `hermes messages recard <revision_id>` | Show a revision and its current rendered plan | Read |
+| `hermes messages edit <revision_id> <text>` | Replace a revision; runs checks and advisory review, producing a new immutable revision | Reviewer |
+| `hermes messages approve <revision_id> --plan-digest D [--digest-id ID] [--override-reason R]` | Approve the exact revision and rendered digest shown by `show`/`recard` | Operator |
+| `hermes messages reject <revision_id> [--reason R]` | Reject a revision and release it to attention tasks | Operator |
+| `hermes messages tasks` / `resolve-task <task_id> --reason R` | List and resolve operator attention tasks | Operator |
+| `hermes messages digest` | Create an immutable review snapshot | Operator |
+| `hermes messages pause` / `resume` | Pause or resume account dispatch | Operator |
+| `hermes messages reconcile` | Reconcile uncertain (`unknown`) attempts without retrying | Operator |
+| `hermes messages status` | Show account mode, bridge and pause state | Read |
+| `hermes messages readiness` | Check workflow readiness (see "Operating notes") | Read |
+| `hermes messages mode <off\|shadow\|supervised>` | Set account mode under readiness guards | Admin |
+| `hermes messages propose-lessons --text T ...` / `confirm-lesson <id>` / `revoke-lesson <id> --reason R` | Learning loop: lessons need explicit confirmation | Operator |
+| `hermes messages credential-grant <vault_item_id> --expires-at-ms N` | Grant scoped protected credential delivery | Admin |
+| `hermes messages inventory <path>` | Inspect a legacy inventory | Admin |
+| `hermes messages import-legacy <path> --source-digest D` | Import legacy work while paused | Admin |
+| `hermes messages prepare-cutover <path> --source-digest D [--legacy-stopped]` | Prepare the paused ownership transfer; `--legacy-stopped` attests every legacy writer is stopped | Admin |
+| `hermes messages apply-cutover <manifest_id> --source-digest D` | Apply a prepared transfer to native ownership | Admin |
+| `hermes messages rollback-cutover <manifest_id>` | Roll back to legacy ownership and export unresolved state | Admin |
+
+(Earlier revisions of this page listed `list`, `review` and `cutover --plan/--apply/--rollback`; those commands
+do not exist.)
+
+### Operating notes (verified 2026-11-09 on a real gateway)
+
+- **Where the `business:` block goes.** In the profile's `config.yaml` under `platforms.whatsapp.extra.business`
+  (not the root config). A gateway that has it reports `{"ok": true, "accounts": []}` from `messages status`; one
+  that does not answers "business messaging is not enabled for this profile". Before the `raw_business` fix in
+  this branch, a real gateway never found the block at all.
+- **The account appears on the first inbound message.** Accounts are created lazily when an inbound episode is
+  admitted, so until the profile has received a message `status` shows no accounts and `readiness` answers
+  `account_required`. Send a message first, then run readiness.
+- **Sandbox.** The `agent_tools_not_sandboxed` blocker clears when the profile's resolved `TERMINAL_ENV` is not
+  `local`. Run the gateway with `docker-compose.sandbox.yml` and set `terminal.backend: docker` for the profile.
+- **Shadow mode keeps the legacy gate sending.** While a profile still has `send-gate/bridge/bridge.js` and a
+  legacy pending queue, `migration_required` is true and the legacy gate remains the sender; native only observes.
+- **Still unverified:** supervised activation, `prepare-cutover`/`apply-cutover`, and native delivery against a
+  real WhatsApp account.
 
 ### Delivery Outcome Meanings
 
