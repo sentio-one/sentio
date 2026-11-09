@@ -1,0 +1,49 @@
+# Gateway + a private Docker-in-Docker daemon, so agent tools run in sandbox containers instead of on the
+# gateway host (native business "supervised" mode refuses to run otherwise: agent_tools_not_sandboxed).
+#
+#   docker build -t hermes-agent:local .
+#   HERMES_IMAGE=hermes-agent:local docker compose -p sentio-sbx -f docker-compose.sandbox.yml up -d
+#   docker compose -p sentio-sbx exec -u 10000:10000 gateway hermes config set terminal.backend docker
+#
+# Verified on an unprivileged LXC with security.nesting=true (isolation: scripts/fork/verify-dind-isolation.sh).
+# The daemon listens on a unix socket only, shared with the gateway through a volume; the firewall in
+# deploy/dokploy/dockerd-entrypoint.sh drops sandbox traffic to private ranges. `--dns` is required: sandboxes
+# inherit the host's resolver, which is usually a private address that firewall blocks, so lookups would fail.
+# Data lives in named volumes (BACK UP sbx-data). One gateway per data volume: never point a second container
+# at the same data (see docs/user-guide/docker.md, "Deploying with docker compose").
+name: sentio-sandbox
+services:
+  gateway:
+    image: ${HERMES_IMAGE:-hermes-agent}
+    restart: unless-stopped
+    command: ["gateway", "run"]
+    depends_on:
+      dockerd:
+        condition: service_healthy
+    environment:
+      DOCKER_HOST: unix:///var/run/dind/docker.sock
+      HERMES_UID: ${HERMES_UID:-10000}
+      HERMES_GID: ${HERMES_GID:-10000}
+    volumes:
+      - data:/opt/data
+      - sock:/var/run/dind
+  dockerd:
+    image: docker:27.5.1-dind
+    restart: unless-stopped
+    privileged: true
+    entrypoint: ["/bin/sh", "/opt/dockerd-entrypoint.sh"]
+    command: ["dockerd", "--host=unix:///var/run/dind/docker.sock", "--group=${HERMES_GID:-10000}", "--dns=1.1.1.1", "--dns=8.8.8.8"]
+    volumes:
+      - dockerd-data:/var/lib/docker
+      - sock:/var/run/dind
+      - ./deploy/dokploy/dockerd-entrypoint.sh:/opt/dockerd-entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /var/run/dind/firewall.ready && docker -H unix:///var/run/dind/docker.sock info >/dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+volumes:
+  data:
+  sock:
+  dockerd-data:

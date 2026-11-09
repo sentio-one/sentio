@@ -444,8 +444,9 @@ The repo's `docker-compose.yml` runs a `gateway` and a `dashboard` container aga
   dashboard to announce its port"). Name the wrapper something else (for example `sentio`) and connect
   the app to a `hermes serve` container with a URL instead.
 - **Native business sandbox.** Supervised business mode needs the agent's tools to run off the gateway
-  host, and the compose file gives the gateway no Docker daemon. See
-  `docs/private-fork/SANDBOX_PLAN.md`.
+  host, and `docker-compose.yml` gives the gateway no Docker daemon. `docker-compose.sandbox.yml` runs the
+  gateway with a private Docker-in-Docker daemon (usage in its header); then set `terminal.backend: docker`
+  for the profile. On an LXC this needs `security.nesting=true`. Design: `docs/private-fork/SANDBOX_PLAN.md`.
 
 ## Optional: Linux desktop audio bridge
 
