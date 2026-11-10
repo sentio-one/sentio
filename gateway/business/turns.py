@@ -163,8 +163,18 @@ def business_turn_input(runner: Any, event: Any, episode: EpisodeRef, policy: An
         f'"policy_version": {json.dumps(policy.version)}' + '}\n```\n'
         'Use kind "no_reply" or "escalate" instead when appropriate.\n'
         f"Active Policy Version: {policy.version}\n"
-        f"Applicable Rules:\n" + "\n".join(f"- {r}" for r in policy.rules)
+        f"Applicable Rules:\n" + "\n".join(f"- {r}" for r in policy.rules) + "\n"
+        + _facts_section(policy.facts)
     )
+
+
+def _facts_section(facts: Any) -> str:
+    """The drafting call sees only the facts cited here, so the agent must know which exist."""
+    if not facts:
+        return "No verified facts are available; do not state product facts.\n"
+    lines = "\n".join(f"- [{f.id}] {f.text}" for f in facts)
+    return ("Verified facts. Cite the ids you rely on in fact_ids; the message may only state what "
+            f"the cited facts say:\n{lines}\n")
 
 
 async def handle_business_turn(
