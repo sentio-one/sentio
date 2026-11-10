@@ -180,13 +180,14 @@ async def _reconcile(service, params, principal):
 
 
 async def _status(service, params, principal):
-    from gateway.business.readiness import get_account_mode, get_bridge_state
+    from gateway.business.readiness import bridge_status, get_account_mode
+    from gateway.business.worker import delivery_adapter
     rows = _rows(service,'business_accounts',principal,params=params)
     accounts = []
     for row in rows:
         account = AccountKey(row['transport_profile'],row['account_id'])
         paused = service.store._connect().execute('SELECT paused,pause_reason FROM business_governor_accounts WHERE transport_profile=? AND account_id=?',(account.transport_profile,account.account_id)).fetchone()
-        accounts.append({**row,'mode':get_account_mode(service.store,account,principal.runtime_profile),'bridge':get_bridge_state(account,store=service.store),'paused':bool(paused and paused['paused']),'pause_reason':paused['pause_reason'] if paused else None})
+        accounts.append({**row,'mode':get_account_mode(service.store,account,principal.runtime_profile),'bridge':bridge_status(account,store=service.store,adapter=delivery_adapter(getattr(service,'runner',None),account)),'paused':bool(paused and paused['paused']),'pause_reason':paused['pause_reason'] if paused else None})
     return {'accounts':accounts}
 
 

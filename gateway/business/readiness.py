@@ -200,4 +200,16 @@ def get_bridge_state(account: AccountKey, store: BusinessStore | None = None) ->
                 respawn_count=row["respawn_count"],
             )
 
-    return BridgeState(state="disconnected", code=None, respawn_count=0)
+    # Nothing recorded is not the same as disconnected: only a terminal logout is ever written here.
+    return BridgeState(state="unknown", code=None, respawn_count=0)
+
+
+def bridge_status(account: AccountKey, store: BusinessStore | None = None, adapter: Any = None) -> BridgeState:
+    """What an operator should be told about the bridge: the live connection, except that a recorded
+    terminal logout (needs_reauth) always wins, because a connected socket must never hide it."""
+    recorded = get_bridge_state(account, store=store)
+    if recorded.state == "needs_reauth" or adapter is None:
+        return recorded
+    if adapter.is_connected:
+        return BridgeState(state="connected", code=None, respawn_count=recorded.respawn_count)
+    return BridgeState(state="disconnected", code=adapter.fatal_error_code, respawn_count=recorded.respawn_count)
