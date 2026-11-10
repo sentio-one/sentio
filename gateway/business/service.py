@@ -117,6 +117,9 @@ class BusinessService:
 
         if decision.kind == "no_reply":
             self.store.record_verdict(scope, episode.id, kind="no_reply", reason=decision.reason)
+            if config.mode == "supervised":
+                from gateway.business.operator_cards import push_silence_notice
+                await push_silence_notice(self, scope, config, decision.reason)
             return Receipt(id=str(uuid.uuid4()), state="no_reply", revision_id=None, reason=decision.reason)
 
         if decision.kind == "escalate":
