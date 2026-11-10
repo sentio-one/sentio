@@ -173,42 +173,46 @@ def _review_card(service,principal,result):
               'instruction':'React 👍 to approve this exact revision.'}}
 
 
-async def handle_business_operator_reaction(runner,event) -> bool:
-    """Apply a WhatsApp thumbs-up only when it targets a sent, exact-revision card."""
-    metadata=getattr(event,'metadata',None) or {}
-    target=metadata.get('reaction_target_id')
-    emoji=metadata.get('reaction_emoji')
+def verified_operator(runner,event):
+    """The operator behind a WhatsApp DM, or None when the sender is not a configured, authorized operator."""
+    from types import SimpleNamespace
     source=event.source
-    if not target or emoji not in {'👍','✅'} or getattr(source,'chat_type',None)!='dm':
-        return False
     service=getattr(runner,'_business_service',None)
-    if service is None or not runner._is_user_authorized_for_source(source):
-        return False
+    if service is None or getattr(source,'chat_type',None)!='dm' or not runner._is_user_authorized_for_source(source):
+        return None
     from gateway.session_identity import identity_of
     identity=identity_of(source)
     runtime=identity.runtime_profile if identity else getattr(source,'profile',None) or 'default'
     transport=identity.transport_profile if identity else runtime
     operator_scope=Scope(runtime,transport,transport,source.chat_id)
     config=service.resolve_config(operator_scope)
-    if not config or not _operator_destination(service,operator_scope,source,config.operators):
+    destination=_operator_destination(service,operator_scope,source,config.operators) if config else None
+    if not destination:
+        return None
+    return SimpleNamespace(service=service,runtime=runtime,transport=transport,notice_scope=Scope(runtime,transport,transport,destination),
+                           principal=Principal(f'whatsapp:{source.user_id}',runtime,OPERATOR_OPERATIONS,'human'))
+
+
+async def handle_business_operator_reaction(runner,event) -> bool:
+    """Apply a WhatsApp 👍 (send) or 👎 (discard) only when it targets a sent, exact-revision card."""
+    metadata=getattr(event,'metadata',None) or {}
+    target=metadata.get('reaction_target_id')
+    emoji=metadata.get('reaction_emoji')
+    if not target or emoji not in {'👍','✅','👎'}:
         return False
-    row=service.store._connect().execute('SELECT * FROM business_operator_cards WHERE message_id=? AND runtime_profile=? AND transport_profile=? AND account_id=?',
-            (str(target),runtime,transport,transport)).fetchone()
+    op=verified_operator(runner,event)
+    if op is None:
+        return False
+    row=op.service.store._connect().execute('SELECT * FROM business_operator_cards WHERE message_id=? AND runtime_profile=? AND transport_profile=? AND account_id=?',
+            (str(target),op.runtime,op.transport,op.transport)).fetchone()
     if not row:
         return False
-    principal=Principal(f'whatsapp:{source.user_id}',runtime,OPERATOR_OPERATIONS,'human')
-    result=await handle_operator_event(service,{'action':'reaction','digest_id':row['digest_id'],
-        'revision_id':row['revision_id'],'plan_digest':row['plan_digest'],
-        'target_message_id':str(target),'scope':{key:row[key] for key in ('runtime_profile','transport_profile','account_id','contact_id')}},principal=principal)
-    destination=_operator_destination(service,operator_scope,source,config.operators)
-    notice_scope=Scope(runtime,transport,transport,destination)
-    from gateway.business.operator_notices import approval_text, contact_label, draft_text
-    from gateway.business.transport import send_operator_notice
-    customer=Scope(*(row[key] for key in ('runtime_profile','transport_profile','account_id','contact_id')))
-    text=approval_text(result,label=contact_label(service.store,customer),draft=draft_text(service.store,customer,row['revision_id']))
-    notice=await send_operator_notice(service,notice_scope,text)
-    if not notice.get('ok'):
-        service.store.put_task(notice_scope,dedupe_key=f'operator-reaction:{target}:{event.message_id}',reason='operator_notice_unavailable',refs=(str(target),))
+    from gateway.business.operator_shorthand import approve_card, reject_card
+    key=f'{target}:{event.message_id}'
+    if emoji=='👎':
+        await reject_card(op,row,'',key=key)
+    else:
+        await approve_card(op,row,action='reaction',key=key)
     return True
 
 

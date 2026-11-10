@@ -37,3 +37,46 @@ def approval_text(result: dict, *, label: str, draft: str | None) -> str:
         return f"⚠️ Not approved for {label}: {reason}. Nothing was sent."
     quoted = f":\n\n{draft}" if draft else "."
     return f"✅ Approved for {label}. It goes out as soon as the sending rules allow{quoted}"
+
+
+_SAID_MAX_CHARS = 300
+_SAID_MAX_MESSAGES = 3
+
+
+def customer_said(store, scope: Scope) -> list[str]:
+    """What the customer wrote since we last spoke, so a reviewer who cannot open the chat can judge the draft."""
+    said: list[str] = []
+    for event in reversed(store.list_events(scope)):
+        if event.actor != "customer":
+            break
+        if event.text:
+            said.append(event.text)
+    return said[::-1][-_SAID_MAX_MESSAGES:]
+
+
+def review_card_text(*, code: str, label: str, said: list[str], draft: str) -> str:
+    lead = "".join(f'They said: "{text[:_SAID_MAX_CHARS]}"\n' for text in said)
+    lead = f"{lead}\n" if lead else ""
+    return (f"🕓 Draft {code} for {label}\n\n{lead}Draft reply:\n{draft}\n\n"
+            f"React 👍 to send or 👎 to discard, or reply: edit {code} your text")
+
+
+def _reason(code) -> str:
+    return _REFUSALS.get(str(code), str(code or "it was refused"))
+
+
+def rejection_text(result: dict, *, label: str) -> str:
+    if result.get("ok") is False or result.get("error"):
+        return f"⚠️ Could not discard the draft for {label}: {_reason(result.get('error'))}. Nothing was sent."
+    return f"🗑 Discarded the draft for {label}. Nothing was sent."
+
+
+def edit_text(result: dict, *, label: str, text: str) -> str:
+    if result.get("state") == "attention":
+        checks = (result.get("revision") or {}).get("checks") or {}
+        reasons = "; ".join(str(i.get("reason") or i.get("code")) for i in checks.get("issues", ())) or "the content checks"
+        return (f"⚠️ Your edit for {label} did not pass the content checks: {reasons}. "
+                "Nothing was sent. Send the edit again with changes.")
+    if result.get("ok") is False or result.get("error") or result.get("approval_count") == 0:
+        return f"⚠️ Your edit was not approved for {label}: {_reason(result.get('error'))}. Nothing was sent."
+    return f"✏️ Your version is approved for {label}. It goes out as soon as the sending rules allow:\n\n{text}"

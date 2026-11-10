@@ -76,7 +76,8 @@ async def test_held_draft_is_pushed_and_recorded_for_a_reaction(tmp_path):
 
     await push_review_cards(service, scope, service.resolve_config(scope), rev.id)
 
-    assert len(sent) == 1 and "Hi. How can I help?" in sent[0] and "👍" in sent[0]
+    assert len(sent) == 1 and "Hi. How can I help?" in sent[0] and "👍" in sent[0] and "👎" in sent[0]
+    assert 'They said: "Hi"' in sent[0] and f"edit {rev.id[:6]} your text" in sent[0]
     row = store._connect().execute("SELECT revision_id, plan_digest FROM business_operator_cards WHERE message_id='card-1'").fetchone()
     assert row["revision_id"] == rev.id and row["plan_digest"] == "sha256:d1"
 
