@@ -7,6 +7,7 @@ so ``hermes_cli.auth.<name>`` patches still intercept (and no import cycle).
 from __future__ import annotations
 
 import logging
+from hermes_cli.log_once import warn_once
 import hashlib
 import json
 import os
@@ -180,7 +181,8 @@ def _scoped_operator_override(*names: str) -> Optional[str]:
                 return value
         return None
     except UnscopedSecretError:
-        logger.warning(
+        warn_once(
+            logger, tuple(names),
             "nous: %s unreadable — no profile secret scope on a multiplexed call; treating the "
             "override as absent (default routing applies). The caller needs a profile scope binding.",
             "/".join(names))

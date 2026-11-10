@@ -13,6 +13,7 @@ def build_parser(parent_subparsers: argparse._SubParsersAction) -> argparse.Argu
     """Attach the ``project`` subcommand tree. Returns the top parser."""
     parser = parent_subparsers.add_parser(
         "project",
+        aliases=["projects"],
         help="Manage projects (named, multi-folder workspaces)",
         description=(
             "Projects are human-named workspaces that can span multiple "

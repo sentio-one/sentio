@@ -30,7 +30,7 @@ def _message_class(db, scope: Scope, episode_id: str) -> str:
     origin = db.execute(
         "SELECT payload FROM business_ingress WHERE runtime_profile=? AND transport_profile=? AND account_id=? "
         "AND contact_id=? AND episode_id=?", (*values, episode_id)).fetchone()
-    inbound_origin = bool(origin) and json.loads(origin["payload"]).get("evidence") == "inbound"
+    inbound_origin = bool(origin) and json.loads(origin["payload"]).get("actor") == "customer"
     dispatched = (
         "SELECT 1 FROM business_outbox o JOIN business_revisions r ON r.revision_id=o.revision_id "
         "WHERE o.runtime_profile=? AND o.transport_profile=? AND o.account_id=? AND o.contact_id=? "
@@ -43,7 +43,7 @@ def _message_class(db, scope: Scope, episode_id: str) -> str:
         return "followup"
     heard_from = db.execute(
         "SELECT 1 FROM business_ingress WHERE runtime_profile=? AND transport_profile=? AND account_id=? "
-        "AND contact_id=? AND json_extract(payload, '$.evidence')='inbound' LIMIT 1", values).fetchone()
+        "AND contact_id=? AND json_extract(payload, '$.actor')='customer' LIMIT 1", values).fetchone()
     return "followup" if heard_from else "cold"
 
 

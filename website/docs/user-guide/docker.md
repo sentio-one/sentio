@@ -418,6 +418,36 @@ services:
 
 Start with `docker compose up -d` and view logs with `docker compose logs -f`. The supervised gateway's stdout is also tee'd to `${HERMES_HOME}/logs/gateways/<profile>/current` on the volume — see [Where the logs go](#where-the-logs-go) for the full routing map.
 
+## Deploying with docker compose
+
+The repo's `docker-compose.yml` runs a `gateway` and a `dashboard` container against one data directory
+(`~/.hermes` by default). Things that trip people up on a fresh host:
+
+- **Host packages.** `docker compose build` needs the Compose v2 plugin and Buildx (on Debian/Ubuntu:
+  `docker-compose-v2` and `docker-buildx`).
+- **Docker group.** The user running compose must be in the `docker` group in the session that runs it.
+  A session started without the group (for example `lxc exec --user`) gets `permission denied` on
+  `docker.sock`; use a login shell as that user.
+- **UID/GID.** Set `HERMES_UID=$(id -u) HERMES_GID=$(id -g)` so files in the data directory belong to
+  the host user, not UID 10000.
+- **One gateway per data directory.** Only the container running `gateway run` should own the gateway.
+  UI-only containers (`dashboard`, `serve`) skip gateway reconcile at boot. If you start any other
+  container on the same data directory, it will try to supervise a gateway too, and the two evict each
+  other in a restart loop ("Gateway runtime already owns profile"). Point `S6_PROFILE_GATEWAY_SCANDIR`
+  at an empty directory on such a container as a workaround.
+- **WhatsApp bridge.** The image ships the bridge without `node_modules`; `hermes -p <profile> whatsapp`
+  copies it into the profile and installs its dependencies there.
+- **Desktop app: use "Remote gateway", not "SSH".** SSH mode runs the `hermes` it finds on the host's
+  login-shell `PATH` and expects a native install that writes token files under `~/.hermes/desktop-ssh/`.
+  A `hermes` wrapper that does `docker exec ... hermes` is found first, and its token files are not
+  visible on the host, so the app waits out the 120 s timeout ("Timed out waiting for the remote
+  dashboard to announce its port"). Name the wrapper something else (for example `sentio`) and connect
+  the app to a `hermes serve` container with a URL instead.
+- **Native business sandbox.** Supervised business mode needs the agent's tools to run off the gateway
+  host, and `docker-compose.yml` gives the gateway no Docker daemon. `docker-compose.sandbox.yml` runs the
+  gateway with a private Docker-in-Docker daemon (usage in its header); then set `terminal.backend: docker`
+  for the profile. On an LXC this needs `security.nesting=true`. Design: `docs/private-fork/SANDBOX_PLAN.md`.
+
 ## Optional: Linux desktop audio bridge
 
 Voice mode in Docker needs two separate things to work: Hermes must be allowed to probe audio devices inside the container, and the container must be able to reach your host audio server. The setup below covers the host audio plumbing for Linux desktops that expose a PulseAudio-compatible socket, including many PipeWire setups.

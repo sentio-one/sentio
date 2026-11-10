@@ -73,6 +73,11 @@ def request_business(
 
     if response.get("ok") is not True:
         err = response.get("error", "unknown_error")
+        if err == "unknown verb: 'business.request'":
+            # The control server only registers the verb when a business block is configured.
+            raise BusinessProtocolError(
+                "business messaging is not enabled for this profile "
+                "(set platforms.whatsapp.extra.business.mode in config.yaml)")
         if err == "permission_denied":
             raise BusinessDenied()
         raise BusinessProtocolError(str(err))

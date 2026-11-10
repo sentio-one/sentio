@@ -31,7 +31,7 @@ BRIDGE_SHAPES = [
       'whatsapp_native': {'location': {'latitude': 1.5, 'longitude': 2.5, 'live': False}}}),
     ({'body': '👍', 'mediaType': 'reaction', 'nativeType': 'reactionMessage',
       'nativeMetadata': {'reaction': {'text': '👍', 'messageId': 'x', 'remoteJid': '1', 'participant': ''}}}, '👍',
-     {'whatsapp_native_type': 'reactionMessage',
+     {'whatsapp_native_type': 'reactionMessage', 'reaction_target_id': 'x', 'reaction_emoji': '👍',
       'whatsapp_native': {'reaction': {'text': '👍', 'messageId': 'x', 'remoteJid': '1', 'participant': ''}}}),
     ({'body': 'Poll: lunch?', 'mediaType': 'poll', 'nativeType': 'pollCreationMessage',
       'nativeMetadata': {'poll': {'question': 'lunch?', 'options': ['a', 'b'], 'selectableCount': 1}}},

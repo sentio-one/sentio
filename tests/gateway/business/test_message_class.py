@@ -22,8 +22,15 @@ SCOPE = Scope("default", "default", "default", "123@s.whatsapp.net")
 ACCOUNT = AccountKey("default", "default")
 
 
+def _origin(source_id, text, evidence):
+    """Production-shaped origins: ingress records a customer message; a plugin job names its plugin."""
+    if evidence == "inbound":
+        return ContextEvent(source_id, "message", "customer", text, None, "inbound message")
+    return ContextEvent(source_id, "plugin_job", "whatsapp-sales-ops", text, None, "durable plugin request")
+
+
 async def _submit(store, source_id, text, *, evidence, approve=True):
-    episode = store.record_ingress(SCOPE, ContextEvent(source_id, "message", "customer", text, None, evidence), source_id=source_id)
+    episode = store.record_ingress(SCOPE, _origin(source_id, text, evidence), source_id=source_id)
     revision = store.append_revision(SCOPE, episode, Candidate("text", f"re: {text}", {}, (), (), ()),
                                      expected_revision_id=None, policy_version="v1", lesson_version=0)
     plan = await render_delivery_plan(SCOPE, revision, now_ms=NOW)

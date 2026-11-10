@@ -213,7 +213,10 @@ class GatewayInboundMixin(GatewayInboundHooksMixin, GatewayInboundTranscriptionM
         # counting internal/system events would keep a genuinely idle gateway awake.
         self._scale_to_zero_note_real_inbound()
         from gateway.business.operators import handle_business_operator_message, handle_business_operator_reaction
+        from gateway.business.operator_shorthand import handle_business_operator_shorthand
         if await handle_business_operator_message(self, event) is not None:
+            return None
+        if await handle_business_operator_shorthand(self, event):
             return None
         if await handle_business_operator_reaction(self,event):
             return None
