@@ -202,8 +202,11 @@ async def handle_business_operator_reaction(runner,event) -> bool:
         'target_message_id':str(target),'scope':{key:row[key] for key in ('runtime_profile','transport_profile','account_id','contact_id')}},principal=principal)
     destination=_operator_destination(service,operator_scope,source,config.operators)
     notice_scope=Scope(runtime,transport,transport,destination)
+    from gateway.business.operator_notices import approval_text, contact_label, draft_text
     from gateway.business.transport import send_operator_notice
-    notice=await send_operator_notice(service,notice_scope,json.dumps(result,ensure_ascii=False,default=str))
+    customer=Scope(*(row[key] for key in ('runtime_profile','transport_profile','account_id','contact_id')))
+    text=approval_text(result,label=contact_label(service.store,customer),draft=draft_text(service.store,customer,row['revision_id']))
+    notice=await send_operator_notice(service,notice_scope,text)
     if not notice.get('ok'):
         service.store.put_task(notice_scope,dedupe_key=f'operator-reaction:{target}:{event.message_id}',reason='operator_notice_unavailable',refs=(str(target),))
     return True

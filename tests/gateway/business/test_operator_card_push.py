@@ -30,8 +30,7 @@ class Adapter(BasePlatformAdapter):
 
 
 def _held_draft(store):
-    scope = Scope("default", "default", "default", CUSTOMER)
-    store.bind_contact("default", "default", "default", [CUSTOMER])
+    scope = store.bind_contact("default", "default", "default", [CUSTOMER])  # the canonical (UUID) contact, as ingress binds it
     store.record_ingress(scope, ContextEvent("e1", "message", "customer", "Hi", None, "inbound"), source_id="s1")
     episode = store.episode_for_source(scope, "s1")
     rev = store.append_revision(scope, episode, Candidate("text", "Hi. How can I help?", {}, (), (), ()),

@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 
 from gateway.business.models import Principal, Scope
+from gateway.business.operator_notices import contact_label
 from gateway.business.operators import _review_card, record_operator_card
 from gateway.business.transport import send_operator_notice
 from gateway.whatsapp_identity import to_whatsapp_jid
@@ -28,7 +29,7 @@ async def push_review_cards(service, scope: Scope, config, revision_id: str) -> 
     card = _review_card(service, principal, {"plan": plan})
     if card is None:
         return
-    text = _card_text(revision.candidate.text or "", card["public"], scope.contact_id)
+    text = _card_text(revision.candidate.text or "", card["public"], contact_label(store, scope))
     for operator in config.operators:
         destination = to_whatsapp_jid(operator)
         notice_scope = Scope(scope.runtime_profile, scope.transport_profile, scope.transport_profile, destination)
