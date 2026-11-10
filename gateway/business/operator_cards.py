@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from gateway.business.models import Principal, Scope
-from gateway.business.operator_notices import contact_label, customer_said, review_card_text
+from gateway.business.operator_notices import contact_label, customer_said, review_card_text, silence_text
 from gateway.business.operators import _review_card, record_operator_card
 from gateway.business.transport import send_operator_notice
 from gateway.whatsapp_identity import to_whatsapp_jid
@@ -37,3 +38,18 @@ async def push_review_cards(service, scope: Scope, config, revision_id: str) -> 
         else:
             store.put_task(scope, dedupe_key=f"operator-notice:{revision_id}",
                            reason=str(notice.get("error") or "operator_notice_unavailable"), refs=(revision_id,))
+
+
+async def push_silence_notice(service, scope: Scope, config, reason: str) -> None:
+    """Tell operators the agent chose not to reply, so silence is never invisible to someone who cannot open the chat."""
+    store = service.store
+    said = customer_said(store, scope)
+    if not any(re.search(r"\w", text) for text in said):
+        return  # a bare reaction or emoji needs no explanation
+    text = silence_text(label=contact_label(store, scope), said=said, reason=reason)
+    for operator in config.operators:
+        notice_scope = Scope(scope.runtime_profile, scope.transport_profile, scope.transport_profile, to_whatsapp_jid(operator))
+        try:
+            await send_operator_notice(service, notice_scope, text)
+        except Exception as exc:  # health: allow BLE001 -- an alert must never fail the customer's turn
+            logger.warning("no-reply notice to %s failed: %s", notice_scope.contact_id, exc, exc_info=True)

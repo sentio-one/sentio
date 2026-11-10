@@ -255,3 +255,33 @@ def audit_events(store, scope):
                  "reason": row["reason"], "payload": json.dumps({"state": row["state"]}, sort_keys=True)}
                 for row in verdicts)
     return tuple(sorted(rows, key=lambda row: row["source_id"]))
+
+
+_SENT_STATES = frozenset({"sent", "accepted", "delivered", "read", "played"})
+
+
+def record_sent_part(db, attempt_id: str, state: str) -> None:
+    """Add what was actually sent to the contact's thread, once per part.
+
+    The thread is what drafting and review read. Without this they see only the customer's side and cannot
+    tell what was already said. It adds an event only: no episode, so pending drafts do not go stale."""
+    from gateway.business.models import ContextEvent
+    if state not in _SENT_STATES:
+        return
+    row = db.execute("SELECT a.part_index, o.runtime_profile, o.transport_profile, o.account_id, o.contact_id, o.plan_id "
+                     "FROM business_attempts a JOIN business_outbox o ON o.outbox_id=a.outbox_id WHERE a.attempt_id=?",
+                     (attempt_id,)).fetchone()
+    plan = db.execute("SELECT payload FROM business_plans WHERE plan_id=?", (row["plan_id"],)).fetchone() if row else None
+    if plan is None:
+        return
+    parts = json.loads(plan["payload"]).get("parts", [])
+    text = (parts[row["part_index"]].get("payload") or {}).get("text") if row["part_index"] < len(parts) else None
+    scope = (row["runtime_profile"], row["transport_profile"], row["account_id"], row["contact_id"])
+    event_id = f"sent:{attempt_id}"
+    if not text or db.execute("SELECT 1 FROM business_events WHERE runtime_profile=? AND transport_profile=? AND account_id=? "
+                              "AND contact_id=? AND json_extract(payload,'$.id')=?", (*scope, event_id)).fetchone():
+        return
+    ordinal = db.execute("SELECT COALESCE(MAX(ordinal),0)+1 FROM business_events WHERE runtime_profile=? AND transport_profile=? "
+                         "AND account_id=? AND contact_id=?", scope).fetchone()[0]
+    db.execute("INSERT INTO business_events(runtime_profile,transport_profile,account_id,contact_id,ordinal,payload) VALUES(?,?,?,?,?,?)",
+               (*scope, ordinal, _event_payload(ContextEvent(event_id, "message", "agent", text, None, "sent message"))))

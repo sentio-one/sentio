@@ -357,6 +357,8 @@ def update_attempt_state(
                 (state, error_code, attempt_id),
             )
 
+        from gateway.business.store_episodes import record_sent_part
+        record_sent_part(db, attempt_id, state)
         from gateway.business.store_jobs import _refresh_outcomes
         owner = db.execute("SELECT runtime_profile FROM business_outbox o JOIN business_attempts a ON a.outbox_id=o.outbox_id WHERE a.attempt_id=?", (attempt_id,)).fetchone()
         if owner:

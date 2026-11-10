@@ -80,3 +80,8 @@ def edit_text(result: dict, *, label: str, text: str) -> str:
     if result.get("ok") is False or result.get("error") or result.get("approval_count") == 0:
         return f"⚠️ Your edit was not approved for {label}: {_reason(result.get('error'))}. Nothing was sent."
     return f"✏️ Your version is approved for {label}. It goes out as soon as the sending rules allow:\n\n{text}"
+
+
+def silence_text(*, label: str, said: list[str], reason: str) -> str:
+    quoted = "".join(f'They said: "{text[:_SAID_MAX_CHARS]}"\n' for text in said)
+    return f"🤫 No reply drafted for {label}.\n{quoted}Why: {reason}\nNothing was sent. Answer from your phone if one is needed."
